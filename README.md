@@ -7,3 +7,7 @@ Intro
 * pretty cool stuff
 * yee
 ok that's it
+
+* add
+* commit
+* push
