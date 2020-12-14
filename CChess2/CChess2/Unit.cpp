@@ -7,8 +7,10 @@ using namespace game;
 
 Coord SetOf8thTurns(int i)
 {
-	switch (i % 8) {
-	case 0:
+	int on = i % 8;
+
+	switch (on) {
+	default: // (0)
 		// North
 		return { 0,1 };
 		break;
@@ -49,15 +51,22 @@ bool Unit::ValidPos(const Coord testPos)
 	else return false;
 }
 
+bool Unit::NullOrEnemy(const Unit* unit)
+{
+	if (unit == nullptr) return true;
+	else return (unit->GetColor() != GetColor());
+}
+
+bool Unit::UnitIsEnemy(const Unit* unit)
+{
+	return (unit != nullptr && unit->GetColor() != GetColor());
+}
+
 bool Unit::SpaceHasNoTeammate(const Coord testPos)
 {
 	const Unit* unitAtPos = m_boardIAmOf->GetUnitAtPos(testPos);
 
-	// Empty space has no teammate
-	if (unitAtPos == nullptr) return true;
-
-	// Space with enemy has no teammate
-	else return (unitAtPos->GetColor() == GetEnemyColor());
+	return NullOrEnemy(unitAtPos);
 }
 
 bool Unit::PieceIsBlocking(Coord testPos, Coord* confirmedMoves, unsigned char& confirmedMoveCount)
@@ -71,7 +80,7 @@ bool Unit::PieceIsBlocking(Coord testPos, Coord* confirmedMoves, unsigned char& 
 	if (thereIsUnit) unitIsTeammate = (testUnit->GetColor() == GetColor());
 
 	if (!unitIsTeammate) {
-		confirmedMoves[confirmedMoveCount++] = testPos;
+		confirmedMoves[confirmedMoveCount++] = testPos; // The unit is an enemy
 	} return thereIsUnit;
 }
 
@@ -79,7 +88,7 @@ void Unit::LineTrace(Coord* confirmedMoves, unsigned char& confirmedMoveCount, c
 {
 	for (Coord testPos = GetLocation() + direction; ValidPos(testPos); testPos = (testPos + direction))
 	{
-		if (PieceIsBlocking(testPos, confirmedMoves, confirmedMoveCount)) break;
+		if (PieceIsBlocking(testPos, confirmedMoves, confirmedMoveCount)) break; // If there is a unit at all, break. Append blocking unit if they are an enemy.
 	}
 }
 
@@ -173,6 +182,11 @@ unsigned char Unit::GetID()
 	return m_ID;
 }
 
+bool Unit::CouldITakeAt(Coord hypothetical)
+{
+	return false;
+}
+
 //
 // UNITS
 //
@@ -200,61 +214,50 @@ void Pawn::AvailableMoves(PieceMoves* moves)
 	// Template moves
 	Coord possibleMoves[4];
 
-	possibleMoves[0] = {  0, 1 };
-	possibleMoves[1] = { -1, 1 }; // Only if capturing
-	possibleMoves[2] = {  1, 1 }; // Only if capturing
-	possibleMoves[3] = {  0, 2 }; // First turn only
+	{
+		// Forward from the perspective of our pawn
+		int fw = 1;
+		if (GetColor() == UnitColor::Unit_White) fw = -1;
+		Coord p = GetLocation(); // Position
 
-	// Pawn movement directions are team-dependent
-	if (GetColor() == UnitColor::Unit_White) {
-		for (Coord& move : possibleMoves) {
-			move.y *= -1;
-		}
+		possibleMoves[0] = { p.x,     p.y + fw };
+		possibleMoves[1] = { p.x - 1, p.y + fw }; // Only if capturing
+		possibleMoves[2] = { p.x + 1, p.y + fw }; // Only if capturing
+		possibleMoves[3] = { p.x,     p.y + fw + fw }; // First turn only
 	}
 
 	Coord confirmedMoves[4];
 
 	unsigned char confirmedMoveCount = 0;
 
-	// Convert the relative-space template positions into absolute space
-	for (unsigned char i = 0; i < 4; ++i)
-	{
-		possibleMoves[i] = possibleMoves[i] + GetLocation();
-	}
-
 	// Can move forward one?
-	if (possibleMoves[0].y < sideTileCount && // Verify that the position is valid
-		possibleMoves[0].y >= 0 && // Verify that the position is valid
-		!m_boardIAmOf->IsUnitAtPos(possibleMoves[0])) // There is no unit there
-	{
-		confirmedMoves[confirmedMoveCount] = possibleMoves[0];
-		++confirmedMoveCount;
-	}
+	if (ValidPos(possibleMoves[0]) && !m_boardIAmOf->IsUnitAtPos(possibleMoves[0])) confirmedMoves[confirmedMoveCount++] = possibleMoves[0];
 
 	// Can move diagonally?
 	for (char i = 1; i < 3; ++i)
 	{
 		Unit* potentialEnemy = m_boardIAmOf->GetUnitAtPos((possibleMoves[i]));
 
-		if (potentialEnemy != nullptr && // There is a unit at that position and
-			potentialEnemy->GetColor() == GetEnemyColor()) // They are an enemy
-		{
-			// Note that we don't have to check if the position is valid, as no enemy will be at an invalid position.
-			confirmedMoves[confirmedMoveCount] = possibleMoves[i];
-			++confirmedMoveCount;
-		}
+		// Note that we don't have to check if the position is valid, as no enemy will be at an invalid position.
+		if (NullOrEnemy(potentialEnemy)) confirmedMoves[confirmedMoveCount++] = possibleMoves[i];
 	}
 
 	// Can move forward two?
-	if (m_moved == false && // First turn
-		!m_boardIAmOf->IsUnitAtPos(possibleMoves[3])) // No unit there
-	{ 
-		// No pawn will ever be starting at a position 2 moves behind an out-of-bounds position, so we don't have to validate the position.
-		confirmedMoves[confirmedMoveCount] = possibleMoves[3];
-		++confirmedMoveCount;
-	}
+	// No pawn will ever be starting at a position 2 moves behind an out-of-bounds position, so we don't have to validate the position.
+	if (m_moved == false && !m_boardIAmOf->IsUnitAtPos(possibleMoves[3])) confirmedMoves[confirmedMoveCount++] = possibleMoves[3];
 
 	moves->SetMoves(confirmedMoves, confirmedMoveCount);
+}
+
+bool Pawn::CouldITakeAt(Coord hypothetical)
+{
+	int fwDirection = 1; // Default assumes black unit (because black is first in the enum definition (personal preference, does not affect code.))
+
+	if (GetColor() == UnitColor::Unit_White) fwDirection = -1; // If the unit is found to be white, invert the forward direction.
+
+	if (hypothetical == (m_position + Coord{ 1 /*right*/, fwDirection }) ||
+		hypothetical == (m_position + Coord{ -1 /*left*/, fwDirection })) return true;
+	else return false;
 }
 
 // Rook
@@ -292,6 +295,14 @@ void Rook::AvailableMoves(PieceMoves* moves)
 	moves->SetMoves(confirmedMoves, confirmedMoveCount);
 }
 
+// We are assuming that a straight line of sight has already been established for this to be called.
+bool Rook::CouldITakeAt(Coord hypothetical)
+{
+	if (hypothetical.x == m_position.x ||
+		hypothetical.y == m_position.y) return true;
+	else return false;
+}
+
 // Bishop
 
 Piece Bishop::GetPieceType()
@@ -319,6 +330,14 @@ void Bishop::AvailableMoves(PieceMoves* moves)
 	}
 
 	moves->SetMoves(confirmedMoves, confirmedMoveCount);
+}
+
+// We are assuming that a straight line of sight has already been established for this to be called.
+bool Bishop::CouldITakeAt(Coord hypothetical)
+{
+	if (hypothetical.x != m_position.x &&
+		hypothetical.y != m_position.y) return true;
+	else return false;
 }
 
 // Knight
@@ -349,23 +368,29 @@ void Knight::AvailableMoves(PieceMoves* moves)
 	// Relative space
 	for (unsigned char i = 0; i < 8; ++i)
 	{
+		const Coord testPos = possibleMoves[i] + GetLocation(); // testPos is the offset location
 
-		Coord testPos = possibleMoves[i] + GetLocation(); // testPos is the offset location
-
-		if (testPos.x >= 0 && testPos.x < sideTileCount && // On the board
-			testPos.y >= 0 && testPos.y < sideTileCount) // On the board
+		if (ValidPos(testPos)) // On the board
 		{
-			if (!m_boardIAmOf->IsUnitAtPos(testPos) || // Either there is no unit at the position or
-				m_boardIAmOf->GetUnitAtPos(testPos)->GetColor() == GetEnemyColor()) // The unit at the position is an enemy
-			{
-				confirmedMoves[confirmedMoveCount] = testPos;
-
-				++confirmedMoveCount;
-			}
+			const Unit* testUnit = m_boardIAmOf->GetUnitAtPos(testPos);
+			if (NullOrEnemy(testUnit)) confirmedMoves[confirmedMoveCount++] = testPos;
 		}
 	}
 	
 	moves->SetMoves(confirmedMoves, confirmedMoveCount);
+}
+
+bool Knight::CouldITakeAt(Coord hypothetical)
+{
+	const Coord possible[8] = { { 1,-2 },{ 2,-1 },{ 2,1 },{ 1,2 },{ -1,2 },{ -2,1 },{ -2,-1 },{ -1,-2 } };
+
+	// Find the hypothetical position in the list of possible positions
+	for (int i = 0; i < 8; ++i)
+	{
+		Coord testPos = m_position + possible[i];
+		if (hypothetical == testPos) return true;
+	}
+	return false;
 }
 
 // Queen
@@ -395,6 +420,12 @@ void Queen::AvailableMoves(PieceMoves* moves)
 	}
 
 	moves->SetMoves(confirmedMoves, confirmedMoveCount);
+}
+
+// We are assuming that a straight line of sight has already been established for this to be called.
+bool Queen::CouldITakeAt(Coord hypothetical)
+{
+	return true; // In the case of the queen, the answer is yes.
 }
 
 // King
@@ -427,9 +458,8 @@ bool King::TestMoveSafetyValidate(Coord position)
 {
 	Unit* unit = TestMoveSafety(position);
 
-	if (unit != nullptr && unit->GetColor() != GetColor()) return false; // There is an enemy
-
-	else return true; // Empty / teammate
+	// Do not use NullOrEnemy, because this needs to be *not* null
+	return (unit != nullptr && unit->GetColor() == GetEnemyColor());
 }
 
 Unit* King::LineTraceSafety(Coord startPos, Coord direction)
@@ -438,25 +468,12 @@ Unit* King::LineTraceSafety(Coord startPos, Coord direction)
 
 	for (Coord testPos = startPos + direction; ValidPos(testPos); testPos = (testPos + direction))
 	{
-		m_boardIAmOf->DrawBoardSpaceColored(testPos, RGB(0,255,0)); // Debug
-
 		unit = TestMoveSafety(testPos);
 
-		if (unit != nullptr) // Space is empty
+		if (unit != nullptr /*Space is not empty*/ && unit != this /*Ignore self*/)
 		{
-			if (unit->GetColor() == GetColor()) // The unit is a teammate
-			{
-				//m_boardIAmOf->DrawBoardSpaceColored(testPos, RGB(0, 0, 255)); // Debug
-				// Stop and return "false"
-				break;
-			}
-			else // The unit is an enemy
-			{
-				// Stop and return the enemy
-				//m_boardIAmOf->DrawBoardSpaceColored(testPos, RGB(255, 0, 0)); // Debug
-				return unit;
-				break;
-			}
+			if (unit->GetColor() == GetColor()) break; // The unit is a teammate, we cannot take them but they block our movement.
+			else return unit; // The unit is an enemy
 		}
 	}
 	// Stop. We have left the board.
@@ -467,119 +484,47 @@ bool King::CanIBeTaken(const Coord position, const Coord direction)
 {
 	Unit* potentialEnemy = LineTraceSafety(position, direction);
 
-	/*
-	* ~ASSUMPTIONS BEING MADE IN THIS FUNCTION BY CURRENT USAGE:~
-	* 
-	* 1. Any unit being taken as an input will be an enemy. Teammates return nullptr through the "LineTraceSafety()" function, 
-	* they do not need to be tested for team.
-	* // NOTE: ASSUMPTION 1 IS NO LONGER VALID! THE CODE HAS BEEN MODIFIED TO MATCH. //
-	* 
-	* 2. There is no piece blocking the way between our king and this unit,
-	* so any input of "nullptr" means we reached the end of the board in this direction without being blocked by any enemy units.
-	*
-	* 3. The enemy will always be on a straight/diagonal-line path,
-	* therefore any piece which returns false to the test "x == x || y == y" is on a path which is certain to be diagonal.
-	* 
-	* 4. Knights cannot, under any circumstance (by the rules of this version of chess), ever take a piece which is in a straight/diagonal line.
-	* Knights will always return false out of this function.
-	*/
-
-	//m_boardIAmOf->DrawBoardSpaceColored(position, RGB(0,255,0)); // Debugging
-
-	if (potentialEnemy != nullptr && potentialEnemy->GetColor() != GetColor()) // Does the enemy exist? An empty space cannot take us.
-	{
-		Piece enemyClass = potentialEnemy->GetPieceType();
-
-		Coord enemyLocation = potentialEnemy->GetLocation();
-
-		//m_boardIAmOf->DrawBoardSpaceColored(enemyLocation, RGB(255, 0, 0)); // Debugging
-
-		switch (enemyClass)
-		{
-		case Piece::Piece_Pawn: // Only forward-diagonal, color matters here.
-
-			switch (GetEnemyColor())
-			{
-			case UnitColor::Unit_Black:
-				if (enemyLocation == (position + Coord{ 1, 1 }) || enemyLocation == (position + Coord{ -1, 1 })) return true;
-				else return false;
-				break;
-
-			case UnitColor::Unit_White:
-				if (enemyLocation == (position + Coord{ 1, -1 }) || enemyLocation == (position + Coord{ -1, -1 })) return true;
-				else return false;
-				break;
-
-			default: // This is just so the compiler will be happy
-				return false;
-				break;
-			}
-			break;
-
-		case Piece::Piece_Rook:
-			return (
-				(position.x == enemyLocation.x) ||
-				(position.y == enemyLocation.y) );
-				break;
-
-		case Piece::Piece_Knight: // See assumption #4
-			return false; 
-			break;
-
-		case Piece::Piece_Bishop: // See assumption #3
-			return (
-				(position.x != enemyLocation.x) &&
-				(position.y != enemyLocation.y) );
-			break;
-
-		case Piece::Piece_Queen: // Any queen found via line trace, by assumptions #1-3, is certain to be putting us in check.
-			return true;
-			break;
-
-		case Piece::Piece_King: // @TODO
-			return false;
-			break;
-
-		default: // Once again, just appeasing the compiler.
-			return false;
-			break;
-		}
-	}
-	else return false;// There was no piece/they were a teammate
+	// Does the enemy exist? An empty space cannot take us.
+	if (potentialEnemy != nullptr && potentialEnemy->GetColor() != GetColor()) return potentialEnemy->CouldITakeAt(position);
+	else return false; // There was no piece/they were a teammate
 }
 
 bool King::CheckSafetyDirectional(Coord position)
 {
 	for (int i = 0; i < 8; ++i) {
-		m_boardIAmOf->DrawBoardSpaceColored(position, RGB(0, 0, 255)); // Debug
 		if (CanIBeTaken(position, SetOf8thTurns(i))) return false; // If i can be taken, return false.
-		m_boardIAmOf->DrawBoardSpaceColored(position, RGB(0, 0, 255)); // Debug
-		m_boardIAmOf->PrintBoard(); // Debug
 	}
-	return true;
+	return true; // Nobody was found who could take us
 }
 
 bool King::CheckSafetyRing(Coord position)
 {
-	if (TestMoveSafetyValidate(position + Coord{  1, -2 }) &&
-		TestMoveSafetyValidate(position + Coord{  2, -1 }) &&
-		TestMoveSafetyValidate(position + Coord{  2,  1 }) &&
-		TestMoveSafetyValidate(position + Coord{  1,  2 }) &&
-		TestMoveSafetyValidate(position + Coord{ -1,  2 }) &&
-		TestMoveSafetyValidate(position + Coord{ -2,  1 }) &&
-		TestMoveSafetyValidate(position + Coord{ -2, -1 }) &&
-		TestMoveSafetyValidate(position + Coord{ -1, -2 })) {
-		return true;
+	const Coord offset[8] = { { 1,-2 },{ 2,-1 },{ 2,1 },{ 1,2 },{ -1,2 },{ -2,1 },{ -2,-1 },{ -1,-2 } };
+
+	Unit* unit;
+
+	for (int i = 0; i < 8; ++i)
+	{
+		const Coord testPos = position + offset[i];
+
+		unit = m_boardIAmOf->GetUnitAtPos(testPos);
+
+		//m_boardIAmOf->DrawBoardSpaceColored(testPos, RGB(127, 127, 127)); // Debug
+
+		if (unit != nullptr && unit->GetPieceType() == Piece::Piece_Knight && unit->GetColor() != GetColor())
+		{
+			//m_boardIAmOf->DrawBoardSpaceColored(testPos, RGB(255, 127, 127)); // Debug
+			return  false;
+		}
 	}
-	else return false;
+	return true;
 }
 
 bool King::SpaceIsSafeFromCheck(Coord ifIWasHere)
 {
 	Coord fromPerspective = ifIWasHere;
 
-	// Must be converted to a Coord to use == on position
-	if (ifIWasHere == Coord{ -1,-1 }) fromPerspective = GetLocation(); // If the input is still the default value, set it to our current position (test if we are in check)
+	if (ifIWasHere == Coord{ -1,-1 }/*The default vaule*/) fromPerspective = GetLocation(); // If the input is still the default value, set it to our current position (test if we are in check)
 		
 	if (CheckSafetyDirectional(fromPerspective) && CheckSafetyRing(fromPerspective)) return true; // Safe
 	else return false; // Not safe to move to this space
@@ -609,4 +554,9 @@ void King::AvailableMoves(PieceMoves* moves)
 	}
 
 	moves->SetMoves(confirmedMoves, confirmedMoveCount); // Write to the output
+}
+
+bool King::CouldITakeAt(Coord hypothetical)
+{
+	return false; // @TODO
 }

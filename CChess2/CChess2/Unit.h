@@ -47,6 +47,8 @@ struct Unit
 	UnitColor GetEnemyColor() const;
 
 	bool ValidPos(const Coord testPos);
+	bool NullOrEnemy(const Unit* unit); // Either the unit is null or an enemy
+	bool UnitIsEnemy(const Unit* unit); // The unit is NOT null && is an enemy
 	bool SpaceHasNoTeammate(const Coord testPos);
 protected:
 	bool PieceIsBlocking(Coord testPos, Coord* confirmedMoves, unsigned char& confirmedMoveCount);
@@ -61,6 +63,7 @@ public:
 	void Hide();
 	void UnHide();
 	unsigned char GetID();
+	virtual bool CouldITakeAt(Coord hypothetical); // Used in code for king
 
 protected:
 	Coord m_position; // 8 bytes
@@ -72,6 +75,9 @@ protected:
 	unsigned char m_ID; // 1 byte
 	// 2 bytes left in alignment
 };
+
+//int size = sizeof(Unit);
+//int align = alignof(Unit);
 
 //
 //
@@ -86,6 +92,7 @@ class Pawn : public Unit
 	void Move(Coord newPosition) override;
 	sprite::Sprite* GetSpritePointer() override;
 	void AvailableMoves(PieceMoves* moves) override;
+	bool CouldITakeAt(Coord hypothetical) override;
 };
 
 class Rook : public Unit
@@ -95,6 +102,7 @@ class Rook : public Unit
 	void Move(Coord newPosition) override;
 	sprite::Sprite* GetSpritePointer() override;
 	void AvailableMoves(PieceMoves* moves) override;
+	bool CouldITakeAt(Coord hypothetical) override;
 };
 
 class Bishop : public Unit
@@ -102,6 +110,7 @@ class Bishop : public Unit
 	Piece GetPieceType() override;
 	sprite::Sprite* GetSpritePointer() override;
 	void AvailableMoves(PieceMoves* moves) override;
+	bool CouldITakeAt(Coord hypothetical) override;
 };
 
 class Knight : public Unit
@@ -109,6 +118,7 @@ class Knight : public Unit
 	Piece GetPieceType() override;
 	sprite::Sprite* GetSpritePointer() override;
 	void AvailableMoves(PieceMoves* moves) override;
+	bool CouldITakeAt(Coord hypothetical) override;
 };
 
 class Queen : public Unit
@@ -116,6 +126,7 @@ class Queen : public Unit
 	Piece GetPieceType() override;
 	sprite::Sprite* GetSpritePointer() override;
 	void AvailableMoves(PieceMoves* moves) override;
+	bool CouldITakeAt(Coord hypothetical) override;
 };
 
 class King : public Unit
@@ -132,4 +143,5 @@ class King : public Unit
 	bool CheckSafetyRing(Coord position); // Safety from knights
 	bool SpaceIsSafeFromCheck(Coord ifIWasHere = { -1,-1 });
 	void AvailableMoves(PieceMoves* moves) override;
+	bool CouldITakeAt(Coord hypothetical) override;
 };
