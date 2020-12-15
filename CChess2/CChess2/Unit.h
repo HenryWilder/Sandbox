@@ -140,7 +140,7 @@ class King : public Unit
 	Unit* LineTraceSafety(Coord startPos, Coord direction);
 	bool CanIBeTaken(const Coord position, const Coord direction);
 	bool CheckSafetyDirectional(Coord position); // Safety from all pieces but knight
-	bool CheckSafetyRing(Coord position); // Safety from knights
+	bool CheckSafeAgainstKnight(Coord position); // Safety from knights
 	bool SpaceIsSafeFromCheck(Coord ifIWasHere = { -1,-1 });
 	void AvailableMoves(PieceMoves* moves) override;
 	bool CouldITakeAt(Coord hypothetical) override;

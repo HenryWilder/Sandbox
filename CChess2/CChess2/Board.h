@@ -6,8 +6,9 @@
 #include "Rendering.h"
 #include "Input.h"
 
-struct Unit;
 enum class Piece;
+struct PieceMoves;
+struct Unit;
 enum class UnitColor : bool;
 
 char NumToLetter(int value);
@@ -47,8 +48,13 @@ public:
 
 private: // Helper functions
 	Coord WaitForClick();
-	Coord TakePosInput();
+	//Coord TakePosInput();
 	void MovePiece(Unit* unit, Coord moveTo);
+
+	bool SelectPhase(const UnitColor team, Coord& input, Unit* unit, PieceMoves* moves);
+	bool HandleSelection(Coord input, Unit* unit, PieceMoves* moves);
+	int MovePhase(Coord& output, PieceMoves* moves, const UnitColor team);
+	bool WrapUpTurn(Coord& input, Coord& output, Unit* unit, PieceMoves* moves);
 
 public:
 	void PlayBoard();

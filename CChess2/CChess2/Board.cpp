@@ -197,6 +197,7 @@ bool InString(const char* string, const char* substring)
 //
 //
 
+/* Made obsolete by WaitForClick()
 Coord Board::TakePosInput()
 {
     std::cout << " (xy): ";
@@ -227,6 +228,7 @@ Coord Board::TakePosInput()
         return out;
     }
 }
+*/
 
 Coord Board::WaitForClick()
 {
@@ -291,6 +293,116 @@ void Board::MovePiece(Unit* unit, Coord moveTo)
     DrawBoardSpaceReset(moveTo); // Redraw the space we've moved to now that we're no longer hidden
 }
 
+bool Board::SelectPhase(const UnitColor team, Coord& input, Unit* unit, PieceMoves* moves)
+{
+    ClearTextLine(0);
+
+    std::cout << "Which piece would you like to move?";
+
+    input = WaitForClick();
+
+    if (input.x > width || input.y > height) // Out of bounds
+    {
+        std::cout << "OUT OF BOUNDS";
+        return false;
+    }
+    unit = GetUnitAtPos(input); // No unit at selection
+    if (unit == nullptr)
+    {
+        std::cout << "That space is empty.";
+        return false;
+    }
+
+    if (unit->GetColor() != team) // Wrong team
+    {
+        std::cout << "You are on team " << TEAM_NAME(team) << ".\n" <<
+            "Please choose a " << TEAM_NAME(team) << " piece.";
+        return false;
+    }
+
+    return true;
+}
+bool Board::HandleSelection(Coord input, Unit* unit, PieceMoves* moves)
+{
+    unit->AvailableMoves(moves);
+
+    if (moves->m_availableMovesCount == 0)
+    {
+        std::cout << "That piece is stuck.";
+        return false;
+    }
+    // Draw the selection square
+    DrawBoardSpaceColored(input, sprite::PaletteColor(sprite::Pltt::Select_Unit));
+
+    // Draw the available positions
+    for (unsigned char i = 0; i < moves->m_availableMovesCount; ++i)
+    {
+        Coord potentialMove = moves->m_available[i]; // The move we are currently looking at/drawing
+
+        sprite::Pltt spaceColoration = sprite::Pltt::Select_Available; // Default with selection color
+
+        Unit* potentialEnemy = GetUnitAtPos(potentialMove);
+
+        if (potentialEnemy != nullptr && (potentialEnemy->GetColor() == unit->GetEnemyColor()))
+        {
+            spaceColoration = sprite::Pltt::Select_TakePiece; // Take-piece color
+        }
+
+        DrawBoardSpaceColored(potentialMove, sprite::PaletteColor(spaceColoration)); // Color the space
+    }
+
+    return true;
+}
+int Board::MovePhase(Coord& input, Coord& output, PieceMoves* moves, const UnitColor team)
+{
+    // Clear the input area
+    ClearTextLine(2, 6);
+
+    ClearTextLine(2);
+    std::cout << "Which space would you like to move to?";
+
+    output = WaitForClick();
+
+    if (output.x > width || output.y > height) // Out of bounds
+    {
+        std::cout << "OUT OF BOUNDS\n";
+        return 0;
+    }
+
+    if (GetUnitAtPos(output)->GetColor() == team) // Change selection
+    {
+        input = output;
+        return 2;
+    }
+
+    if (!(moves->MoveIsValid(output))) // Not a legal move
+    {
+        std::cout << "This is not an available position.\n";
+        return 0;
+    }
+
+    return 1;
+}
+bool Board::WrapUpTurn(Coord& input, Coord& output, Unit* unit, PieceMoves* moves)
+{
+    // Reset the potential positions
+    for (unsigned char i = 0; i < moves->m_availableMovesCount; ++i) {
+        DrawBoardSpaceReset(moves->m_available[i]);
+    }
+
+    MovePiece(unit, output); // Move the piece
+
+    DrawBoardSpaceReset(input); // Clear the old space
+    DrawBoardSpaceReset(output); // Draw the piece at the new space
+
+    // Clear the input area
+    ClearTextLine(0, 6);
+
+    IncrementTurn();
+
+    return true;
+}
+
 void Board::PlayBoard()
 {
     const UnitColor team = CURRENT_TEAM;
@@ -298,111 +410,46 @@ void Board::PlayBoard()
     Coord output; // User input for end position
     Unit* unit = nullptr; // Unit at the user-input coorinates
     PieceMoves moves{}; // What moves can be made by the unit
+    bool hasMoved = false;
 
-    using namespace sprite;
+    enum class Phase {
+        Select = 0,
+        HandleSelect = 1,
+        Move = 2,
+        Wrapup = 3,
+    };
 
-    // Select phase
-    while (true) // Until the piece selected can move
+    Phase turnPhase = Phase::Select;
+
+    // State machine
+    while (!hasMoved)
     {
-        while (true) // Until the piece selected is of this turn's team
-        {
-            while (true) // Until the space selected contains a piece
-            {
-                while (true) // Until the input is a valid position (inside the board region)
-                {
-                    ClearTextLine(0);
-                    std::cout << "Which piece would you like to move?";
+        switch (turnPhase) {
+        default: // Select
+            if (SelectPhase(team, input, unit, &moves)) turnPhase = Phase::Move;
+            else break;
 
-                    input = WaitForClick();
+        case Phase::HandleSelect:
+            if (HandleSelection(input, unit, &moves)) turnPhase = Phase::Move;
+            else turnPhase = Phase::Select;
 
-                    if (input.x > width || input.y > height) // Out of bounds
-                        std::cout << "OUT OF BOUNDS";
-                    else
-                        break;
-                }
-
-                unit = GetUnitAtPos(input);
-
-                if (unit == nullptr)
-                    std::cout << "That space is empty.";
-                else
-                    break;
+        case Phase::Move:
+            switch (MovePhase(output, &moves, team)) {
+            default: // Failed
+                break;
+            case 1: // Went well
+                turnPhase = Phase::Wrapup;
+                break;
+            case 2: // Player selected a different piece on their team; reset to Select phase
+                turnPhase = Phase::Select;
+                break;
             }
-
-            if (unit->GetColor() != team)
-                std::cout << "You are on team " << TEAM_NAME(team) << ".\n" <<
-                        "Please choose a " << TEAM_NAME(team) << " piece.";
-            else
-                break;
-        }
-
-        unit->AvailableMoves(&moves);
-
-        if (moves.m_availableMovesCount == 0)
-            std::cout << "That piece is stuck.";
-        else
             break;
-    }
 
-    // Draw the selection square
-    DrawBoardSpaceColored(input, PaletteColor(Pltt::Select_Unit));
-    
-    // Draw the available positions
-    for (unsigned char i = 0; i < moves.m_availableMovesCount; ++i)
-    {
-        Coord potentialMove = moves.m_available[i]; // The move we are currently looking at/drawing
-
-        Pltt spaceColoration = Pltt::Select_Available; // Default with selection color
-
-        Unit* potentialEnemy = GetUnitAtPos(potentialMove);
-
-        if (potentialEnemy != nullptr && (potentialEnemy->GetColor() == unit->GetEnemyColor()))
-        {
-            spaceColoration = Pltt::Select_TakePiece; // Take-piece color
+        case Phase::Wrapup:
+            if (WrapUpTurn(input, output, unit, &moves)) hasMoved = true;
         }
-
-        DrawBoardSpaceColored(potentialMove, PaletteColor(spaceColoration)); // Color the space
     }
-
-    // Clear the input area
-    ClearTextLine(2,6);
-
-    // Move phase
-    while (true) // Until the position selected is available.
-    {
-        while (true) // Until the input is a valid position (inside the board region)
-        {
-            ClearTextLine(2);
-            std::cout << "Which space would you like to move to?";
-
-            output = WaitForClick();
-
-            if (output.x > width || output.y > height) // Out of bounds
-                std::cout << "OUT OF BOUNDS\n";
-            else
-                break;
-        }
-
-        if (!(moves.MoveIsValid(output)))
-            std::cout << "This is not an available position.\n";
-        else
-            break;
-    }
-
-    // Reset the potential positions
-    for (unsigned char i = 0; i < moves.m_availableMovesCount; ++i) {
-        DrawBoardSpaceReset(moves.m_available[i]);
-    }
-
-    MovePiece(unit, output); // Move the piece
-
-    DrawBoardSpaceReset(input); // Clear the old space
-    DrawBoardSpaceReset(output); // Draw the piece at the new space
-    
-    // Clear the input area
-    ClearTextLine(0, 6);
-
-    IncrementTurn();
 }
 
 void Board::PrintBoard()
