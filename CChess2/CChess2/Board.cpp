@@ -1,8 +1,10 @@
 #include "Board.h"
 #include <string>
 #define CURRENT_TEAM UnitColor(Even(turn))
+#define OPPONENT_TEAM UnitColor(!Even(turn))
 #define TEAM_NAME(team) ((team) == UnitColor::Unit_White ? "white" : "black")
 #define RESTORE_CURSOR "\x1b[u"
+#define CURSOR_TO_POSITION(x,y) ('\x1b','[',#x,';',#y,'f')
 
 char NumToLetter(int value)
 {
@@ -32,6 +34,8 @@ char CharToValue(char character)
 void ClearTextLine(int start, int count)
 {
     std::cout << RESTORE_CURSOR;
+
+    std::cout << CURSOR_TO_POSITION(0, 0);
 
     // Move to start
     for (int row = 0; row < start; ++row)
@@ -129,7 +133,7 @@ void Board::ResetBoard(int _width, int _height)
     PrintBoard();
 }
 
-void Board::DrawBoardSpaceColored(Coord pos, COLORREF color)
+void Board::DrawBoardSpaceColored(Coord pos, COLORREF color, bool effect)
 {
     Unit* unit = GetUnitAtPos(pos); // Find the unit at the space
 
@@ -140,14 +144,15 @@ void Board::DrawBoardSpaceColored(Coord pos, COLORREF color)
             pos, // Which space
             unit->GetSpritePointer(), // The sprite to draw
             bool(unit->GetColor()), // Which team the unit is on
-            color); // The color of the background
+            color, // The color of the background
+            effect); // Whether to use the ghost effect
     }
     else g_frameBuffer.DrawGridSpaceFAST(pos, color);
 }
 
-void Board::DrawBoardSpaceColored(Coord pos, Color color)
+void Board::DrawBoardSpaceColored(Coord pos, Color color, bool effect)
 {
-    DrawBoardSpaceColored(pos, CRef(color));
+    DrawBoardSpaceColored(pos, CRef(color), effect);
 }
 
 // Draws the space as it is without any selection or effects. Draws the unit there if there is one.
@@ -230,7 +235,7 @@ Coord Board::TakePosInput()
 }
 */
 
-Coord Board::WaitForClick()
+Coord Board::WaitForClick(Phase turnPhase, const PieceMoves* pMoves, const sprite::Sprite* sprite, bool team)
 {
     InitInput();
 
@@ -241,30 +246,35 @@ Coord Board::WaitForClick()
 
     while (true)
     {
-        PingInput();
+        PingInput(); // Update the mouse location
+
         mouseCoordCurrent = g_mouse.ReadMouseHover();
-        if (mouseCoordLast != mouseCoordCurrent)
+
+        if (mouseCoordLast != mouseCoordCurrent) // If the mouse location has changed
         {
-            DrawBoardSpaceColored(mouseCoordLast, lastSpaceColor);
+            DrawBoardSpaceColored(mouseCoordLast, lastSpaceColor); // Reset the old space's color
 
-            mouseCoordLast = mouseCoordCurrent;
+            mouseCoordLast = mouseCoordCurrent; // Update the temporary mouse position variable
 
-            lastSpaceColor = g_frameBuffer.Get(PixelSpace(mouseCoordCurrent));
+            lastSpaceColor = g_frameBuffer.Get(PixelSpace(mouseCoordCurrent)); // Store the color of the new space before we recolor it
 
-            DrawBoardSpaceColored(mouseCoordCurrent, RGB(127, 127, 255));
+            if (turnPhase == Phase::Move && pMoves != nullptr && pMoves->MoveIsValid(mouseCoordCurrent))
+                g_frameBuffer.DrawSpriteFASTWithBG(mouseCoordCurrent, sprite, team, lastSpaceColor, true);
+
+            else DrawBoardSpaceColored(mouseCoordCurrent, RGB(127, 127, 255)); // Color the new space
         }
 
         if (g_mouse.CheckMouseState()) { // Click is true
 
-            DrawBoardSpaceColored(mouseCoordCurrent, RGB(64, 64, 255));
+            //DrawBoardSpaceColored(mouseCoordCurrent, RGB(64, 64, 255)); // Click color
 
-            SleepForMS(127);
+            //SleepForMS(127); // Delay
 
-            DrawBoardSpaceColored(mouseCoordCurrent, lastSpaceColor);
+            DrawBoardSpaceColored(mouseCoordCurrent, lastSpaceColor); // Reset space color
 
             break;
         }
-        else SleepForMS(16.7); // Otherwise sleep
+        //else SleepForMS(16.7); // Otherwise sleep (feels less responsive)
     }
     return g_mouse.GetMouseClickCoord();
 }
@@ -290,117 +300,173 @@ void Board::MovePiece(Unit* unit, Coord moveTo)
 
     unit->UnHide();
 
+    Pawn* pawn = dynamic_cast<Pawn*>(unit);
+
+    if (pawn != nullptr) // Is a pawn
+    {
+        Coord passantPos = { moveTo.x, moveTo.y - pawn->GetForward() }; // Subtract because we are looking for the *other pawn's* direction
+        Pawn* passantPawn = dynamic_cast<Pawn*>(GetUnitAtPos(passantPos));
+        if (passantPawn != nullptr && passantPawn->GetColor() != pawn->GetColor() && passantPawn->en_pasant)
+        {
+            RemoveUnit(passantPawn);
+            DrawBoardSpaceReset(passantPos);
+        }
+
+        if (unit->GetLocation().y == space::game::sideTileCount || unit->GetLocation().y == 0) // On the other side of the board
+        {
+            unsigned char id = unit->GetID();
+            ConstructNewUnit(unit->GetLocation(), Piece::Piece_Queen, unit->GetColor(), id);
+            RemoveUnit(unit);
+        }
+    }
+
     DrawBoardSpaceReset(moveTo); // Redraw the space we've moved to now that we're no longer hidden
 }
 
-bool Board::SelectPhase(const UnitColor team, Coord& input, Unit* unit, PieceMoves* moves)
+void Board::DrawPossibleMoves(PieceMoves* moves, const UnitColor team)
 {
-    ClearTextLine(0);
-
-    std::cout << "Which piece would you like to move?";
-
-    input = WaitForClick();
-
-    if (input.x > width || input.y > height) // Out of bounds
-    {
-        std::cout << "OUT OF BOUNDS";
-        return false;
-    }
-    unit = GetUnitAtPos(input); // No unit at selection
-    if (unit == nullptr)
-    {
-        std::cout << "That space is empty.";
-        return false;
-    }
-
-    if (unit->GetColor() != team) // Wrong team
-    {
-        std::cout << "You are on team " << TEAM_NAME(team) << ".\n" <<
-            "Please choose a " << TEAM_NAME(team) << " piece.";
-        return false;
-    }
-
-    return true;
-}
-bool Board::HandleSelection(Coord input, Unit* unit, PieceMoves* moves)
-{
-    unit->AvailableMoves(moves);
-
-    if (moves->m_availableMovesCount == 0)
-    {
-        std::cout << "That piece is stuck.";
-        return false;
-    }
-    // Draw the selection square
-    DrawBoardSpaceColored(input, sprite::PaletteColor(sprite::Pltt::Select_Unit));
-
     // Draw the available positions
     for (unsigned char i = 0; i < moves->m_availableMovesCount; ++i)
     {
-        Coord potentialMove = moves->m_available[i]; // The move we are currently looking at/drawing
+        Coord pMove = moves->m_available[i]; // The move we are currently looking at/drawing
+        Unit* pEnemy = GetUnitAtPos(pMove); // The (potential) enemy at that space
 
-        sprite::Pltt spaceColoration = sprite::Pltt::Select_Available; // Default with selection color
+        sprite::Pltt spaceColor = sprite::Pltt::Select_Available; // Default with selection color
 
-        Unit* potentialEnemy = GetUnitAtPos(potentialMove);
-
-        if (potentialEnemy != nullptr && (potentialEnemy->GetColor() == unit->GetEnemyColor()))
+        if (pEnemy != nullptr)
         {
-            spaceColoration = sprite::Pltt::Select_TakePiece; // Take-piece color
+            if (pEnemy->GetColor() != team) // Unit exists at the space and is an enemy
+                spaceColor = sprite::Pltt::Select_TakePiece; // Change the color to "TakePiece"
+            else
+                spaceColor = sprite::Pltt::NoSelect_Teammate; // Change the color to "TakePiece"
         }
-
-        DrawBoardSpaceColored(potentialMove, sprite::PaletteColor(spaceColoration)); // Color the space
+        
+        DrawBoardSpaceColored(pMove, sprite::PaletteColor(spaceColor)); // Color the space
     }
-
-    return true;
 }
-int Board::MovePhase(Coord& input, Coord& output, PieceMoves* moves, const UnitColor team)
-{
-    // Clear the input area
-    ClearTextLine(2, 6);
 
-    ClearTextLine(2);
-    std::cout << "Which space would you like to move to?";
-
-    output = WaitForClick();
-
-    if (output.x > width || output.y > height) // Out of bounds
-    {
-        std::cout << "OUT OF BOUNDS\n";
-        return 0;
-    }
-
-    if (GetUnitAtPos(output)->GetColor() == team) // Change selection
-    {
-        input = output;
-        return 2;
-    }
-
-    if (!(moves->MoveIsValid(output))) // Not a legal move
-    {
-        std::cout << "This is not an available position.\n";
-        return 0;
-    }
-
-    return 1;
-}
-bool Board::WrapUpTurn(Coord& input, Coord& output, Unit* unit, PieceMoves* moves)
+void Board::UnDrawPossibleMoves(PieceMoves* moves)
 {
     // Reset the potential positions
     for (unsigned char i = 0; i < moves->m_availableMovesCount; ++i) {
         DrawBoardSpaceReset(moves->m_available[i]);
     }
+}
+
+bool Board::SelectPhase(const UnitColor team, Coord& input, Unit*& unit, PieceMoves* moves)
+{
+    //ClearTextLine(0);
+
+    //std::cout << "Which piece would you like to move?\n";
+
+    input = WaitForClick(Phase::Select);
+
+    //ClearTextLine(1);
+
+    if (input.x > width || input.y > height) // Out of bounds
+    {
+        //std::cout << "OUT OF BOUNDS";
+        return false;
+    }
+    else
+    {
+        unit = GetUnitAtPos(input); 
+
+        if (unit == nullptr) // No unit at selection
+        {
+            //std::cout << "That space is empty.";
+            return false;
+        }
+        else if (unit->GetColor() != team) // Wrong team
+        {
+            //std::cout << "You are on team " << TEAM_NAME(team) << ".\n" << "Please choose a " << TEAM_NAME(team) << " piece.";
+            return false;
+        }
+        else return true; // Unit exists & is correct team
+    }
+}
+bool Board::HandleSelection(Coord input, Unit*& unit, PieceMoves* moves)
+{
+    unit->AvailableMoves(moves);
+
+    if (moves->m_availableMovesCount == 0)
+    {
+        //std::cout << "That piece is stuck.";
+        return false;
+    }
+    else
+    {
+        // Draw the selection square
+        DrawBoardSpaceColored(input, sprite::PaletteColor(sprite::Pltt::Select_Unit));
+
+        // Draw all legal moves that can be made by this piece
+        DrawPossibleMoves(moves, unit->GetColor());
+
+        // Clear the input area before continuing
+        //ClearTextLine(0, 6);
+
+        return true;
+    }
+}
+int Board::MovePhase(Coord& input, Coord& output, Unit*& unit, PieceMoves* moves, const UnitColor team)
+{
+    //ClearTextLine(0);
+
+    //std::cout << "Which space would you like to move to?";
+
+    output = WaitForClick(Phase::Move, moves, unit->GetSpritePointer(), (bool)team);
+
+    if (output.x > width || output.y > height) // Out of bounds
+    {
+        //std::cout << "OUT OF BOUNDS\n";
+        return 0;
+    }
+    else
+    {
+        Unit* checkUnit = GetUnitAtPos(output);
+
+        if (checkUnit != nullptr && checkUnit->GetColor() == team) // Change selection
+        {
+            DrawBoardSpaceReset(input);
+            UnDrawPossibleMoves(moves);
+            input = output;
+            unit = checkUnit;
+            return 2;
+        }
+        else if (!(moves->MoveIsValid(output))) // Not a legal move
+        {
+            //std::cout << "This is not an available position.\n";
+            return 0;
+        }
+        else return 1;
+    }
+}
+bool Board::WrapUpTurn(Coord& input, Coord& output, Unit*& unit, PieceMoves* moves)
+{
+    UnDrawPossibleMoves(moves); // Clear the move highlighting
+
+    DrawBoardSpaceReset(input); // Clear the old space
 
     MovePiece(unit, output); // Move the piece
 
-    DrawBoardSpaceReset(input); // Clear the old space
-    DrawBoardSpaceReset(output); // Draw the piece at the new space
-
     // Clear the input area
-    ClearTextLine(0, 6);
+    //ClearTextLine(0, 6);
 
     IncrementTurn();
 
     return true;
+}
+
+Unit* Board::FindKingFromTeam(UnitColor team)
+{
+    const std::vector<Unit*>* teamArray = GetTeamArray(team);
+
+    // Find the king in the team array
+    for (Unit* unit : *teamArray) {
+        if (unit->GetPieceType() == Piece::Piece_King) return unit;
+    }
+
+    return nullptr; // Defaults to current position
 }
 
 void Board::PlayBoard()
@@ -412,42 +478,41 @@ void Board::PlayBoard()
     PieceMoves moves{}; // What moves can be made by the unit
     bool hasMoved = false;
 
-    enum class Phase {
-        Select = 0,
-        HandleSelect = 1,
-        Move = 2,
-        Wrapup = 3,
-    };
-
     Phase turnPhase = Phase::Select;
 
-    // State machine
     while (!hasMoved)
     {
+        // State machine
         switch (turnPhase) {
         default: // Select
             if (SelectPhase(team, input, unit, &moves)) turnPhase = Phase::Move;
-            else break;
+            else break; // Failed, retry
 
         case Phase::HandleSelect:
             if (HandleSelection(input, unit, &moves)) turnPhase = Phase::Move;
-            else turnPhase = Phase::Select;
+            else { // HandleSelect phase cannot reconsile on its own and must resort to retrying the Select phase.
+                turnPhase = Phase::Select;
+                break;
+            }
 
         case Phase::Move:
-            switch (MovePhase(output, &moves, team)) {
-            default: // Failed
+            switch (MovePhase(input, output, unit, &moves, team))
+            {
+            default: // Failed (0)
                 break;
             case 1: // Went well
                 turnPhase = Phase::Wrapup;
                 break;
-            case 2: // Player selected a different piece on their team; reset to Select phase
-                turnPhase = Phase::Select;
+            case 2: // Player changed their selection
+                turnPhase = Phase::HandleSelect;
                 break;
             }
-            break;
+            if (turnPhase != Phase::Wrapup) break; // We want to break out of the state machine if the return was unsuccessful
 
         case Phase::Wrapup:
-            if (WrapUpTurn(input, output, unit, &moves)) hasMoved = true;
+            WrapUpTurn(input, output, unit, &moves);
+            hasMoved = true;
+            break;
         }
     }
 }
@@ -747,9 +812,45 @@ void Board::RemoveUnit(Unit* unit)
     DrawBoardSpaceReset(unitSpace);
 }
 
+void Board::ResetEnPasant()
+{
+    std::vector<Unit*>* teamArray = GetTeamArray(CURRENT_TEAM);
+    
+    for (Unit* unit : *teamArray)
+    {
+        Pawn* pawn = dynamic_cast<Pawn*>(unit);
+        if (pawn != nullptr && pawn->en_pasant)
+        {
+            pawn->en_pasant = false;
+            break; // Only one pawn can have moved in a turn
+        }
+    }
+}
+
 void Board::IncrementTurn()
 {
-    // @TODO: Store an array of all pieces on the board so that we can look through the game like a flipbook
+    King* king = dynamic_cast<King*>(FindKingFromTeam(CURRENT_TEAM));
 
-    ++turn;
+    if (king == nullptr) // Game over
+    {
+        // @TODO: Display the flipbook of moves
+    }
+    else
+    {
+        if (!king->SpaceIsSafeFromCheck()) DrawBoardSpaceColored(king->GetLocation(), RGB(255, 80, 80)); // King in check
+        // @TODO: Store an array of all pieces on the board so that we can look through the game like a flipbook
+        ++turn;
+        
+        // Start the next turn
+
+        ResetEnPasant(); 
+
+        king = dynamic_cast<King*>(FindKingFromTeam(CURRENT_TEAM));
+
+        if (king == nullptr) // Game over
+        {
+            // @TODO: Display the flipbook of moves
+        }
+        else if (!king->SpaceIsSafeFromCheck()) DrawBoardSpaceColored(king->GetLocation(), RGB(255, 80, 80)); // King in check
+    }
 }

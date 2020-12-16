@@ -126,7 +126,15 @@ void FrameBuffer::DrawSpriteFAST(Coord space, sprite::Sprite* sprite, bool team,
     }
 }
 
-void FrameBuffer::DrawSpriteFASTWithBG(Coord space, sprite::Sprite* sprite, bool team, COLORREF bgColor, bool effect)
+COLORREF AverageCRef(COLORREF a, COLORREF b, float alpha = .5f)
+{
+    return RGB(
+        BYTE(((float)GetRValue((a)) * alpha + (float)GetRValue((b))) * (1.0f - alpha)),
+        BYTE(((float)GetGValue((a)) * alpha + (float)GetGValue((b))) * (1.0f - alpha)),
+        BYTE(((float)GetBValue((a)) * alpha + (float)GetBValue((b))) * (1.0f - alpha)));
+}
+
+void FrameBuffer::DrawSpriteFASTWithBG(Coord space, const sprite::Sprite* sprite, bool team, COLORREF bgColor, bool effect)
 {
     BoardTile spaceBounds = BoardTile(space);
 
@@ -143,7 +151,13 @@ void FrameBuffer::DrawSpriteFASTWithBG(Coord space, sprite::Sprite* sprite, bool
 #else
             if (sprite->m_texture[i] != ' ') // Check is opaque
 #endif
-                DrawToBufferAndScreen(pix, sprite->SpriteColor(i, team)); // Draws the pixel from the frame buffer to the console
+            {
+                COLORREF pixelColor = sprite->SpriteColor(i, team);
+
+                if (effect) pixelColor = AverageCRef(pixelColor, bgColor, .4f); // Causes ghost effect
+
+                DrawToBufferAndScreen(pix, pixelColor); // Draws the pixel from the frame buffer to the console
+            }
             else
                 DrawToBufferAndScreen(pix, bgColor);
 
@@ -377,7 +391,11 @@ namespace sprite
         // Select
         {44, 200, 37}, // Unit we are moving
         {155, 235, 135}, // Available space we can move to
-        {220, 20, 20}, // Available space with a piece we can take
+        {255, 80, 80}, // Available space with a piece we can take
+
+        // NoSelect
+        {255, 200, 80}, // King would be put in check
+        {127, 127, 127}, // A teammate is already at that space
     };
 
     COLORREF PaletteColor(Pltt col)
@@ -385,7 +403,7 @@ namespace sprite
         return CRef(colorPalette[(unsigned int)col]);
     }
 
-    COLORREF Sprite::SpriteColor(int index, bool team)
+    COLORREF Sprite::SpriteColor(int index, bool team) const
     {
         unsigned char value = m_texture[index];
 

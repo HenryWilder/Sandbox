@@ -42,19 +42,31 @@ public:
 
 	void ResetBoard(int _width, int _height = 0);
 
-	void DrawBoardSpaceColored(Coord pos, COLORREF color); // Draws the space on the board with the input color and the piece at that space
-	void DrawBoardSpaceColored(Coord pos, Color color); // Draws the space on the board with the input color and the piece at that space
+	void DrawBoardSpaceColored(Coord pos, COLORREF color, bool effect = false); // Draws the space on the board with the input color and the piece at that space
+	void DrawBoardSpaceColored(Coord pos, Color color, bool effect = false); // Draws the space on the board with the input color and the piece at that space
 	void DrawBoardSpaceReset(Coord pos);
 
+	enum class Phase {
+		Select = 0,
+		HandleSelect = 1,
+		Move = 2,
+		Wrapup = 3,
+	};
+
 private: // Helper functions
-	Coord WaitForClick();
+	Coord WaitForClick(Phase turnPhase, const PieceMoves* pMoves = nullptr, const sprite::Sprite* sprite = nullptr, bool team = 0);
 	//Coord TakePosInput();
 	void MovePiece(Unit* unit, Coord moveTo);
 
-	bool SelectPhase(const UnitColor team, Coord& input, Unit* unit, PieceMoves* moves);
-	bool HandleSelection(Coord input, Unit* unit, PieceMoves* moves);
-	int MovePhase(Coord& output, PieceMoves* moves, const UnitColor team);
-	bool WrapUpTurn(Coord& input, Coord& output, Unit* unit, PieceMoves* moves);
+	void DrawPossibleMoves(PieceMoves* moves, const UnitColor team);
+	void UnDrawPossibleMoves(PieceMoves* moves);
+
+	bool SelectPhase(const UnitColor team, Coord& input, Unit*& unit, PieceMoves* moves);
+	bool HandleSelection(Coord input, Unit*& unit, PieceMoves* moves);
+	int MovePhase(Coord& input, Coord& output, Unit*& unit, PieceMoves* moves, const UnitColor team);
+	bool WrapUpTurn(Coord& input, Coord& output, Unit*& unit, PieceMoves* moves);
+	Unit* FindKingFromTeam(UnitColor team);
+	void ResetEnPasant();
 
 public:
 	void PlayBoard();

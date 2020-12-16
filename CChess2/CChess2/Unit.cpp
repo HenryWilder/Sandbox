@@ -138,7 +138,7 @@ int PieceMoves::GetMoves(Coord* moves)
 	return (int)m_availableMovesCount;
 }
 
-bool PieceMoves::MoveIsValid(Coord move)
+bool PieceMoves::MoveIsValid(Coord move) const
 {
 	bool valid = false;
 
@@ -187,7 +187,7 @@ sprite::Sprite* Unit::GetSpritePointer() {	return &sprite::unit::null;	}
 
 void Unit::AvailableMoves(PieceMoves* moves) {}
 
-Piece Unit::GetPieceType()
+Piece Unit::GetPieceType() const
 {
 	return Piece::Piece_Pawn;
 }
@@ -223,7 +223,13 @@ bool Unit::CouldITakeAt(Coord hypothetical)
 
 // Pawn
 
-Piece Pawn::GetPieceType()
+signed int Pawn::GetForward() const
+{
+	if (GetColor() == UnitColor::Unit_Black) return 1;
+	else return -1;
+}
+
+Piece Pawn::GetPieceType() const
 {
 	return Piece::Piece_Pawn;
 }
@@ -231,6 +237,7 @@ Piece Pawn::GetPieceType()
 void Pawn::Move(Coord newPosition)
 {
 	m_moved = true;
+	if (newPosition.y == GetLocation().y + 2 || newPosition.y == GetLocation().y - 2) en_pasant = true;
 	Unit::Move(newPosition);
 }
 
@@ -244,37 +251,50 @@ void Pawn::AvailableMoves(PieceMoves* moves)
 	// Template moves
 	Coord possibleMoves[4];
 
-	{
-		// Forward from the perspective of our pawn
-		int fw = 1;
-		if (GetColor() == UnitColor::Unit_White) fw = -1;
-		Coord p = GetLocation(); // Position
+	// Forward from the perspective of our pawn
+	const int fw = GetForward();
+	Coord p = GetLocation(); // Position
 
-		possibleMoves[0] = { p.x,     p.y + fw };
-		possibleMoves[1] = { p.x - 1, p.y + fw }; // Only if capturing
-		possibleMoves[2] = { p.x + 1, p.y + fw }; // Only if capturing
-		possibleMoves[3] = { p.x,     p.y + fw + fw }; // First turn only
-	}
+	possibleMoves[0] = { p.x,     p.y + fw };
+	possibleMoves[1] = { p.x,     p.y + fw + fw }; // First turn only
+	possibleMoves[2] = { p.x - 1, p.y + fw }; // Only if capturing
+	possibleMoves[3] = { p.x + 1, p.y + fw }; // Only if capturing
+	
 
-	Coord confirmedMoves[4];
+	Coord confirmedMoves[6];
 
 	unsigned char confirmedMoveCount = 0;
 
 	// Can move forward one?
 	if (ValidPos(possibleMoves[0]) && !m_boardIAmOf->IsUnitAtPos(possibleMoves[0])) confirmedMoves[confirmedMoveCount++] = possibleMoves[0];
 
-	// Can move diagonally?
-	for (char i = 1; i < 3; ++i)
-	{
-		Unit* potentialEnemy = m_boardIAmOf->GetUnitAtPos((possibleMoves[i]));
-
-		// Note that we don't have to check if the position is valid, as no enemy will be at an invalid position.
-		if (NullOrEnemy(potentialEnemy)) confirmedMoves[confirmedMoveCount++] = possibleMoves[i];
-	}
-
 	// Can move forward two?
 	// No pawn will ever be starting at a position 2 moves behind an out-of-bounds position, so we don't have to validate the position.
-	if (m_moved == false && !m_boardIAmOf->IsUnitAtPos(possibleMoves[3])) confirmedMoves[confirmedMoveCount++] = possibleMoves[3];
+	if (m_moved == false &&
+		!m_boardIAmOf->IsUnitAtPos(possibleMoves[0]) && // Really weird edge-case
+		!m_boardIAmOf->IsUnitAtPos(possibleMoves[1]))
+	{
+		confirmedMoves[confirmedMoveCount++] = possibleMoves[1];
+	}
+
+	// Can move diagonally?
+	for (char i = 2; i < 4; ++i)
+	{
+		Unit* pEnemy = m_boardIAmOf->GetUnitAtPos((possibleMoves[i]));
+
+		// Note that we don't have to check if the position is valid, as no enemy will be at an invalid position.
+		if (UnitIsEnemy(pEnemy)) confirmedMoves[confirmedMoveCount++] = possibleMoves[i];
+
+		//
+		// En'passant
+		//
+		Coord passantPos = { possibleMoves[i].x, possibleMoves[i].y - fw };
+		Pawn* passantPawn = dynamic_cast<Pawn*>(m_boardIAmOf->GetUnitAtPos(passantPos));
+
+		if (UnitIsEnemy(passantPawn) && passantPawn->en_pasant) confirmedMoves[confirmedMoveCount++] = possibleMoves[i];
+	}
+
+	
 
 	moves->SetMoves(confirmedMoves, confirmedMoveCount);
 }
@@ -292,7 +312,7 @@ bool Pawn::CouldITakeAt(Coord hypothetical)
 
 // Rook
 
-Piece Rook::GetPieceType()
+Piece Rook::GetPieceType() const
 {
 	return Piece::Piece_Rook;
 }
@@ -335,7 +355,7 @@ bool Rook::CouldITakeAt(Coord hypothetical)
 
 // Bishop
 
-Piece Bishop::GetPieceType()
+Piece Bishop::GetPieceType() const
 {
 	return Piece::Piece_Bishop;
 }
@@ -354,7 +374,7 @@ void Bishop::AvailableMoves(PieceMoves* moves)
 	Coord testPos;
 
 	// Diagonals
-	for (int direction = 1; direction < 4; ++direction)
+	for (int direction = 0; direction < 4; ++direction)
 	{
 		LineTrace(confirmedMoves, confirmedMoveCount, DiagonalDir(direction));
 	}
@@ -372,7 +392,7 @@ bool Bishop::CouldITakeAt(Coord hypothetical)
 
 // Knight
 
-Piece Knight::GetPieceType()
+Piece Knight::GetPieceType() const
 {
 	return Piece::Piece_Knight;
 }
@@ -416,7 +436,7 @@ bool Knight::CouldITakeAt(Coord hypothetical)
 
 // Queen
 
-Piece Queen::GetPieceType()
+Piece Queen::GetPieceType() const
 {
 	return Piece::Piece_Queen;
 }
@@ -451,7 +471,7 @@ bool Queen::CouldITakeAt(Coord hypothetical)
 
 // King
 
-Piece King::GetPieceType()
+Piece King::GetPieceType() const
 {
 	return Piece::Piece_King;
 }
@@ -478,9 +498,7 @@ Unit* King::TestMoveSafety(Coord testPos)
 bool King::TestMoveSafetyValidate(Coord position)
 {
 	Unit* unit = TestMoveSafety(position);
-
-	// Do not use NullOrEnemy, because this needs to be *not* null
-	return (unit != nullptr && unit->GetColor() == GetEnemyColor());
+	return (UnitIsEnemy(unit));
 }
 
 Unit* King::LineTraceSafety(Coord startPos, Coord direction)
@@ -574,6 +592,27 @@ void King::AvailableMoves(PieceMoves* moves)
 	}
 
 	moves->SetMoves(confirmedMoves, confirmedMoveCount); // Write to the output
+}
+
+void King::UnAvailableMoves(PieceMoves* checks)
+{
+	Coord confirmedMoves[8];
+
+	unsigned char confirmedMoveCount = 0;
+
+	for (unsigned char i = 0; i < 8; ++i)
+	{
+		const Coord testPos = GetLocation() + AllDir(i); // testPos is the offset location
+
+		if (ValidPos(testPos) && // Check that the position is on the board
+			SpaceHasNoTeammate(testPos) && // The unit at the position, be there one at all, is not a teammate
+			!SpaceIsSafeFromCheck(testPos)) // Would that space be safe from putting me in check?
+		{
+			confirmedMoves[confirmedMoveCount++] = testPos; // Append the current array of confirmed moves with the move we are currently checking
+		}
+	}
+
+	checks->SetMoves(confirmedMoves, confirmedMoveCount); // Write to the output
 }
 
 bool King::CouldITakeAt(Coord hypothetical)

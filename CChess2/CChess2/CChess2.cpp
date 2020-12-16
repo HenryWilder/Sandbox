@@ -21,14 +21,14 @@ bool PromptReplay()
 int main(void)
 {
 	cout << "\x1b]2;Console Chess 2.0\x07"; // Renames the window
-	//std::cout << "\x1b[?25l"; // Hide the cursor
+	std::cout << "\x1b[?25l"; // Hide the cursor
 	Board playSpace;
 
 	bool replay = true;
 	system("CLS"); // Reset the newlines
-	std::cout << "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"; // Move the cursor where we want it
+	//std::cout << "\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n"; // Move the cursor where we want it
 
-	std::cout << "\x1b[s"; // Save the cursor position
+	//std::cout << "\x1b[s"; // Save the cursor position
 
 	while (replay)
 	{

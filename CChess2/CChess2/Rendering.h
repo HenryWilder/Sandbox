@@ -32,6 +32,9 @@ namespace sprite
         Select_Unit = 10, // This is the piece we want to move
         Select_Available = 11, // This space is available to move to
         Select_TakePiece = 12, // There is an enemy unit here we can take
+
+        NoSelect_KingDanger = 13, // The space would put the king into check
+        NoSelect_Teammate = 14, // There is a teammate there blocking us from movement
     };
     extern const Color colorPalette[];
 
@@ -57,7 +60,7 @@ namespace sprite
         const char* m_texture;
 #endif
 
-        COLORREF SpriteColor(int index, bool team);
+        COLORREF SpriteColor(int index, bool team) const;
     };
 
     namespace unit
@@ -108,7 +111,7 @@ public:
     bool DrawToBufferSafe(PixelPos pos, Color c);
     
     void DrawSpriteFAST(Coord space, sprite::Sprite* sprite, bool team, bool effect = false);
-    void DrawSpriteFASTWithBG(Coord space, sprite::Sprite* sprite, bool team, COLORREF bgColor, bool effect = false); // Draws a sprite at the position with a background of the specified color.
+    void DrawSpriteFASTWithBG(Coord space, const sprite::Sprite* sprite, bool team, COLORREF bgColor, bool effect = false); // Draws a sprite at the position with a background of the specified color.
     void BufferCleanplateSpace(Coord space); // Draws the buffer-stored pixels of a rectangular area
     void DrawGhost(PixelPos spritePosTL, PixelPos cleanPosTL, sprite::Sprite* sprite, bool team); // Draws a sprite with a cleanplate background without drawing the sprite to the buffer.
     void DrawSprite(Coord space, sprite::Sprite* sprite, bool team, bool effect = false);

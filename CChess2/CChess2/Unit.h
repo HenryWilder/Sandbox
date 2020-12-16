@@ -27,7 +27,7 @@ struct PieceMoves
 	int GetMoves(Coord* moves);
 
 	// Takes a coord as input and checks whether it is in the list of valid moves
-	bool MoveIsValid(Coord move);
+	bool MoveIsValid(Coord move) const;
 };
 
 // The color of the piece
@@ -58,7 +58,7 @@ public:
 
 	virtual sprite::Sprite* GetSpritePointer();
 	virtual void AvailableMoves(PieceMoves* moves);
-	virtual Piece GetPieceType();
+	virtual Piece GetPieceType() const;
 	bool IsHidden();
 	void Hide();
 	void UnHide();
@@ -87,8 +87,11 @@ protected:
 
 class Pawn : public Unit
 {
-	Piece GetPieceType() override;
+public:
+	signed int GetForward() const;
+	Piece GetPieceType() const override;
 	bool m_moved = false;
+	bool en_pasant = false;
 	void Move(Coord newPosition) override;
 	sprite::Sprite* GetSpritePointer() override;
 	void AvailableMoves(PieceMoves* moves) override;
@@ -97,7 +100,8 @@ class Pawn : public Unit
 
 class Rook : public Unit
 {
-	Piece GetPieceType() override;
+public:
+	Piece GetPieceType() const override;
 	bool m_moved = false;
 	void Move(Coord newPosition) override;
 	sprite::Sprite* GetSpritePointer() override;
@@ -107,7 +111,8 @@ class Rook : public Unit
 
 class Bishop : public Unit
 {
-	Piece GetPieceType() override;
+public:
+	Piece GetPieceType() const override;
 	sprite::Sprite* GetSpritePointer() override;
 	void AvailableMoves(PieceMoves* moves) override;
 	bool CouldITakeAt(Coord hypothetical) override;
@@ -115,7 +120,8 @@ class Bishop : public Unit
 
 class Knight : public Unit
 {
-	Piece GetPieceType() override;
+public:
+	Piece GetPieceType() const override;
 	sprite::Sprite* GetSpritePointer() override;
 	void AvailableMoves(PieceMoves* moves) override;
 	bool CouldITakeAt(Coord hypothetical) override;
@@ -123,7 +129,8 @@ class Knight : public Unit
 
 class Queen : public Unit
 {
-	Piece GetPieceType() override;
+public:
+	Piece GetPieceType() const override;
 	sprite::Sprite* GetSpritePointer() override;
 	void AvailableMoves(PieceMoves* moves) override;
 	bool CouldITakeAt(Coord hypothetical) override;
@@ -131,7 +138,8 @@ class Queen : public Unit
 
 class King : public Unit
 {
-	Piece GetPieceType() override;
+public:
+	Piece GetPieceType() const override;
 	bool m_moved = false;
 	void Move(Coord newPosition) override;
 	sprite::Sprite* GetSpritePointer() override;
@@ -143,5 +151,6 @@ class King : public Unit
 	bool CheckSafeAgainstKnight(Coord position); // Safety from knights
 	bool SpaceIsSafeFromCheck(Coord ifIWasHere = { -1,-1 });
 	void AvailableMoves(PieceMoves* moves) override;
+	void UnAvailableMoves(PieceMoves* checks);
 	bool CouldITakeAt(Coord hypothetical) override;
 };
