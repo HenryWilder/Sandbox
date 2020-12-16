@@ -1,7 +1,6 @@
 #include <iostream>
 #include <stdio.h>
 #include <SDL.h>
-#include <SDL_opengl.h>
 
 SDL_Surface* g_surface;
 
@@ -49,6 +48,36 @@ void DrawPixel(Vec2 pixel, Color color)
 
 int main(int argc, char** args)
 {
+    SDL_Window* window;
+    SDL_Renderer* renderer;
+    if (SDL_Init(SDL_INIT_EVERYTHING) == 0) {
+        if (!SDL_CreateWindowAndRenderer(800, 600, 0, &window, &renderer))
+        {
+            while (true)
+            {
+                for (int x = 0; x < 800; ++x) {
+                    for (int y = 0; y < 600; ++y) {
+                        try
+                        {
+                            if (SDL_RenderDrawPoint(renderer, x, y)) throw 20; //Renders on middle of screen.
+                        }
+                        catch (int e)
+                        {
+                            std::cout << "ya fucked up.";
+                        }
+
+                        SDL_RenderPresent(renderer);
+                    }
+                }
+            }
+        }
+    }
+    else
+    {
+        std::cout << "ya fucked up. Big time.";
+    }
+
+    /*
     Uint32 rmask, gmask, bmask, amask;
 
 #if SDL_BYTEORDER == SDL_BIG_ENDIAN
@@ -75,7 +104,8 @@ int main(int argc, char** args)
         "SDL Test", // Window name
         200, 200, // Position (offset from top-left)
         640, 480, // Size
-        SDL_WINDOW_OPENGL /* Needed */ | SDL_WINDOW_RESIZABLE); // Flags
+        SDL_WINDOW_OPENGL // Needed
+    | SDL_WINDOW_RESIZABLE); // Flags
 
     // Create an OpenGL context associated with the window.
     SDL_GLContext glcontext = SDL_GL_CreateContext(window);
@@ -84,17 +114,18 @@ int main(int argc, char** args)
     {
         SDL_PumpEvents();
         // now you can make GL calls.
-        glClearColor(0, 0, 0, 1);
-        glClear(GL_COLOR_BUFFER_BIT);
+        //glClearColor(0, 0, 0, 1);
+        //glClear(GL_COLOR_BUFFER_BIT);
         DrawPixel({20,20}, {255,255,255});
         SDL_GL_SwapWindow(window);
     }
-    glVertex2d(14,32);
+    //glVertex2d(14,32);
     int input;
     std::cin >> input;
 
     // Once finished with OpenGL functions, the SDL_GLContext can be deleted.
     SDL_GL_DeleteContext(glcontext);
+    */
 
 
     SDL_Quit();
