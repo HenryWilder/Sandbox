@@ -74,12 +74,6 @@ Coord KnightDir(int i)
 	return DiagonalDir(i / 2) + CardinalDir((i + 1) / 2);
 }
 
-bool Unit::ValidPos(const Coord testPos)
-{
-	if (((testPos.x >= 0) && (testPos.x < sideTileCount)) && ((testPos.y >= 0) && (testPos.y < sideTileCount))) return true;
-	else return false;
-}
-
 bool Unit::NullOrEnemy(const Unit* unit)
 {
 	if (unit == nullptr) return true;

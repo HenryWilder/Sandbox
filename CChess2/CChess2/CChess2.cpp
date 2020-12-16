@@ -38,10 +38,12 @@ int main(void)
 
 		while (!gameOver)
 		{
-			playSpace.PlayBoard(); // 0 is an even number. Therefore white starts.
+			playSpace.PlayBoard();
+			gameOver = playSpace.IncrementTurn();
 		}
+		playSpace.GameFlipbook();
 
-		replay = PromptReplay();
+		//replay = PromptReplay();
 	}
 
 	ReleaseDC(window, hdc);

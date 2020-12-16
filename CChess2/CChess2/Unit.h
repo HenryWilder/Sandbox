@@ -7,12 +7,14 @@ class Board;
 
 enum class Piece
 {
-	Piece_Pawn = 0,
-	Piece_Rook = 1,
-	Piece_Knight = 2,
-	Piece_Bishop = 3,
-	Piece_Queen = 4,
-	Piece_King = 5,
+	Piece_Pawn = 1,
+	Piece_Rook = 2,
+	Piece_Knight = 3,
+	Piece_Bishop = 4,
+	Piece_Queen = 5,
+	Piece_King = 6,
+
+	Piece_NULL = 0,
 };
 
 struct PieceMoves
@@ -46,7 +48,6 @@ struct Unit
 	UnitColor GetColor() const;
 	UnitColor GetEnemyColor() const;
 
-	bool ValidPos(const Coord testPos);
 	bool NullOrEnemy(const Unit* unit); // Either the unit is null or an enemy
 	bool UnitIsEnemy(const Unit* unit); // The unit is NOT null && is an enemy
 	bool SpaceHasNoTeammate(const Coord testPos);

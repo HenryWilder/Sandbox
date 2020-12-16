@@ -22,8 +22,13 @@ int Snap(int value, int gridsize) {
     return snappedVal;
 }
 
-bool Even(int a) {
-    return a == Snap(a, 2);
+bool Even(int a) { return !(a % 2); }
+
+bool ValidPos(const Coord testPos)
+{
+    if (((testPos.x >= 0) && (testPos.x < space::game::sideTileCount)) &&
+        ((testPos.y >= 0) && (testPos.y < space::game::sideTileCount))) return true;
+    else return false;
 }
 
 PixelPos Snap(PixelPos pix, PixelPos gridsize)

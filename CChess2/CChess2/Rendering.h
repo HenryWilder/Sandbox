@@ -1,6 +1,5 @@
 #pragma once
 #include "Universal.h"
-#define UCHARARRAY_SPRITE_METHOD false
 
 // A 24-bit color in RGB space
 struct Color
@@ -42,15 +41,6 @@ namespace sprite
 
     struct Sprite
     {
-#if UCHARARRAY_SPRITE_METHOD
-        /// <summary>
-        /// 0 = empty,
-        /// 1 = fill,
-        /// 2 = shade,
-        /// 3 = edge,
-        /// </summary>
-        unsigned char m_texture[space::screen::tileArea];
-#else
         /// <summary>
         /// ' ' = empty,
         /// '1' = fill,
@@ -58,9 +48,8 @@ namespace sprite
         /// '3' = edge,
         /// </summary>
         const char* m_texture;
-#endif
 
-        COLORREF SpriteColor(int index, bool team) const;
+        COLORREF SpriteColor(int index, int team) const;
     };
 
     namespace unit
@@ -72,6 +61,12 @@ namespace sprite
         extern Sprite bishop;
         extern Sprite queen;
         extern Sprite king;
+    }
+
+    namespace symbol
+    {
+        extern Sprite arrowL;
+        extern Sprite arrowR;
     }
 }
 
@@ -111,6 +106,7 @@ public:
     bool DrawToBufferSafe(PixelPos pos, Color c);
     
     void DrawSpriteFAST(Coord space, sprite::Sprite* sprite, bool team, bool effect = false);
+    void DrawSymbolSkippingBuffer(Coord space, char symbol, int colorspace);
     void DrawSpriteFASTWithBG(Coord space, const sprite::Sprite* sprite, bool team, COLORREF bgColor, bool effect = false); // Draws a sprite at the position with a background of the specified color.
     void BufferCleanplateSpace(Coord space); // Draws the buffer-stored pixels of a rectangular area
     void DrawGhost(PixelPos spritePosTL, PixelPos cleanPosTL, sprite::Sprite* sprite, bool team); // Draws a sprite with a cleanplate background without drawing the sprite to the buffer.

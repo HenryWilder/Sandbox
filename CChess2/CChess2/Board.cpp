@@ -252,20 +252,25 @@ Coord Board::WaitForClick(Phase turnPhase, const PieceMoves* pMoves, const sprit
 
         if (mouseCoordLast != mouseCoordCurrent) // If the mouse location has changed
         {
-            DrawBoardSpaceColored(mouseCoordLast, lastSpaceColor); // Reset the old space's color
+            if (ValidPos(mouseCoordLast))
+                DrawBoardSpaceColored(mouseCoordLast, lastSpaceColor); // Reset the old space's color
 
             mouseCoordLast = mouseCoordCurrent; // Update the temporary mouse position variable
 
-            lastSpaceColor = g_frameBuffer.Get(PixelSpace(mouseCoordCurrent)); // Store the color of the new space before we recolor it
+            if (ValidPos(mouseCoordCurrent))
+            {
+                lastSpaceColor = g_frameBuffer.Get(PixelSpace(mouseCoordCurrent)); // Store the color of the new space before we recolor it
 
-            if (turnPhase == Phase::Move && pMoves != nullptr && pMoves->MoveIsValid(mouseCoordCurrent))
-                g_frameBuffer.DrawSpriteFASTWithBG(mouseCoordCurrent, sprite, team, lastSpaceColor, true);
+                // Draw transparent image of our piece at the move we are hovering over
+                if (turnPhase == Phase::Move && pMoves != nullptr && pMoves->MoveIsValid(mouseCoordCurrent))
+                    g_frameBuffer.DrawSpriteFASTWithBG(mouseCoordCurrent, sprite, team, lastSpaceColor, true);
 
-            else DrawBoardSpaceColored(mouseCoordCurrent, RGB(127, 127, 255)); // Color the new space
+                else DrawBoardSpaceColored(mouseCoordCurrent, RGB(127, 127, 255)); // Color the new space
+            }
         }
 
-        if (g_mouse.CheckMouseState()) { // Click is true
-
+        if (g_mouse.CheckMouseState()) // Click is true
+       {
             //DrawBoardSpaceColored(mouseCoordCurrent, RGB(64, 64, 255)); // Click color
 
             //SleepForMS(127); // Delay
@@ -451,8 +456,6 @@ bool Board::WrapUpTurn(Coord& input, Coord& output, Unit*& unit, PieceMoves* mov
 
     // Clear the input area
     //ClearTextLine(0, 6);
-
-    IncrementTurn();
 
     return true;
 }
@@ -827,18 +830,32 @@ void Board::ResetEnPasant()
     }
 }
 
-void Board::IncrementTurn()
+void Board::StoreBoardState()
+{
+    for (int y = 0; y < space::game::sideTileCount; ++y) {
+        for (int x = 0; x < space::game::sideTileCount; ++x)
+        {
+            Unit* unit = GetUnitAtPos({ x,y });
+            m_history[turn].SetStateSpace(x, y, MakeUnitData(unit));
+        }
+    }
+}
+
+bool Board::IncrementTurn()
 {
     King* king = dynamic_cast<King*>(FindKingFromTeam(CURRENT_TEAM));
 
     if (king == nullptr) // Game over
     {
-        // @TODO: Display the flipbook of moves
+        return true;
     }
     else
     {
         if (!king->SpaceIsSafeFromCheck()) DrawBoardSpaceColored(king->GetLocation(), RGB(255, 80, 80)); // King in check
-        // @TODO: Store an array of all pieces on the board so that we can look through the game like a flipbook
+        else  DrawBoardSpaceReset(king->GetLocation()); // King not in check
+        
+        StoreBoardState();
+
         ++turn;
         
         // Start the next turn
@@ -849,8 +866,203 @@ void Board::IncrementTurn()
 
         if (king == nullptr) // Game over
         {
-            // @TODO: Display the flipbook of moves
+            return true;
         }
-        else if (!king->SpaceIsSafeFromCheck()) DrawBoardSpaceColored(king->GetLocation(), RGB(255, 80, 80)); // King in check
+        else
+        {
+            if (!king->SpaceIsSafeFromCheck()) DrawBoardSpaceColored(king->GetLocation(), RGB(255, 80, 80)); // King in check
+            else  DrawBoardSpaceReset(king->GetLocation()); // King not in check
+            return false; // Game is not over
+        }
+    }
+}
+
+int BoardStateMemory::Index(int x, int y) const
+{
+    return (space::game::sideTileCount) * y + x;
+}
+
+char MakeUnitData(Unit* unit)
+{
+    char data = 0b00000000; // Space is empty by default
+
+    if (unit != nullptr)
+    {
+        data = char(unit->GetPieceType());
+        if (unit->GetColor() == UnitColor::Unit_White) data |= 0b1000;
+    }
+
+    return data;
+}
+
+const char BoardStateMemory::GetUnitData(int x, int y) const
+{
+    return m_stateData[Index(x, y)];
+}
+
+UnitColor BoardStateMemory::GetUnitData_Color(const char data) const
+{
+    if (data & 0b1000) return UnitColor::Unit_White;
+    else return UnitColor::Unit_Black;
+}
+
+UnitColor BoardStateMemory::GetUnitData_Color(int x, int y) const
+{
+    return GetUnitData_Color(GetUnitData(x, y));
+}
+
+Piece BoardStateMemory::GetUnitData_Piece(const char data) const
+{
+    char check = data;
+    if (check >= 8) check -= 8;
+    for (char test = 1; test < 7; ++test)
+    {
+        if (check == test) return Piece(test);
+    }
+    return Piece::Piece_NULL;
+}
+
+Piece BoardStateMemory::GetUnitData_Piece(int x, int y) const
+{
+    return GetUnitData_Piece(GetUnitData(x, y));
+}
+
+void BoardStateMemory::SetStateSpace(int x, int y, const char data)
+{
+    m_stateData[Index(x, y)] = data; // Set
+}
+
+void Board::DrawBoardState(int state)
+{
+    system("CLS");
+    std::cout << "\x1b[?25l"; // Hide the cursor
+
+    BoardStateMemory& gameState = m_history[state];
+
+    for (int y = 0; y < space::game::sideTileCount; ++y) {
+        for (int x = 0; x < space::game::sideTileCount; ++x)
+        {
+            Coord space = { x, y };
+
+            UnitColor color;
+            color = gameState.GetUnitData_Color(x, y);
+
+            Piece piece = gameState.GetUnitData_Piece(x, y);
+
+            if (piece != Piece::Piece_NULL)
+            {
+                sprite::Sprite* sprite;
+                switch (piece)
+                {
+                case Piece::Piece_Pawn: // Default is pawn
+                    sprite = &sprite::unit::pawn;
+                    break;
+
+                case Piece::Piece_Knight:
+                    sprite = &sprite::unit::knight;
+                    break;
+
+                case Piece::Piece_Rook:
+                    sprite = &sprite::unit::rook;
+                    break;
+
+                case Piece::Piece_Bishop:
+                    sprite = &sprite::unit::bishop;
+                    break;
+
+                case Piece::Piece_Queen:
+                    sprite = &sprite::unit::queen;
+                    break;
+
+                case Piece::Piece_King:
+                    sprite = &sprite::unit::king;
+                    break;
+
+                default: // Null
+                    sprite = &sprite::unit::null;
+                    break;
+                }
+                g_frameBuffer.DrawSpriteFASTWithBG(space, sprite,(bool)color, g_frameBuffer.SpacePatternAtPos(space));
+            }
+            else
+            {
+                g_frameBuffer.DrawBoardPattern1SpaceFAST(space);
+            }
+        }
+    }
+}
+
+int Board::FlipbookWFClick(int state)
+{
+    // Initialization
+    Coord arrowPosR;
+    arrowPosR.x = space::game::sideTileCount / 2;
+    arrowPosR.y = space::game::sideTileCount + 1;
+    Coord arrowPosL = arrowPosR;
+    arrowPosL.x -= 1;
+
+    bool b_lArrow = false;
+    bool b_rArrow = false;
+
+    if (state > 0)
+    {
+        b_lArrow = true;
+        g_frameBuffer.DrawSymbolSkippingBuffer(arrowPosL, '<', 0);
+    }
+    if (state < this->turn - 1)
+    {
+        b_rArrow = true;
+        g_frameBuffer.DrawSymbolSkippingBuffer(arrowPosR, '>', 0);
+    }
+
+    InitInput();
+
+    Coord mouseCoordLast = { 0,0 };
+    Coord mouseCoordCurrent = { 0,0 };
+
+    while (true)
+    {
+        PingInput(); // Update the mouse location
+
+        mouseCoordCurrent = g_mouse.ReadMouseHover();
+
+        if (mouseCoordLast != mouseCoordCurrent) // If the mouse location has changed
+        {
+            // Draw transparent image of our piece at the move we are hovering over
+            if (b_lArrow)
+            {
+                if (mouseCoordCurrent == arrowPosL) g_frameBuffer.DrawSymbolSkippingBuffer(arrowPosL, '<', 1);
+                if (mouseCoordLast == arrowPosL) g_frameBuffer.DrawSymbolSkippingBuffer(arrowPosL, '<', 0);
+            }
+            if (b_rArrow)
+            {
+                if (mouseCoordCurrent == arrowPosR) g_frameBuffer.DrawSymbolSkippingBuffer(arrowPosR, '>', 1);
+                if (mouseCoordLast == arrowPosR) g_frameBuffer.DrawSymbolSkippingBuffer(arrowPosR, '>', 0);
+            }
+            mouseCoordLast = mouseCoordCurrent; // Update the temporary mouse position variable
+        }
+
+        if (g_mouse.CheckMouseState()) break; // Click is true
+    }
+    // Click on button confirmed
+    Coord whereClicked = g_mouse.GetMouseClickCoord();
+    if (whereClicked == arrowPosL) return -1;
+    else if (whereClicked == arrowPosR) return 1;
+    else return 0;
+}
+
+void Board::GameFlipbook()
+{
+    int state = 0;
+    while (true)
+    {
+        DrawBoardState(state);
+
+        int update = 0;
+        
+        while (update == 0 && ((state + update) >= 0) && ((state + update) <= turn)) {
+            update = FlipbookWFClick(state);
+        }
+        state += update;
     }
 }

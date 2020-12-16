@@ -19,15 +19,50 @@ char CharToValue(char character);
 
 void ClearTextLine(int start = 0, int count = 1);
 
+class BoardStateMemory
+{
+private:
+	int Index(int x, int y) const;
+	const char GetUnitData(int x, int y) const; // Retrieces unit data
+	UnitColor GetUnitData_Color(const char data) const;
+	Piece GetUnitData_Piece(const char data) const;
+
+public:
+	UnitColor GetUnitData_Color(int x, int y) const;
+	Piece GetUnitData_Piece(int x, int y) const;
+	void SetStateSpace(int x, int y, const char data); // Writes data into the state
+
+private:
+	char m_stateData[space::game::boardArea];
+	/* Memory layout:
+	* 1 char = 1 unit = { [empty][empty][empty][empty] [color][class][class][class] }
+	* 
+	* 0 000 = NULL (avoid pls)
+	* 1 001 = pawn
+	* 2 010 = rook
+	* 3 011 = knight
+	* 4 100 = bishop
+	* 5 101 = queen
+	* 6 110 = king
+	* 7 111 = empty */
+};
+
+// Creates unit data
+// Input nullptr for empty space
+char MakeUnitData(Unit* unit);
+
 class Board
 {
 private:
+	// Member properties
 	int width = 0;
 	int height = 0;
 	int turn = 0;
 	std::vector<Unit*> whiteUnits;
 	std::vector<Unit*> blackUnits;
-
+	BoardStateMemory m_history[50];
+	
+	// Functions
 	const std::vector<Unit*>* GetTeamArrayReadOnly(UnitColor team);
 	std::vector<Unit*>* GetTeamArray(UnitColor team);
 
@@ -68,11 +103,17 @@ private: // Helper functions
 	Unit* FindKingFromTeam(UnitColor team);
 	void ResetEnPasant();
 
+
 public:
 	void PlayBoard();
 	void PrintBoard();
 
 	void AddUnit(Unit* unit);
 	void RemoveUnit(Unit* unit);
-	void IncrementTurn();
+
+	void StoreBoardState();
+	bool IncrementTurn(); // Returns whether the game is over
+	void DrawBoardState(int state);
+	int FlipbookWFClick(int state);
+	void GameFlipbook();
 };

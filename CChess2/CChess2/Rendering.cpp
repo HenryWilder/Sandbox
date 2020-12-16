@@ -42,7 +42,7 @@ COLORREF FrameBuffer::SpacePatternAtPos(Coord space)
 
 void FrameBuffer::DrawPixel(PixelPos pixel, COLORREF color)
 {
-    PixelPos pix = pixel * space::screen::gameScale;
+    PixelPos pix = pixel * space::screen::gameScale; // Output-space
 
     for (int x = pix.x; x < pix.x + space::screen::gameScale; ++x)
         for (int y = pix.y; y < pix.y + space::screen::gameScale; ++y)
@@ -114,14 +114,48 @@ void FrameBuffer::DrawSpriteFAST(Coord space, sprite::Sprite* sprite, bool team,
     {
         for (pix.x = spaceBounds.start.x; pix.x < spaceBounds.end.x; ++pix.x)
         {
-#if UCHARARRAY_SPRITE_METHOD
-            if (sprite->m_texture[i] != 0) // Check is opaque
-#else
             if (sprite->m_texture[i] != ' ') // Check is opaque
-#endif
                 DrawToBufferAndScreen(pix, sprite->SpriteColor(i, team)); // Draws the pixel from the frame buffer to the console
 
             ++i;
+        }
+    }
+}
+
+void FrameBuffer::DrawSymbolSkippingBuffer(Coord space, char symbol, int colorspace)
+{
+    sprite::Sprite* sprite;
+
+    switch (symbol)
+    {
+    case '<':
+        sprite = &sprite::symbol::arrowL;
+        break;
+    case '>':
+        sprite = &sprite::symbol::arrowR;
+        break;
+    default:
+        sprite = nullptr;
+        break;
+    }
+
+    if (sprite != nullptr)
+    {
+        BoardTile spaceBounds = BoardTile(space);
+
+        PixelPos pix;
+
+        unsigned int i = 0; // The index of the sprite's array
+
+        for (pix.y = spaceBounds.start.y; pix.y < spaceBounds.end.y; ++pix.y)
+        {
+            for (pix.x = spaceBounds.start.x; pix.x < spaceBounds.end.x; ++pix.x)
+            {
+                if (sprite->m_texture[i] != ' ') // Check is opaque
+                    DrawPixel(pix, sprite->SpriteColor(i, colorspace)); // Draws the pixel from the frame buffer to the console
+
+                ++i;
+            }
         }
     }
 }
@@ -146,11 +180,7 @@ void FrameBuffer::DrawSpriteFASTWithBG(Coord space, const sprite::Sprite* sprite
     {
         for (pix.x = spaceBounds.start.x; pix.x < spaceBounds.end.x; ++pix.x)
         {
-#if UCHARARRAY_SPRITE_METHOD
-            if (sprite->m_texture[i] != 0) // Check is opaque
-#else
             if (sprite->m_texture[i] != ' ') // Check is opaque
-#endif
             {
                 COLORREF pixelColor = sprite->SpriteColor(i, team);
 
@@ -229,11 +259,7 @@ void FrameBuffer::DrawGhost(
 
             if (inSpriteBounds)
             {
-#if UCHARARRAY_SPRITE_METHOD
-                if (sprite->m_texture[i] != 0) // Check is opaque
-#else
                 if (sprite->m_texture[i] != ' ') // Check is opaque
-#endif
                     DrawPixel(pix, sprite->SpriteColor(i, team));
                 else
                     DrawPixel(pix, Get(pix));
@@ -260,11 +286,7 @@ void FrameBuffer::DrawSprite(Coord space, sprite::Sprite* sprite, bool team, boo
     {
         for (pix.x = spaceBounds.start.x; pix.x < spaceBounds.end.x; ++pix.x)
         {
-#if UCHARARRAY_SPRITE_METHOD
-            if (sprite->m_texture[i] != 0) // Check is opaque
-#else
             if (sprite->m_texture[i] != ' ') // Check is opaque
-#endif
             {
                 WriteToBuffer(pix, sprite->SpriteColor(i, team)); // Draws the pixel from the frame buffer to the console
             }
@@ -403,33 +425,17 @@ namespace sprite
         return CRef(colorPalette[(unsigned int)col]);
     }
 
-    COLORREF Sprite::SpriteColor(int index, bool team) const
+    COLORREF Sprite::SpriteColor(int index, int team) const
     {
         unsigned char value = m_texture[index];
 
         Pltt out = Pltt::Board_Black;
 
-        if (!team)
+        switch (team)
         {
+        case 0:
             switch (value)
             {
-#if UCHARARRAY_SPRITE_METHOD
-            case 1:
-                out = Pltt::UnitB_Fill;
-                break;
-            case 2:
-                out = Pltt::UnitB_Shade;
-                break;
-            case 3:
-                out = Pltt::UnitB_Edge;
-                break;
-            case 4:
-                out = Pltt::UnitB_Shine;
-                break;
-            case 5: // Glow
-                out = Pltt::Select_Unit;
-                break;
-#else
             case '1':
                 out = Pltt::UnitB_Fill;
                 break;
@@ -445,30 +451,11 @@ namespace sprite
             case '5': // Glow
                 out = Pltt::Select_Unit;
                 break;
-#endif
             }
-        }
-        else
-        {
+            break;
+        case 1:
             switch (value)
             {
-#if UCHARARRAY_SPRITE_METHOD
-            case 1:
-                out = Pltt::UnitW_Fill;
-                break;
-            case 2:
-                out = Pltt::UnitW_Shade;
-                break;
-            case 3:
-                out = Pltt::UnitW_Edge;
-                break;
-            case 4:
-                out = Pltt::UnitW_Shine;
-                break;
-            case 5: // Glow
-                out = Pltt::Select_Unit;
-                break;
-#else
             case '1':
                 out = Pltt::UnitW_Fill;
                 break;
@@ -484,8 +471,28 @@ namespace sprite
             case '5': // Glow
                 out = Pltt::Select_Unit;
                 break;
-#endif
             }
+            break;
+        case 2:
+            switch (value)
+            {
+            case '1':
+                out = Pltt::Select_Available;
+                break;
+            case '2':
+                out = Pltt::Select_Unit;
+                break;
+            case '3':
+                out = Pltt::Select_TakePiece;
+                break;
+            case '4':
+                out = Pltt::NoSelect_KingDanger;
+                break;
+            case '5':
+                out = Pltt::NoSelect_Teammate;
+                break;
+            }
+            break;
         }
 
         return PaletteColor(out);
@@ -493,9 +500,6 @@ namespace sprite
 
     namespace unit
     {
-#if UCHARARRAY_SPRITE_METHOD
-        Sprite null = { {} };
-#else
         Sprite null = {
            "                "
            "                "
@@ -513,28 +517,7 @@ namespace sprite
            "                "
            "                "
            "                "
-    };
-#endif
-#if UCHARARRAY_SPRITE_METHOD
-        Sprite pawn = { {
-           0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-           0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-           0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-           0,0,0,0,0,0,2,2,2,2,0,0,0,0,0,0,
-           0,0,0,0,0,2,1,1,4,4,2,0,0,0,0,0,
-           0,0,0,0,0,3,1,1,4,4,2,0,0,0,0,0,
-           0,0,0,0,0,3,1,1,1,1,2,0,0,0,0,0,
-           0,0,0,0,0,3,2,1,1,1,3,0,0,0,0,0,
-           0,0,0,0,0,0,3,2,4,2,0,0,0,0,0,0,
-           0,0,0,0,0,3,2,1,1,4,3,0,0,0,0,0,
-           0,0,0,0,0,0,3,2,4,3,0,0,0,0,0,0,
-           0,0,0,0,0,0,3,1,4,3,0,0,0,0,0,0,
-           0,0,0,0,0,0,3,1,4,3,0,0,0,0,0,0,
-           0,0,0,0,0,3,2,1,4,1,3,0,0,0,0,0,
-           0,0,0,0,3,2,1,1,1,4,4,3,0,0,0,0,
-           0,0,0,0,3,3,3,3,3,3,3,3,0,0,0,0,
-        } };
-#else
+        };
         Sprite pawn = {
            "                "
            "                "
@@ -553,27 +536,6 @@ namespace sprite
            "    32111443    "
            "    33333333    "
         };
-#endif
-#if UCHARARRAY_SPRITE_METHOD
-        Sprite rook = { {
-           0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-           0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-           0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-           0,0,0,0,3,3,0,3,3,0,3,3,0,0,0,0,
-           0,0,0,0,3,2,3,2,4,3,4,3,0,0,0,0,
-           0,0,0,0,3,2,1,1,1,1,4,3,0,0,0,0,
-           0,0,0,0,3,2,1,1,1,1,1,3,0,0,0,0,
-           0,0,0,0,0,3,2,2,1,2,3,0,0,0,0,0,
-           0,0,0,0,0,3,2,1,1,4,3,0,0,0,0,0,
-           0,0,0,0,0,3,2,1,1,4,3,0,0,0,0,0,
-           0,0,0,0,0,3,2,1,1,4,3,0,0,0,0,0,
-           0,0,0,0,0,3,2,1,1,4,3,0,0,0,0,0,
-           0,0,0,0,0,3,2,1,1,4,3,0,0,0,0,0,
-           0,0,0,0,3,2,2,1,1,4,4,3,0,0,0,0,
-           0,0,0,3,2,2,1,1,1,1,4,4,3,0,0,0,
-           0,0,0,3,3,3,3,3,3,3,3,3,3,0,0,0,
-        } };
-#else
         Sprite rook = {
            "                "
            "                "
@@ -592,27 +554,6 @@ namespace sprite
            "   3221111443   "
            "   3333333333   "
         };
-#endif
-#if UCHARARRAY_SPRITE_METHOD
-        Sprite knight = { {
-           0,0,0,0,0,0,3,3,0,0,0,0,0,0,0,0,
-           0,0,0,0,0,3,2,1,2,0,0,0,0,0,0,0,
-           0,0,0,0,3,2,1,4,2,3,3,3,3,3,0,0,
-           0,0,0,3,2,1,1,1,4,4,2,2,4,4,3,0,
-           0,0,0,3,2,1,1,1,1,1,1,1,1,2,3,0,
-           0,0,0,3,2,1,1,2,1,1,1,1,1,1,3,0,
-           0,0,0,0,3,2,1,2,1,1,1,1,3,3,0,0,
-           0,0,0,0,3,2,1,1,2,2,2,3,0,0,0,0,
-           0,0,0,0,0,3,2,1,4,4,2,0,0,0,0,0,
-           0,0,0,0,0,0,3,2,1,4,4,2,0,0,0,0,
-           0,0,0,0,0,0,3,2,1,1,4,4,3,0,0,0,
-           0,0,0,0,0,0,3,2,1,1,4,1,3,0,0,0,
-           0,0,0,0,0,3,2,1,1,1,1,2,3,0,0,0,
-           0,0,0,0,3,2,2,1,1,1,2,3,0,0,0,0,
-           0,0,0,3,2,2,1,1,1,1,4,4,2,0,0,0,
-           0,0,0,3,3,3,3,3,3,3,3,3,3,0,0,0,
-        } };
-#else
         Sprite knight = {
            "      33        "
            "     3212       "
@@ -631,27 +572,6 @@ namespace sprite
            "   3221111442   "
            "   3333333333   "
         };
-#endif
-#if UCHARARRAY_SPRITE_METHOD
-        Sprite bishop = { {
-           0,0,0,0,0,0,0,3,3,0,0,0,0,0,0,0,
-           0,0,0,0,0,0,3,1,4,3,0,0,0,0,0,0,
-           0,0,0,0,0,3,2,2,1,3,2,0,0,0,0,0,
-           0,0,0,0,3,2,1,1,1,3,2,0,0,0,0,0,
-           0,0,0,0,3,2,1,1,3,1,4,3,0,0,0,0,
-           0,0,0,0,3,2,1,1,1,1,4,3,0,0,0,0,
-           0,0,0,0,0,3,2,1,1,1,3,0,0,0,0,0,
-           0,0,0,0,0,0,3,2,2,3,0,0,0,0,0,0,
-           0,0,0,0,0,3,2,1,1,4,3,0,0,0,0,0,
-           0,0,0,0,0,0,3,2,4,3,0,0,0,0,0,0,
-           0,0,0,0,0,0,3,1,4,3,0,0,0,0,0,0,
-           0,0,0,0,0,3,2,1,1,4,3,0,0,0,0,0,
-           0,0,0,0,0,3,2,1,1,4,3,0,0,0,0,0,
-           0,0,0,0,3,2,2,1,1,4,4,3,0,0,0,0,
-           0,0,0,3,2,2,1,1,1,1,4,4,3,0,0,0,
-           0,0,0,3,3,3,3,3,3,3,3,3,3,0,0,0,
-        } };
-#else
         Sprite bishop = {
            "       33       "
            "      3143      "
@@ -670,27 +590,6 @@ namespace sprite
            "   3221111443   "
            "   3333333333   "
         };
-#endif
-#if UCHARARRAY_SPRITE_METHOD
-        Sprite queen = { {
-           0,0,0,0,0,0,0,3,3,0,0,0,0,0,0,0,
-           0,0,0,3,3,2,3,1,4,3,2,3,3,0,0,0,
-           0,0,0,3,1,3,3,3,2,3,3,1,3,0,0,0,
-           0,0,0,3,2,1,1,1,1,1,2,1,3,0,0,0,
-           0,0,0,0,3,2,2,2,1,2,1,3,0,0,0,0,
-           0,0,0,0,0,3,2,1,1,1,3,0,0,0,0,0,
-           0,0,0,0,0,3,2,1,1,2,3,0,0,0,0,0,
-           0,0,0,0,0,0,3,2,2,3,0,0,0,0,0,0,
-           0,0,0,0,0,3,2,1,1,4,3,0,0,0,0,0,
-           0,0,0,0,0,0,3,2,4,3,0,0,0,0,0,0,
-           0,0,0,0,0,0,3,1,4,3,0,0,0,0,0,0,
-           0,0,0,0,0,3,2,1,1,4,3,0,0,0,0,0,
-           0,0,0,0,0,3,2,1,1,4,3,0,0,0,0,0,
-           0,0,0,0,3,2,2,2,1,4,4,3,0,0,0,0,
-           0,0,0,3,2,2,1,1,1,1,4,4,3,0,0,0,
-           0,0,0,3,3,3,3,3,3,3,3,3,3,0,0,0,
-        } };
-#else
         Sprite queen = {
            "       33       "
            "   3323143233   "
@@ -709,27 +608,6 @@ namespace sprite
            "   3221111443   "
            "   3333333333   "
         };
-#endif
-#if UCHARARRAY_SPRITE_METHOD
-        Sprite king = { {
-           0,0,0,0,0,0,0,3,3,0,0,0,0,0,0,0,
-           0,0,0,0,0,0,2,3,3,2,0,0,0,0,0,0,
-           0,0,0,0,2,3,3,1,1,3,3,2,0,0,0,0,
-           0,0,0,0,3,2,1,1,4,4,4,3,0,0,0,0,
-           0,0,0,0,3,2,1,1,1,1,2,3,0,0,0,0,
-           0,0,0,0,0,3,2,1,1,1,3,0,0,0,0,0,
-           0,0,0,0,0,3,2,1,1,2,3,0,0,0,0,0,
-           0,0,0,0,0,0,3,2,2,3,0,0,0,0,0,0,
-           0,0,0,0,0,3,2,1,1,4,3,0,0,0,0,0,
-           0,0,0,0,0,0,3,2,4,3,0,0,0,0,0,0,
-           0,0,0,0,0,0,3,1,4,3,0,0,0,0,0,0,
-           0,0,0,0,0,3,2,1,1,4,3,0,0,0,0,0,
-           0,0,0,0,0,3,2,1,1,4,3,0,0,0,0,0,
-           0,0,0,0,3,2,2,2,1,4,4,3,0,0,0,0,
-           0,0,0,3,2,2,1,1,1,1,4,4,3,0,0,0,
-           0,0,0,3,3,3,3,3,3,3,3,3,3,0,0,0,
-        } };
-#else
         Sprite king = {
            "       33       "
            "      2332      "
@@ -748,61 +626,45 @@ namespace sprite
            "   3221111443   "
            "   3333333333   "
         };
-#endif
     }
 
     namespace symbol
     {
-#if UCHARARRAY_SPRITE_METHOD
-        Sprite n0 = { {
-           0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-           0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,
-           0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,
-           0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,
-           0,0,0,0,1,0,0,0,0,1,1,0,0,0,0,0,
-           0,0,0,0,1,0,0,0,1,1,1,0,0,0,0,0,
-           0,0,0,0,1,0,0,1,1,0,1,0,0,0,0,0,
-           0,0,0,0,1,0,1,1,0,0,1,0,0,0,0,0,
-           0,0,0,0,1,1,1,0,0,0,1,0,0,0,0,0,
-           0,0,0,0,1,1,0,0,0,0,1,0,0,0,0,0,
-           0,0,0,0,1,0,0,0,0,0,1,0,0,0,0,0,
-           0,0,0,0,0,1,0,0,0,1,0,0,0,0,0,0,
-           0,0,0,0,0,0,1,1,1,0,0,0,0,0,0,0,
-           0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-        } };
-#else
-        Sprite n0 = { 
-           "                "
-           "      111       "
-           "     1   1      "
-           "    1     1     "
-           "    1     1     "
-           "    1    11     "
-           "    1   1 1     "
-           "    1  1  1     "
-           "    1 1   1     "
-           "    11    1     "
-           "    1     1     "
-           "     1   1      "
-           "      111       "
-           "                "
-         };
-#endif
-        Sprite n1 = {
-           "                "
-           "       1        "
-           "      11        "
-           "     1 1        "
-           "    1  1        "
-           "       1        "
-           "       1        "
-           "       1        "
-           "       1        "
-           "       1        "
-           "       1        "
-           "       1        "
-           "    1111111     "
-           "                "
+        Sprite arrowL = {
+           "       33       "
+           "      313       "
+           "     3113       "
+           "    31113       "
+           "   311113       "
+           "  3111113       "
+           " 31111113       "
+           "311111113       "
+           "311111113       "
+           " 31111113       "
+           "  3111113       "
+           "   311113       "
+           "    31113       "
+           "     3113       "
+           "      313       "
+           "       33       "
+        };
+        Sprite arrowR = {
+           "       33       "
+           "       313      "
+           "       3113     "
+           "       31113    "
+           "       311113   "
+           "       3111113  "
+           "       31111113 "
+           "       311111113"
+           "       311111113"
+           "       31111113 "
+           "       3111113  "
+           "       311113   "
+           "       31113    "
+           "       3113     "
+           "       313      "
+           "       33       "
         };
     }
 }

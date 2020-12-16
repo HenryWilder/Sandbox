@@ -98,6 +98,8 @@ struct Vec2
     }
 };
 
+bool ValidPos(const Coord testPos);
+
 // Implies (to programmers) screenspace position
 // Can be multiplied/divided
 struct PixelPos : public Vec2

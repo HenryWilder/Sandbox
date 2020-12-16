@@ -68,8 +68,10 @@ void Mouse::MouseEventProc(MOUSE_EVENT_RECORD mEvent)
         m_tileCoord = MouseToBoardspace(mEvent.dwMousePosition);
 
         // Clamp to board
+        /*
         m_tileCoord.x = min(m_tileCoord.x, game::sideTileCount - 1);
         m_tileCoord.y = min(m_tileCoord.y, game::sideTileCount - 1);
+        */
 
 #if DEBUG_MODE
         /* --TESTING-- */
