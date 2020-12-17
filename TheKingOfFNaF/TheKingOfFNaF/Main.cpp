@@ -1,5 +1,6 @@
 #include <iostream>
 #include <Windows.h>
+#include "CustomTypes.h"
 
 // Get a console handle
 HWND window = GetConsoleWindow();
@@ -12,88 +13,126 @@ BYTE* g_screenData = 0;
 int g_screenWidth = 0;
 int g_screenHeight = 0;
 
-struct Color
-{
-	unsigned char r, g, b;
+ClockTime g_time = ClockTime();
 
-	unsigned char Gray()
-	{
-		return (unsigned char)(((int)r + (int)g + (int)b) / 3);
-	}
-};
-
-Color GetPixelColor(int x, int y)
+unsigned long PixelIndex(long x, long y)
 {
-	unsigned long long pos = 4 * ((y * (unsigned long long)g_screenWidth) + x);
-	return { g_screenData[pos + 2], g_screenData[pos + 1], g_screenData[pos] };
+	return 4u * (unsigned)((y * (long)g_screenWidth) + x);
 }
 
-struct Pixel
+Color GetPixelColor(long x, long y)
 {
-	Pixel() : color{ 0,0,0 }, x{ 0 }, y{ 0 } {};
-	Pixel(Color _color, int _x, int _y) : color{ _color }, x{ _x }, y{ _y } {};
-
-	Color color;
-	int x;
-	int y;
-};
-
-void SetPixelColor(int x, int y, Color color)
-{
-	unsigned long long pos = 4 * ((y * (unsigned long long)g_screenWidth) + x);
-	g_screenData[pos + 2] = color.r; // Red
-	g_screenData[pos + 1] = color.g; // Green
-	g_screenData[pos] = color.b; // Blue
+	unsigned long index = PixelIndex(x, y);
+	return { g_screenData[index + 2u],	// Red
+			 g_screenData[index + 1u],	// Green
+			 g_screenData[index] };		// Blue
 }
 
-// A section of the screen
-// PixelRect<width, height>(startX, startY)
-template<short w, short h>
-struct PixelRect
+void SetPixelColor(long x, long y, Color color, BYTE* data = g_screenData)
 {
-	PixelRect() {
-		int i = 0;
-		for (int y = 0; y < h; ++y)
-		{
-			for (int x = 0; x < w; ++x)
-			{
-				m_frame[i++] = Pixel({ 0,0,0 }, x, y);
-			}
-		}
-	}
-	PixelRect(int startX, int startY) {
-		int i = 0;
-		for (int y = startY; y < startY + h; ++y)
-		{
-			for (int x = startX; x < startX + w; ++x)
-			{
-				m_frame[i++] = Pixel(GetPixelColor(x, y), x, y);
-			}
-		}
-	}
+	unsigned long index = PixelIndex(x, y);
+	data[index + 2u] = color.r;	// Red
+	data[index + 1u] = color.g;	// Green
+	data[index] = color.b;		// Blue
+}
 
-	Pixel m_frame[w * h];
+enum class NumberScale
+{
+	Small = 0,
+	Norml = 1,
+	Large = 2,
 };
 
-void PixelProcessing(HDC context)
+// Input should be top-left corner of the number followed by the size
+char ReadNumber(int x, int y, NumberScale size
+#ifdef _DEBUG
+	, HDC context
+#endif
+)
 {
-	PixelRect<50, 35> clock = PixelRect<50, 35>((g_screenWidth / 2) - 75, 0);
-	for (Pixel pixel : clock.m_frame)
+	enum Sample : unsigned short
 	{
-		//if (pixel.color.r > 127)
-		SetPixel(context, pixel.x, pixel.y, RGB(pixel.color.r + 0, pixel.color.g + 50, pixel.color.b + 50)); // Draws the pixels (we only want this on a small number of pixels)
+		Top =		0b000000001,
+		Middle =	0b000000010,
+		Left =		0b000000100,
+		Right =		0b000001000,
+		BottomL =	0b000010000,
+		BottomC =	0b000100000,
+		BottomR =	0b001000000,
+		TopL =		0b010000000,
+		TopR =		0b100000000,
+	};
+	Sample sampleIDs[] = { Top, Middle, Left, Right, BottomL, BottomC, BottomR, TopL, TopR };
+	POINT sampleOffsets[] = { {5,0}, {5,8}, {0,8}, {10,8}, {0,12}, {5,12}, {10,12}, {0,7}, {10,7} };
+	enum SamplesToNumbers : unsigned short
+	{
+		_n1 = 0b000100011,
+		_n2 = 0b001110011,
+		_n3 = 0b000100001,
+		_n4 = 0b000001110,
+		_n5 = 0b000101001,
+		_n6 = 0b010101101,
+		_n7 = 0b000000011,
+		_n8 = 0b000101101,
+		_n9 = 0b100100001,
+		_n0 = 0b110101101,
+	};
+	SamplesToNumbers values[] = { _n0,_n1,_n2,_n3,_n4,_n5,_n6,_n7,_n8,_n9 };
+
+	int guess = 0b000000000;
+	unsigned char threshold = 63;
+
+	for (int sample = 0; sample < 9; ++sample)
+	{
+		if (GetPixelColor(x + sampleOffsets[sample].x, y + sampleOffsets[sample].y).Gray() > threshold) guess |= sampleIDs[sample];
+#ifdef _DEBUG
+		if ((guess & sampleIDs[sample]) == sampleIDs[sample]) SetPixel(context, x + sampleOffsets[sample].x, y + sampleOffsets[sample].y, RGB(255, 0, 0));
+		else SetPixel(context, x + sampleOffsets[sample].x, y + sampleOffsets[sample].y, RGB(0, 0, 255));
+#endif
 	}
+
+	for (char guessValue = 0; guessValue < 10; ++guessValue)
+	{
+		if (guess == values[guessValue]) return guessValue;
+	}
+	return '!'; // Error
+}
+
+// Run this about once every frame
+void ReadGameClock(HDC context)
+{
+	std::cout << ReadNumber(1873, 85, NumberScale::Small, context); // Deciseconds
+	std::cout << ReadNumber(1849, 85, NumberScale::Small, context); // Seconds (ones)
+	std::cout << ReadNumber(1832, 85, NumberScale::Small, context); // Seconds (tens)
+	std::cout << ReadNumber(1807, 85, NumberScale::Small, context); // Minutes
+	std::cout << '\n';
 
 	/*
-	for (int y = 0; y < g_screenHeight; ++y)
+	int clockWidth = 85;
+	int clockHeight = 65;
+	int clockOffsetX = g_screenWidth / 2 - clockWidth - 30;
+	int clockOffsetY = 35;
+	for (int y = clockOffsetY; y < clockOffsetY + clockHeight; ++y)
 	{
-		for (int x = 0; x < g_screenWidth; ++x)
+		for (int x = clockOffsetX; x < clockOffsetX + clockWidth; ++x)
 		{
 			Color color = GetPixelColor(x, y);
-			if (color.Gray() > 127) SetPixel(context, x, y, RGB(0, 255, 255)); // Draws the pixels (we only want this on a small number of pixels)
+			//if (color.Gray() > 63)
+			{
+#ifdef _DEBUG
+				SetPixel(context, x, y, RGB(255, 0, 0)); // Draws the pixels (we only want this on a small number of pixels)
+#endif
+			}
 		}
 	}
 	*/
+
+	//g_time.IncrementTime();
+}
+
+void PingGameState(HDC context)
+{
+	ReadGameClock(context);
 }
 
 int main()
@@ -124,7 +163,7 @@ int main()
 		bmi.biWidth = g_screenWidth;
 		bmi.biHeight = -g_screenHeight;
 		bmi.biCompression = BI_RGB;
-		bmi.biSizeImage = 0;// 3 * ScreenX * ScreenY;
+		bmi.biSizeImage = 0; // 3 * ScreenX * ScreenY;
 
 		if (g_screenData) free(g_screenData); // Empty screen data
 
@@ -132,11 +171,14 @@ int main()
 
 		GetDIBits(hDest, hBitmap, 0, g_screenHeight, g_screenData, (BITMAPINFO*)&bmi, DIB_RGB_COLORS);
 
-		PixelProcessing(hDest);
+		//PingGameState(hDest);
+		PingGameState(hDesktop);
 
-		BitBlt(hConsole, 0, 0, g_screenWidth, g_screenHeight, hDest, 0, 0, SRCCOPY); // Render output to console window
+#ifdef _DEBUG
+		//BitBlt(hConsole, 0, 0, g_screenWidth, g_screenHeight, hDest, 0, 0, SRCCOPY); // Render output to console window
+#endif
 
-		Sleep(1); // How long we should wait before the next snapshot
+		//Sleep(16); // How long we should wait before the next snapshot
 	}
 
 	// after the recording is done, release the desktop context you got..
