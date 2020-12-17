@@ -7,8 +7,8 @@ using namespace std;
 // Get a console handle
 extern HWND window;
 
-// Get a handle to device context
-extern HDC context;
+// Get a handle to device hdc
+extern HDC hdc;
 
 // A 24-bit color in RGB space
 struct Color

@@ -31,19 +31,18 @@ GrayscaleOutput NoiseToRender(int in)
 
 int main()
 {
-    NoiseSpace2 noiseData = NoiseSpace2(10U, 0U);
-
     GrayscaleOutput mat_Noise;
 
     mat_Noise = NoiseToRender(1);
 
-    g_frameBuffer.ApplyGrayscaleShader(mat_Noise, &noiseData);
+    for (unsigned int i = 0; i < 100; ++i)
+    {
+        NoiseSpace2 noiseData = NoiseSpace2(100U, i);
+        g_frameBuffer.ApplyGrayscaleShader(mat_Noise, &noiseData);
+        g_frameBuffer.Draw();
+    }
 
-    //DrawNoiseNodes(noiseData);
-
-    g_frameBuffer.Draw();
-
-    ReleaseDC(window, context);
+    ReleaseDC(window, hdc);
     cin.ignore();
 
     return 0;
