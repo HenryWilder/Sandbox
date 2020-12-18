@@ -135,12 +135,13 @@ struct GameState
 	};
 	unsigned short m_testableDataFlags;
 
-	/*
 	// This is the type which actually stores the data we have about the gamestate
-	class Data
+	struct Data
 	{
-
+		ClockTime time;
+		bool ventilationNeedsReset;
 	};
 	Data m_data;
-	*/
+
+	void DisplayGamestateData();
 };

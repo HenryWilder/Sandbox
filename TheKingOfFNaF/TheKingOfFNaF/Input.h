@@ -23,4 +23,4 @@ char ReadNumber(int x, int y, NumberScale size);
 // Run this about once every frame
 bool ReadGameClock(HDC context);
 
-bool CheckVentsReset(HDC context);
+void CheckVentsReset(HDC context);

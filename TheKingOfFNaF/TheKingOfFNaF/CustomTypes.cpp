@@ -53,15 +53,25 @@ unsigned char Color::Gray() const
 
 unsigned char Color::RedDev() const
 {
-	return (r - Gray()) / 3;
+	int distFromMean = (r - Gray());
+	return (unsigned char)sqrt((distFromMean * distFromMean) / 3);
 }
 
 unsigned char Color::GreenDev() const
 {
-	return (g - Gray()) / 3;
+	int distFromMean = (g - Gray());
+	return (unsigned char)sqrt((distFromMean * distFromMean) / 3);
 }
 
 unsigned char Color::BlueDev() const
 {
-	return (b - Gray()) / 3;
+	int distFromMean = (b - Gray());
+	return (unsigned char)sqrt((distFromMean * distFromMean) / 3);
+}
+
+void GameState::DisplayGamestateData()
+{
+	system("CLS");
+	std::cout << (int)(m_data.time.GetDeciseconds()) << '\n';
+	if () std::cout << (int)(m_data.time.GetDeciseconds()) << '\n'; // vent needs reset
 }

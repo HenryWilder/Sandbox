@@ -97,24 +97,24 @@ bool ReadGameClock(HDC context)
 	int tensOfSeconds = (int)ReadNumber(1832, 85, NumberScale::Small); // Seconds (tens)
 	int minute = (int)ReadNumber(1807, 85, NumberScale::Small); // Minutes
 
-	std::cout << minute << ":" << tensOfSeconds << seconds << "." << time << '\n';
-
 	time = time + 10 * seconds + 100 * tensOfSeconds + 600 * minute;
 
-	if (time > g_time.GetDeciseconds())
+	if (time > g_gameState.m_data.time.GetDeciseconds())
 	{
-		g_time.IncrementTime();
-		std::cout << g_time.GetDeciseconds() << '\n';
+		g_gameState.m_data.time.IncrementTime();
 		return true;
 	}
 	else
 	{
-		g_time.PingWithoutChange();
+		g_gameState.m_data.time.PingWithoutChange();
 		return false;
 	}
 }
 
-bool CheckVentsReset(HDC context)
+void CheckVentsReset(HDC context)
 {
-	return (GetPixelColor(1580, 1040).RedDev() > 20);
+	if (GetPixelColor(1580, 1040).RedDev() > 35)
+	{
+		g_gameState.m_data.ventilationNeedsReset = true;
+	}
 }

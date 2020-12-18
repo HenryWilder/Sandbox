@@ -12,8 +12,6 @@ extern int g_screenWidth;
 
 extern BYTE* g_screenData;
 
-extern ClockTime g_time;
-
 extern GameState g_gameState;
 
 extern HDC g_hDesktop; // get the desktop device context

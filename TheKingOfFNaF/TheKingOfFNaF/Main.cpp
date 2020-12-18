@@ -16,6 +16,8 @@ int main()
 
 		ExecuteBestAction();
 
+		g_gameState.DisplayGamestateData();
+
 		/// !! SAFETY !!
 		Sleep(30); // Give the user time to move the mouse
 		POINT p;
@@ -26,7 +28,7 @@ int main()
 				break; // I want to reserve 0,0 for the mouse to reset itself without closing the program
 			}
 		}
-		if (g_time.GetPingsSinceChange() > 10)
+		if (g_gameState.m_data.time.GetPingsSinceChange() > 30)
 		{
 			std::cout << "Task pinged too many times without updated input from UCN.\nTask ended.\n";
 			break;
