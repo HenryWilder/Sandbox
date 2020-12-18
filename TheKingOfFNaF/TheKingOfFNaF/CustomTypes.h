@@ -1,13 +1,15 @@
+#include <Windows.h>
+#include <iostream>
 #pragma once
 
 struct Color
 {
 	unsigned char r, g, b;
 
-	unsigned char Gray()
-	{
-		return (unsigned char)(((int)r + (int)g + (int)b) / 3);
-	}
+	unsigned char Gray() const;
+	unsigned char RedDev() const;
+	unsigned char GreenDev() const;
+	unsigned char BlueDev() const;
 };
 
 struct Pixel
@@ -25,10 +27,11 @@ class ClockTime
 private:
 	// One hour is 45 seconds. A night is 4 minutes 30 seconds, or 270 seconds -- 2700 deciseconds. This can be expressed in 12 bits as 0b101010001100.
 	unsigned short m_deciseconds;
+	int m_pingsSinceChange;
 
 public:
-	ClockTime() : m_deciseconds{ 0u } {};
-	ClockTime(unsigned short const& deciseconds) : m_deciseconds{ deciseconds } {};
+	ClockTime() : m_deciseconds{ 0u }, m_pingsSinceChange{ 0 } {};
+	ClockTime(unsigned short const& deciseconds) : m_deciseconds{ deciseconds }, m_pingsSinceChange{ 0 }{};
 
 	unsigned short const& GetDeciseconds(); // Read-only
 	unsigned short GetSeconds(); // It takes 1 bit more than a char to describe the number of seconds in a night.
@@ -39,6 +42,8 @@ public:
 	unsigned short GetDecisecondsSinceHour(); // Finds how many deciseconds into the current hour we are.
 
 	void IncrementTime(unsigned short const& amount = 1);
+	void PingWithoutChange();
+	int const& GetPingsSinceChange();
 };
 
 struct GameState

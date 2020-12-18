@@ -33,4 +33,35 @@ unsigned short ClockTime::GetDecisecondsSinceHour()
 void ClockTime::IncrementTime(unsigned short const& amount)
 {
 	m_deciseconds += amount;
+	m_pingsSinceChange = 0;
+}
+
+void ClockTime::PingWithoutChange()
+{
+	++m_pingsSinceChange;
+}
+
+int const& ClockTime::GetPingsSinceChange()
+{
+	return m_pingsSinceChange;
+}
+
+unsigned char Color::Gray() const
+{
+	return (unsigned char)(((int)r + (int)g + (int)b) / 3);
+}
+
+unsigned char Color::RedDev() const
+{
+	return (r - Gray()) / 3;
+}
+
+unsigned char Color::GreenDev() const
+{
+	return (g - Gray()) / 3;
+}
+
+unsigned char Color::BlueDev() const
+{
+	return (b - Gray()) / 3;
 }
