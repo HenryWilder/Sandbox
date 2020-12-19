@@ -143,6 +143,7 @@
     <ClCompile Include="GameActions.cpp" />
     <ClCompile Include="Globals.cpp" />
     <ClCompile Include="Input.cpp" />
+    <ClCompile Include="InputProcessing.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Output.cpp" />
   </ItemGroup>
@@ -151,6 +152,7 @@
     <ClInclude Include="GameActions.h" />
     <ClInclude Include="Globals.h" />
     <ClInclude Include="Input.h" />
+    <ClInclude Include="InputProcessing.h" />
     <ClInclude Include="Output.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

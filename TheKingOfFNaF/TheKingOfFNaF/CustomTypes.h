@@ -2,6 +2,11 @@
 #include <iostream>
 #pragma once
 
+struct NormalizedColor
+{
+	double r, g, b;
+};
+
 struct Color
 {
 	unsigned char r, g, b;
@@ -10,7 +15,10 @@ struct Color
 	unsigned char RedDev() const;
 	unsigned char GreenDev() const;
 	unsigned char BlueDev() const;
+	NormalizedColor Normal() const;
 };
+double NormalizedColorDifference(NormalizedColor color1, NormalizedColor color2);
+double NormalizedColorDifference(Color color1, Color color2);
 
 struct Pixel
 {
@@ -33,115 +41,98 @@ public:
 	ClockTime() : m_deciseconds{ 0u }, m_pingsSinceChange{ 0 } {};
 	ClockTime(unsigned short const& deciseconds) : m_deciseconds{ deciseconds }, m_pingsSinceChange{ 0 }{};
 
-	unsigned short const& GetDeciseconds(); // Read-only
-	unsigned short GetSeconds(); // It takes 1 bit more than a char to describe the number of seconds in a night.
-	unsigned char GetMinutes(); // Not sure what we'd need this for, but just in case.
-	unsigned char GetHour(); // What hour of the night we are at
+	unsigned short const& GetDeciseconds() const; // Read-only
+	unsigned short GetSeconds() const; // It takes 1 bit more than a char to describe the number of seconds in a night.
+	unsigned char GetMinutes() const; // Not sure what we'd need this for, but just in case.
+	unsigned char GetHour() const; // What hour of the night we are at
 
-	unsigned short GetWholeHourDeciseconds(); // Converts hours to deciseconds, for finding how many deciseconds we are through the current hour.
-	unsigned short GetDecisecondsSinceHour(); // Finds how many deciseconds into the current hour we are.
+	unsigned short GetWholeHourDeciseconds() const; // Converts hours to deciseconds, for finding how many deciseconds we are through the current hour.
+	unsigned short GetDecisecondsSinceHour() const; // Finds how many deciseconds into the current hour we are.
 
-	void IncrementTime(unsigned short const& amount = 1);
-	void PingWithoutChange();
+	void UpdateTime(unsigned short const&);
 	int const& GetPingsSinceChange();
+};
+
+// What gamestate we are in (what we can see on the screen)
+enum class State : unsigned char
+{
+	Office = 0,
+	Camera = 1,
+	Vent = 2,
+	Duct = 3,
+};
+
+enum class Camera : unsigned char
+{
+	PleaseUpdate = 0, // If this is 0 we are working with un-updated data
+	WestHall = 1,
+	EastHall = 2,
+	Closet = 3,
+	Kitchen = 4,
+	PirateCove = 5,
+	ShowtimeStage = 6,
+	PrizeCounter = 7,
+	PartsAndServices = 8,
+};
+
+enum class Vent : unsigned char
+{
+	Inactive = 0, // Snares reset after being tripped
+	WestSnare = 1,
+	NorthSnare = 2,
+	EastSnare = 3,
+};
+
+enum class Duct : bool
+{
+	West = false,
+	East = true,
 };
 
 struct GameState
 {
-	/*Tells information about how the data should be read (What data is known vs what is uncertain/unknowable at the current state)
-	* -Examples-
-	* ==========
-	* Information which can be semi-permanently known:
-	* -When Funtime Foxy's next show will be, given we have checked since it last updated.
-	* -Whether Afton has attacked yet or not
-	* 
-	* Information which cannot be known at certain gamestates:
-	* -How close Freddy or Lefty is to the office (would need to check the cameras)
-	* -How wound the music box is (can still be inferred, however)
-	*/
-	enum State : unsigned char
-	{
-		Office = 0,
-		Camera = 1,
-		Vent = 2,
-		Duct = 3,
-	};
-	State m_state; // What state we are in (office, checking cameras, ducts, vents)
+	State state; // What state we are in (office, checking cameras, ducts, vents)
 
 	union StateData // The metadata about the state (what part of the office, which camera)
 	{
-		signed char officeYaw; // How far left/right we are looking [-1,1]
-
-		enum Camera : unsigned char
+		struct OfficeData
 		{
-			PleaseUpdate = 0, // If this is 0 we are working with un-updated data
-			WestHall = 1,
-			EastHall = 2,
-			Closet = 3,
-			Kitchen = 4,
-			PirateCove = 5,
-			ShowtimeStage = 6,
-			PrizeCounter = 7,
-			PartsAndServices = 8,
+			signed char officeYaw; // How far left/right we are looking [-1,1]
 		};
-		Camera camera; // Which camera we are looking at
+		OfficeData od;
 
-		enum Vent : unsigned char
+		struct CamData
 		{
-			Inactive = 0, // Snares reset after being tripped
-			WestSnare = 1,
-			NorthSnare = 2,
-			EastSnare = 3,
+			Camera camera; // Which camera we are looking at
 		};
-		Vent ventSnare; // Which vent snare is active
+		CamData cd;
 
-		enum Duct : unsigned char
+		struct VentData
 		{
-			NA = 0, // Both are open (only true at the beginning of the game)
-			West = 1,
-			East = 2,
+			Vent ventSnare; // Which vent snare is active
 		};
-		Duct ductClosed; // Which duct is currently closed
+		VentData vd;
+
+		struct DuctData
+		{
+			Duct closedDuct; // Which duct is currently closed
+			POINT audioLure;
+		};
+		DuctData dd;
 	};
-	StateData m_metaState; // Information about the current state that can tell us how to interpret information
-
-	// Flags referring to what data we can test in the current gameState
-	// This is dependent on both the state and state metadata (in the case of the cameras/office)
-	enum GameDataFlag : unsigned short
-	{
-		// Basically always
-		InGameTime = 0,
-		PowerLevel = 0,
-		PowerUsage = 0,
-		NoiseLevel = 0,
-		OfficeTemp = 0,
-		TokenCount = 0,
-		// Requires internal memory
-		DFanActive = 0,
-		MuManAnger = 0,
-		// Only in office
-		MaskOnFace = 0,
-		WhoInPCove = 0,
-		NMarioOpac = 0, // Nightmarione
-		NMBBStandn = 0,
-		GoldFreddy = 0,
-		WetFlrSign = 0,
-		GostFreddy = 0,
-		// Only on camera
-		ScndSystem = 0,
-		FFShowtime = 0,
-		// Only in vents
-		// Only in ducts
-	};
-	unsigned short m_testableDataFlags;
+	StateData stateData; // Information about the current state that can tell us how to interpret information
 
 	// This is the type which actually stores the data we have about the gamestate
-	struct Data
+	struct GameData
 	{
 		ClockTime time;
 		bool ventilationNeedsReset;
-	};
-	Data m_data;
 
-	void DisplayGamestateData();
+		bool doorsClosed[4]; // In order from left to right
+		bool flashlight;
+	};
+	GameData gameData;
+
+	void DisplayData();
+	void Init();
 };

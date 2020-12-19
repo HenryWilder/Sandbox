@@ -6,6 +6,8 @@
 
 int main()
 {
+	g_gameState.Init();
+
 	SelectObject(g_hInternal, g_hBitmap);
 
 	while (true)
@@ -16,19 +18,17 @@ int main()
 
 		ExecuteBestAction();
 
-		g_gameState.DisplayGamestateData();
+		g_gameState.DisplayData();
 
 		/// !! SAFETY !!
 		Sleep(30); // Give the user time to move the mouse
-		POINT p;
-		if (GetCursorPos(&p)) {
-			if (!(p.x == 0 && p.y == 0) && (p.x == 0 || p.y == 0 || p.x >= g_screenWidth || p.y >= g_screenHeight))
-			{
-				std::cout << "User has chosen to reclaim control.\nTask ended.\n";
-				break; // I want to reserve 0,0 for the mouse to reset itself without closing the program
-			}
+		POINT p = GetMousePos();
+		if (!(p.x == 0 && p.y == 0) && (p.x == 0 || p.y == 0 || p.x >= g_screenWidth || p.y >= g_screenHeight))
+		{
+			std::cout << "User has chosen to reclaim control.\nTask ended.\n";
+			break; // I want to reserve 0,0 for the mouse to reset itself without closing the program
 		}
-		if (g_gameState.m_data.time.GetPingsSinceChange() > 30)
+		if (g_gameState.gameData.time.GetPingsSinceChange() > 30)
 		{
 			std::cout << "Task pinged too many times without updated input from UCN.\nTask ended.\n";
 			break;

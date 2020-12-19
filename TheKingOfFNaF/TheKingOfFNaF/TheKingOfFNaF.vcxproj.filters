@@ -33,6 +33,9 @@
     <ClCompile Include="GameActions.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="InputProcessing.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CustomTypes.h">
@@ -48,6 +51,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="GameActions.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="InputProcessing.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
