@@ -69,40 +69,76 @@ void CheckVentsReset()
 	}
 }
 
+void GenerateSamplePoints(POINT* arr, POINT start, long scale)
+{
+	arr[0] = start;
+	arr[1] = { arr[0].x, arr[0].y + scale };
+	arr[2] = { arr[0].x + scale, arr[0].y };
+	arr[3] = { arr[0].x, arr[0].y - scale };
+	arr[4] = { arr[0].x - scale, arr[0].y };
+}
+
+int TestSamples(Button button, CNorm compare, double threshold)
+{
+	POINT samplePoint[5];
+
+	GenerateSamplePoints(samplePoint, GetButtonPos(button), 1);
+
+	int matchCount = 0;
+
+	for (int i = 0; i < 5; ++i)
+	{
+		CNorm sample = GetPixelColor(samplePoint[i]).Normal();
+
+		if (CDot(sample, compare) > threshold) ++matchCount; // Increment matchCount when a match is found
+	}
+
+	return matchCount;
+}
+
+int MaxInArray(int* arr, size_t size) // Returns the index of the highest value
+{
+	int currentMax = 0;
+	int indexOfMax = 0;
+	for (int index = 0; index < size; ++index)
+	{
+		int value = arr[index];
+		if (value > currentMax)
+		{
+			currentMax = value;
+			indexOfMax = index;
+		}
+	}
+	return indexOfMax;
+}
+
 void UpdateState()
 {
+	constexpr double threshold = 0.95;
 	State state = State::Office;
+
+	int statesToTest[3] = { 0,0,0 };
 
 	for (int sysBtn = 0; sysBtn < 3; ++sysBtn)
 	{
-		Button button = (sysBtn == 0 ? Button::CameraSystem : (sysBtn == 1 ? Button::VentSystem : Button::DuctSystem));
-
-		Color buttonColor = GetPixelColor(GetButtonPos(button));
-		CNorm bColorNorm = buttonColor.Normal();
-		if (CDot(bColorNorm, clr::sysButtonNrm) > 0.9)
-		{
-			state = (button == Button::CameraSystem ? State::Camera : (button == Button::VentSystem ? State::Vent : State::Duct));
-			break;
-		}
+		statesToTest[sysBtn] = TestSamples(Button(10 + sysBtn), clr::sysButtonNrm, threshold);
 	}
+	state = State(1 + MaxInArray(statesToTest, 3)); // Systems start at 1 in the State enum (after Office)
+
+	g_gameState.state = state;
 
 	switch (state)
 	{
 	case State::Office:
 		break;
 	case State::Camera:
-		{
-			for (int camera = 0; camera < 8; ++camera)
-			{
-				Color buttonColor = GetPixelColor(GetButtonPos(Button(camera + 2)));
-				CNorm bColorNorm = buttonColor.Normal();
-				if (CDot(bColorNorm, clr::camButtonNrm) > 0.9)
-				{
-					g_gameState.stateData.cd.camera = Camera(camera + 1);
-					break;
-				}
-			}
+	{
+		int camsToTest[8] = { 0,0,0,0,0,0,0,0, };
+		for (int camera = 0; camera < 8; ++camera) {
+			camsToTest[camera] = TestSamples(Button(2 + camera), clr::sysButtonNrm, threshold);
 		}
+		g_gameState.stateData.cd.camera = Camera(1 + MaxInArray(camsToTest, 8));
+	}
 		break;
 	case State::Vent:
 		break;
@@ -111,6 +147,4 @@ void UpdateState()
 	default:
 		break;
 	}
-
-	g_gameState.state = state;
 }

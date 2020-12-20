@@ -16,4 +16,10 @@ void ReadGameClock();
 
 void CheckVentsReset();
 
+void GenerateSamplePoints(POINT* arr, POINT start, long size);
+
+int TestSamples(Button button, CNorm compare, double threshold);
+
+int MaxInArray(int* arr, size_t size); // Returns the index of the highest value
+
 void UpdateState();
