@@ -54,7 +54,7 @@ namespace pnt
 
 		constexpr POINT cam01 = { 1133, 903 }; // WestHall
 		constexpr POINT cam02 = { 1382, 903 }; // EastHall
-		constexpr POINT cam03 = { 1068, 824 }; // Closet
+		constexpr POINT cam03 = { 1067, 825 }; // Closet
 		constexpr POINT cam04 = { 1491, 765 }; // Kitchen
 		constexpr POINT cam05 = { 1122, 670 }; // PirateCove
 		constexpr POINT cam06 = { 1422, 590 }; // ShowtimeStage
@@ -82,8 +82,10 @@ namespace pnt
 }
 namespace clr // Colors
 {
-	constexpr Color sysButton = { 40,152,120 };
-	constexpr Color camButton = { 136,172,0 };
+	constexpr Color sysButton = { 40, 152, 120 };
+	const CNorm sysButtonNrm = sysButton.Normal();
+	constexpr Color camButton = { 136, 172, 0 };
+	const CNorm camButtonNrm = camButton.Normal();
 }
 
 constexpr int camResponseMS = 300; // Time it takes for the camera to be ready for input
@@ -109,5 +111,7 @@ enum class Button
 	Duct_Left = 16,
 	Duct_Right = 17,
 };
+
+extern const POINT buttonPositions[18];
 
 POINT GetButtonPos(Button);

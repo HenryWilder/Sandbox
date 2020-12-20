@@ -2,10 +2,11 @@
 #include <iostream>
 #pragma once
 
-struct NormalizedColor
+struct CNorm
 {
 	double r, g, b;
 };
+double CDot(CNorm, CNorm);
 
 struct Color
 {
@@ -15,10 +16,9 @@ struct Color
 	unsigned char RedDev() const;
 	unsigned char GreenDev() const;
 	unsigned char BlueDev() const;
-	NormalizedColor Normal() const;
+	CNorm Normal() const;
 };
-double NormalizedColorDifference(NormalizedColor color1, NormalizedColor color2);
-double NormalizedColorDifference(Color color1, Color color2);
+double CDot(Color, Color);
 
 struct Pixel
 {

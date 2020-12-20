@@ -12,8 +12,8 @@ enum class NumberScale
 char ReadNumber(int x, int y, NumberScale size);
 
 // Run this about once every frame
-void ReadGameClock(HDC context);
+void ReadGameClock();
 
-void CheckVentsReset(HDC context);
+void CheckVentsReset();
 
-void UpdateState(HDC context);
+void UpdateState();

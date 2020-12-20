@@ -14,7 +14,7 @@ int main()
 	{
 		UpdateScreencap();
 
-		PingGameState(g_hDesktop);
+		PingGameState();
 
 		ExecuteBestAction();
 

@@ -1,10 +1,11 @@
 #include "GameActions.h"
 
 // Updates all known game information
-void PingGameState(HDC context)
+void PingGameState()
 {
-	ReadGameClock(context);
-	CheckVentsReset(context);
+	UpdateState();
+	ReadGameClock();
+	CheckVentsReset();
 }
 
 namespace actn

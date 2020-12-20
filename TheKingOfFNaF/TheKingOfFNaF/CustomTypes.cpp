@@ -68,15 +68,15 @@ unsigned char Color::BlueDev() const
 	return (unsigned char)sqrt((distFromMean * distFromMean) / 3);
 }
 
-NormalizedColor Color::Normal() const
+CNorm Color::Normal() const
 {
-	NormalizedColor normal; // Note that this will always be [0-1]
+	CNorm normal; // Note that this will always be [0-1]
 
-	normal.r = (double)r;
-	normal.g = (double)g;
-	normal.b = (double)b;
+	normal.r = (double)r / 255.0;
+	normal.g = (double)g / 255.0;
+	normal.b = (double)b / 255.0;
 
-	double length = sqrt((normal.r * normal.r + normal.g * normal.g + normal.b * normal.b));
+	double length = sqrt(((normal.r * normal.r) + (normal.g * normal.g) + (normal.b * normal.b))); // a^2 + b^2 + c^2 = d^2
 
 	normal.r /= length;
 	normal.g /= length;
@@ -123,28 +123,31 @@ void GameState::DisplayData()
 		switch (stateData.cd.camera)
 		{
 		case Camera::EastHall:
-			camera = "East hall";
+			camera = "East hall         ";
 			break;
 		case Camera::Kitchen:
-			camera = "Kitchen";
+			camera = "Kitchen           ";
 			break;
 		case Camera::PartsAndServices:
 			camera = "Parts and services";
 			break;
 		case Camera::PirateCove:
-			camera = "Pirate cove";
+			camera = "Pirate cove       ";
 			break;
 		case Camera::PrizeCounter:
-			camera = "Prize counter";
+			camera = "Prize counter     ";
 			break;
 		case Camera::ShowtimeStage:
-			camera = "Showtime stage";
+			camera = "Showtime stage    ";
 			break;
 		case Camera::WestHall:
-			camera = "West hall";
+			camera = "West hall         ";
+			break;
+		case Camera::Closet:
+			camera = "Supply closet     ";
 			break;
 		default:
-			camera = "Error";
+			camera = "Error             ";
 			break;
 		}
 		printf("Looking at: %s\n", camera);
@@ -171,16 +174,18 @@ void GameState::Init()
 }
 
 // Better for determining how close a color is to another, regardless of the scale. (brightness/darkness)
-double NormalizedColorDifference(NormalizedColor color1, NormalizedColor color2)
+double CDot(CNorm a, CNorm b)
 {
-	double out = 0;
-	out += abs(color1.r - color2.r);
-	out += abs(color1.g - color2.g);
-	out += abs(color1.b - color2.b);
-	return out;
+	CNorm c;
+	c.r = a.r * b.r;
+	c.g = a.g * b.g;
+	c.b = a.b * b.b;
+	double dot;
+	dot = c.r + c.g + c.b;
+	return dot;
 }
 
-double NormalizedColorDifference(Color color1, Color color2)
+double CDot(Color a, Color b)
 {
-	return NormalizedColorDifference(color1.Normal(), color2.Normal());
+	return CDot(a.Normal(), b.Normal());
 }

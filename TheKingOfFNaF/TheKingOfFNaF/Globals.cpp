@@ -18,66 +18,27 @@ HDC g_hInternal = CreateCompatibleDC(g_hDesktop); // create a device context to 
 
 HBITMAP g_hBitmap = CreateCompatibleBitmap(g_hDesktop, g_screenWidth, g_screenHeight);
 
+const POINT buttonPositions[] = {
+		pnt::ofc::mask,
+		pnt::cam::resetVent,
+		pnt::cam::cam01,
+		pnt::cam::cam02,
+		pnt::cam::cam03,
+		pnt::cam::cam04,
+		pnt::cam::cam05,
+		pnt::cam::cam06,
+		pnt::cam::cam07,
+		pnt::cam::cam08,
+		{ pnt::cam::sysbX, pnt::cam::cSysY },
+		{ pnt::cam::sysbX, pnt::cam::vSysY },
+		{ pnt::cam::sysbX, pnt::cam::dSysY },
+		pnt::vnt::snrL,
+		pnt::vnt::snrT,
+		pnt::vnt::snrR,
+		pnt::dct::btnL,
+		pnt::dct::btnR };
+
 POINT GetButtonPos(Button button)
 {
-	switch (button)
-	{
-	case Button::Mask:
-		return pnt::ofc::mask;
-		break;
-	case Button::ResetVent:
-		return pnt::cam::resetVent;
-		break;
-	case Button::Cam01:
-		return pnt::cam::cam01;
-		break;
-	case Button::Cam02:
-		return pnt::cam::cam02;
-		break;
-	case Button::Cam03:
-		return pnt::cam::cam03;
-		break;
-	case Button::Cam04:
-		return pnt::cam::cam04;
-		break;
-	case Button::Cam05:
-		return pnt::cam::cam05;
-		break;
-	case Button::Cam06:
-		return pnt::cam::cam06;
-		break;
-	case Button::Cam07:
-		return pnt::cam::cam07;
-		break;
-	case Button::Cam08:
-		return pnt::cam::cam08;
-		break;
-	case Button::CameraSystem:
-		return { pnt::cam::sysbX, pnt::cam::cSysY };
-		break;
-	case Button::VentSystem:
-		return { pnt::cam::sysbX, pnt::cam::vSysY };
-		break;
-	case Button::DuctSystem:
-		return { pnt::cam::sysbX, pnt::cam::dSysY };
-		break;
-	case Button::Snare_Left:
-		return pnt::vnt::snrL;
-		break;
-	case Button::Snare_Top:
-		return pnt::vnt::snrT;
-		break;
-	case Button::Snare_Right:
-		return pnt::vnt::snrR;
-		break;
-	case Button::Duct_Left:
-		return pnt::dct::btnL;
-		break;
-	case Button::Duct_Right:
-		return pnt::dct::btnR;
-		break;
-	default:
-		return { 0,0 };
-		break;
-	}
+	return buttonPositions[(int)button];
 }

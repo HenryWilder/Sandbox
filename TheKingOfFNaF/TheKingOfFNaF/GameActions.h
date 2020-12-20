@@ -4,7 +4,7 @@
 #include "Output.h"
 
 // Updates all known game information
-void PingGameState(HDC context);
+void PingGameState();
 
 // Playbook of actions
 namespace actn

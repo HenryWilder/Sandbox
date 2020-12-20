@@ -48,7 +48,7 @@ char ReadNumber(int x, int y, NumberScale size)
 }
 
 // Run this about once every frame
-void ReadGameClock(HDC context)
+void ReadGameClock()
 {
 	int time = (int)ReadNumber(pnt::clk_decisecX, pnt::clk.y, NumberScale::Small); // Deciseconds
 	int seconds = (int)ReadNumber(pnt::clk_secX, pnt::clk.y, NumberScale::Small); // Seconds (ones)
@@ -60,7 +60,7 @@ void ReadGameClock(HDC context)
 	g_gameState.gameData.time.UpdateTime(time);
 }
 
-void CheckVentsReset(HDC context)
+void CheckVentsReset()
 {
 	if (GetPixelColor(pnt::ofc::ventWarning).RedDev() > 35 ||
 		GetPixelColor(pnt::cam::ventWarning).RedDev() > 35)
@@ -69,7 +69,48 @@ void CheckVentsReset(HDC context)
 	}
 }
 
-void UpdateState(HDC context)
+void UpdateState()
 {
+	State state = State::Office;
 
+	for (int sysBtn = 0; sysBtn < 3; ++sysBtn)
+	{
+		Button button = (sysBtn == 0 ? Button::CameraSystem : (sysBtn == 1 ? Button::VentSystem : Button::DuctSystem));
+
+		Color buttonColor = GetPixelColor(GetButtonPos(button));
+		CNorm bColorNorm = buttonColor.Normal();
+		if (CDot(bColorNorm, clr::sysButtonNrm) > 0.9)
+		{
+			state = (button == Button::CameraSystem ? State::Camera : (button == Button::VentSystem ? State::Vent : State::Duct));
+			break;
+		}
+	}
+
+	switch (state)
+	{
+	case State::Office:
+		break;
+	case State::Camera:
+		{
+			for (int camera = 0; camera < 8; ++camera)
+			{
+				Color buttonColor = GetPixelColor(GetButtonPos(Button(camera + 2)));
+				CNorm bColorNorm = buttonColor.Normal();
+				if (CDot(bColorNorm, clr::camButtonNrm) > 0.9)
+				{
+					g_gameState.stateData.cd.camera = Camera(camera + 1);
+					break;
+				}
+			}
+		}
+		break;
+	case State::Vent:
+		break;
+	case State::Duct:
+		break;
+	default:
+		break;
+	}
+
+	g_gameState.state = state;
 }
