@@ -82,7 +82,7 @@ int TestSamples(Button button, CNorm compare, double threshold)
 {
 	POINT samplePoint[5];
 
-	GenerateSamplePoints(samplePoint, GetButtonPos(button), 1);
+	GenerateSamplePoints(samplePoint, GetButtonPos(button), 4);
 
 	int matchCount = 0;
 
@@ -100,11 +100,9 @@ int MaxInArray(int* arr, size_t size) // Returns the index of the highest value
 {
 	int currentMax = 0;
 	int indexOfMax = 0;
-	for (int index = 0; index < size; ++index)
-	{
-		int value = arr[index];
-		if (value > currentMax)
-		{
+	for (int index = 0; index < size; ++index) {
+		const int& value = arr[index];
+		if (value > currentMax) {
 			currentMax = value;
 			indexOfMax = index;
 		}
@@ -114,37 +112,39 @@ int MaxInArray(int* arr, size_t size) // Returns the index of the highest value
 
 void UpdateState()
 {
-	constexpr double threshold = 0.95;
+	constexpr double threshold = .99;
 	State state = State::Office;
 
-	int statesToTest[3] = { 0,0,0 };
+	int statesToTest[3] = { 0,0,0 }; // List of how many samples returned as matches for each of the buttons being tested
 
-	for (int sysBtn = 0; sysBtn < 3; ++sysBtn)
-	{
+	for (int sysBtn = 0; sysBtn < 3; ++sysBtn) {
 		statesToTest[sysBtn] = TestSamples(Button(10 + sysBtn), clr::sysButtonNrm, threshold);
 	}
-	state = State(1 + MaxInArray(statesToTest, 3)); // Systems start at 1 in the State enum (after Office)
+	int indexOfHighestValue = MaxInArray(statesToTest, 3);
+	if (statesToTest[indexOfHighestValue] == 5) // We must have over 50% of the samples returning as matches
+		state = State(1 + indexOfHighestValue); // Systems start at 1 in the State enum (after Office)
 
-	g_gameState.state = state;
+	g_gameState.state = state; // Update the global state
 
 	switch (state)
 	{
 	case State::Office:
 		break;
+
 	case State::Camera:
 	{
 		int camsToTest[8] = { 0,0,0,0,0,0,0,0, };
 		for (int camera = 0; camera < 8; ++camera) {
 			camsToTest[camera] = TestSamples(Button(2 + camera), clr::sysButtonNrm, threshold);
 		}
-		g_gameState.stateData.cd.camera = Camera(1 + MaxInArray(camsToTest, 8));
+		g_gameState.stateData.cd.camera = Camera(1 + MaxInArray(camsToTest, 8)); // If we've confirmed the state then there's no doubt we can identify the camera
 	}
 		break;
+
 	case State::Vent:
 		break;
+
 	case State::Duct:
-		break;
-	default:
 		break;
 	}
 }

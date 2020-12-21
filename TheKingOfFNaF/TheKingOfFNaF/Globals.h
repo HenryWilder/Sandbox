@@ -112,6 +112,10 @@ enum class Button
 	Duct_Right = 17,
 };
 
+Button CameraButton(Camera cam);
+
+Button SystemButton(State system);
+
 extern const POINT buttonPositions[18];
 
 POINT GetButtonPos(Button);

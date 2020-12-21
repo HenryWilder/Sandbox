@@ -20,15 +20,14 @@ struct Color
 };
 double CDot(Color, Color);
 
-struct Pixel
+struct ColorHSL
 {
-	Pixel() : color{ 0,0,0 }, x{ 0 }, y{ 0 } {};
-	Pixel(Color _color, int _x, int _y) : color{ _color }, x{ _x }, y{ _y } {};
-
-	Color color;
-	int x;
-	int y;
+	double
+		hue, // A degree on the color wheel [0..360]
+		sat, // Percentage of color [0..100]
+		lum; // Percentage of brightness [0..100]
 };
+ColorHSL RGBtoHSL(Color color);
 
 class ClockTime
 {

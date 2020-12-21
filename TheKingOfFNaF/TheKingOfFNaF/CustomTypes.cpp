@@ -189,3 +189,63 @@ double CDot(Color a, Color b)
 {
 	return CDot(a.Normal(), b.Normal());
 }
+
+ColorHSL RGBtoHSL(Color color)
+{
+	double col[3] = {
+		(double)color.r / 255.0,
+		(double)color.g / 255.0,
+		(double)color.b / 255.0, };
+
+	double cmax;
+	int cmaxComp;
+	double cmin;
+
+	if (col[0] > col[1]) {
+		if (col[0] > col[2]) cmaxComp = 0;
+		else cmaxComp = 2; // col[0] < col[2]
+	}
+	else { // col[0] < col[1]
+		if (col[1] > col[2]) cmaxComp = 1;
+		else cmaxComp = 2; // col[1] < col[2]
+	}
+
+	cmax = col[cmaxComp];
+	cmin = min(col[0], min(col[1], col[2]));
+	double delta = cmax - cmin;
+
+	double h, s, l;
+
+	// Hue
+	if (delta == 0.0) h = 0.0;
+	else
+	{
+		switch (cmaxComp)
+		{
+		case 0: // Red
+			h = 60.0 * ((col[1] - col[2]) / delta);
+			break;
+		case 1: // Green
+			h = 60.0 * (((col[2] - col[0]) / delta) + 2.0);
+			break;
+		case 2: // Blue
+			h = 60.0 * (((col[0] - col[1]) / delta) + 4.0);
+			break;
+		}
+	}
+
+	// Lum
+	l = (cmax + cmin) / 2.0;
+
+	// Sat
+	if (delta == 0.0) s = 0;
+	else
+	{
+		double temp = 2 * l - 1;
+		s = delta / (1 - (temp < 0.0 ? temp * -1.0 : temp));
+	}
+
+	// Finished
+
+	return { h,s,l };
+}

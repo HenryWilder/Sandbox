@@ -1,7 +1,7 @@
 #include "GameActions.h"
 
 // Updates all known game information
-void PingGameState()
+void RefreshGameState()
 {
 	UpdateState();
 	ReadGameClock();
@@ -10,34 +10,96 @@ void PingGameState()
 
 namespace actn
 {
-	void OpenCameraIfClosed()
+	namespace sub
 	{
-		if (g_gameState.state == State::Office)
+		void ConfirmSystem(State system)
 		{
-			SimulateKey(VirtualKey::CameraToggle);
-			Sleep(camResponseMS);
+			if (g_gameState.state != system)
+			{
+				if (g_gameState.state == State::Office)
+				{
+					SimulateKey(VirtualKey::CameraToggle);
+					Sleep(camResponseMS);
+					UpdateState();
+					if (g_gameState.state != system) SimulateMouseClickAt(GetButtonPos(SystemButton(system)));
+				}
+				else SimulateMouseClickAt(GetButtonPos(Button(10 + (int)system)));
+			}
+		}
+		void OpenCameraIfClosed()
+		{
+			switch (g_gameState.state)
+			{
+			case State::Camera:
+				break;
+
+			case State::Office:
+				SimulateKey(VirtualKey::CameraToggle);
+				Sleep(camResponseMS);
+				UpdateState();
+				if (g_gameState.state != State::Camera) SimulateMouseClickAt(GetButtonPos(Button::CameraSystem));
+				break;
+
+			default: // Vent or duct
+				SimulateMouseClickAt(GetButtonPos(Button::CameraSystem));
+				break;
+			}
+			Sleep(1); // In case the next step is another button press elsewhere
+		}
+		void OpenMonitorIfClosed()
+		{
+			if (g_gameState.state == State::Office) {
+				SimulateKey(VirtualKey::CameraToggle);
+				Sleep(camResponseMS);
+			}
+		}
+		void CloseMonitorIfOpen()
+		{
+			if (g_gameState.state != State::Office) {
+				SimulateKey(VirtualKey::CameraToggle);
+				Sleep(camResponseMS);
+			}
+		}
+		void EnterGameState(State state)
+		{
+			switch (state)
+			{
+			case State::Office:
+				if (g_gameState.state != State::Office) CloseMonitorIfOpen();
+				break;
+			case State::Camera:
+				if (g_gameState.state != State::Camera)
+				{
+					if (g_gameState.state == State::Office)
+					{
+						SimulateKey(VirtualKey::CameraToggle);
+						Sleep(camResponseMS);
+						UpdateState();
+						if (g_gameState.state != State::Camera) SimulateMouseClickAt(GetButtonPos(Button::CameraSystem));
+					}
+					else SimulateMouseClickAt(GetButtonPos(Button::CameraSystem));
+				}
+				break;
+			case State::Duct:
+				break;
+			case State::Vent:
+				break;
+			}
 		}
 	}
-	void CloseCameraIfOpen()
-	{
-		if (g_gameState.state != State::Office)
-		{
-			SimulateKey(VirtualKey::CameraToggle);
-			Sleep(camResponseMS);
-		}
-	}
+
 	void FuntimeFoxy()
 	{
-		OpenCameraIfClosed();
+		State storedState = g_gameState.state;
+		sub::OpenCameraIfClosed();
 		SimulateMouseClickAt(GetButtonPos(Button::Cam06));
 	}
 	void ResetVents()
 	{
-		OpenCameraIfClosed();
+		sub::OpenMonitorIfClosed(); // We don't need to care which system, only that the monitor is up.
 		SimulateMouseClickAt(GetButtonPos(Button::ResetVent));
 		g_gameState.gameData.ventilationNeedsReset = false;
 		Sleep(10);
-		CloseCameraIfOpen();
 	}
 }
 

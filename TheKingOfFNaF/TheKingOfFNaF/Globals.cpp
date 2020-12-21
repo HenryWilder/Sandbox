@@ -38,6 +38,16 @@ const POINT buttonPositions[] = {
 		pnt::dct::btnL,
 		pnt::dct::btnR };
 
+Button CameraButton(Camera cam)
+{
+	return Button((int)Button::Cam01 + (int)cam);
+}
+
+Button SystemButton(State system)
+{
+	return Button((int)Button::CameraSystem + (int)system);
+}
+
 POINT GetButtonPos(Button button)
 {
 	return buttonPositions[(int)button];
