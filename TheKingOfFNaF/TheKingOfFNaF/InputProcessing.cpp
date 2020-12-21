@@ -118,11 +118,11 @@ void UpdateState()
 	int statesToTest[3] = { 0,0,0 }; // List of how many samples returned as matches for each of the buttons being tested
 
 	for (int sysBtn = 0; sysBtn < 3; ++sysBtn) {
-		statesToTest[sysBtn] = TestSamples(Button(10 + sysBtn), clr::sysButtonNrm, threshold);
+		statesToTest[sysBtn] = TestSamples(Button(SystemButton(sysBtn)), clr::sysButtonNrm, threshold);
 	}
 	int indexOfHighestValue = MaxInArray(statesToTest, 3);
 	if (statesToTest[indexOfHighestValue] == 5) // We must have over 50% of the samples returning as matches
-		state = State(1 + indexOfHighestValue); // Systems start at 1 in the State enum (after Office)
+		state = State(indexOfHighestValue);
 
 	g_gameState.state = state; // Update the global state
 
@@ -133,11 +133,11 @@ void UpdateState()
 
 	case State::Camera:
 	{
-		int camsToTest[8] = { 0,0,0,0,0,0,0,0, };
+		int camsToTest[8] = {};
 		for (int camera = 0; camera < 8; ++camera) {
-			camsToTest[camera] = TestSamples(Button(2 + camera), clr::sysButtonNrm, threshold);
+			camsToTest[camera] = TestSamples(CameraButton(camera), clr::camButtonNrm, threshold);
 		}
-		g_gameState.stateData.cd.camera = Camera(1 + MaxInArray(camsToTest, 8)); // If we've confirmed the state then there's no doubt we can identify the camera
+		g_gameState.stateData.cd.camera = Camera(MaxInArray(camsToTest, 8)); // If we've confirmed the state then there's no doubt we can identify the camera
 	}
 		break;
 

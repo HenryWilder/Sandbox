@@ -15,7 +15,7 @@ namespace actn
 		void OpenCameraIfClosed();
 		void OpenMonitorIfClosed(); // Like OpenCameraIfClosed(), but slightly faster because it doesn't take into account the system we're on
 		void CloseMonitorIfOpen();
-		void EnterGameState(State state);
+		void EnterGameState(State state, Camera cam = Camera::WestHall);
 	}
 	void FuntimeFoxy();
 	void ResetVents();

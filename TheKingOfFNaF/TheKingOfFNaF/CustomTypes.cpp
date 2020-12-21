@@ -99,65 +99,50 @@ void GameState::DisplayData()
 	const char* dispState;
 	switch (state)
 	{
-	case State::Office:
-		dispState = "Office";
-			break;
-	case State::Camera:
-		dispState = "Camera";
-			break;
-	case State::Vent:
-		dispState = "Vent  ";
-			break;
-	case State::Duct:
-		dispState = "Duct  ";
+	case State::Office: dispState = "Office";
 		break;
-	default:
-		dispState = "Error ";
+	case State::Camera: dispState = "Camera";
+		break;
+	case State::Vent: dispState = "Vent  ";
+		break;
+	case State::Duct: dispState = "Duct  ";
+		break;
+	default: dispState = "Error ";
 		break;
 	}
-	printf("Gamestate\n=========\nState: %s\n", dispState);
+	printf("Gamestate\n=========\nState: %s\n                                 \x1b[1G", dispState);
 	if (state == State::Camera)
 	{
 		const char* camera;
 
 		switch (stateData.cd.camera)
 		{
-		case Camera::EastHall:
-			camera = "East hall         ";
+		case Camera::EastHall: camera = "East hall         ";
 			break;
-		case Camera::Kitchen:
-			camera = "Kitchen           ";
+		case Camera::Kitchen: camera = "Kitchen           ";
 			break;
-		case Camera::PartsAndServices:
-			camera = "Parts and services";
+		case Camera::PartsAndServices: camera = "Parts and services";
 			break;
-		case Camera::PirateCove:
-			camera = "Pirate cove       ";
+		case Camera::PirateCove: camera = "Pirate cove       ";
 			break;
-		case Camera::PrizeCounter:
-			camera = "Prize counter     ";
+		case Camera::PrizeCounter: camera = "Prize counter     ";
 			break;
-		case Camera::ShowtimeStage:
-			camera = "Showtime stage    ";
+		case Camera::ShowtimeStage: camera = "Showtime stage    ";
 			break;
-		case Camera::WestHall:
-			camera = "West hall         ";
+		case Camera::WestHall: camera = "West hall         ";
 			break;
-		case Camera::Closet:
-			camera = "Supply closet     ";
+		case Camera::Closet: camera = "Supply closet     ";
 			break;
-		default:
-			camera = "Error             ";
+		default: camera = "Error             ";
 			break;
 		}
-		printf("Looking at: %s\n", camera);
+		printf("Looking at: %s", camera);
 	}
 	else if (state == State::Office)
 	{
-		printf("Yaw: %d\n", stateData.od.officeYaw);
+		printf("Yaw: %d", stateData.od.officeYaw);
 	}
-	else printf("                                 \n");
-	printf("\n");
+	printf("\n\n");
 }
 
 void GameState::Init()

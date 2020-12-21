@@ -46,6 +46,7 @@ namespace actn
 			}
 			Sleep(1); // In case the next step is another button press elsewhere
 		}
+
 		void OpenMonitorIfClosed()
 		{
 			if (g_gameState.state == State::Office) {
@@ -53,6 +54,7 @@ namespace actn
 				Sleep(camResponseMS);
 			}
 		}
+
 		void CloseMonitorIfOpen()
 		{
 			if (g_gameState.state != State::Office) {
@@ -60,7 +62,8 @@ namespace actn
 				Sleep(camResponseMS);
 			}
 		}
-		void EnterGameState(State state)
+
+		void EnterGameState(State state, Camera cam)
 		{
 			switch (state)
 			{
@@ -78,7 +81,10 @@ namespace actn
 						if (g_gameState.state != State::Camera) SimulateMouseClickAt(GetButtonPos(Button::CameraSystem));
 					}
 					else SimulateMouseClickAt(GetButtonPos(Button::CameraSystem));
+
+					UpdateState();
 				}
+				if (g_gameState.stateData.cd.camera != cam) SimulateMouseClickAt(GetButtonPos(CameraButton(cam)));
 				break;
 			case State::Duct:
 				break;
@@ -90,7 +96,6 @@ namespace actn
 
 	void FuntimeFoxy()
 	{
-		State storedState = g_gameState.state;
 		sub::OpenCameraIfClosed();
 		SimulateMouseClickAt(GetButtonPos(Button::Cam06));
 	}
@@ -108,6 +113,9 @@ void ExecuteBestAction()
 {
 	GameState::StateData const& stateData = g_gameState.stateData;
 	GameState::GameData const& gameData = g_gameState.gameData;
+	const State storedState = g_gameState.state; // We need a copy of this, not just a reference
+	const Camera storedCamera = g_gameState.stateData.cd.camera; // We need a copy of this, not just a reference
+
 
 	// Organized in order of importance
 	if (gameData.ventilationNeedsReset)
@@ -115,9 +123,11 @@ void ExecuteBestAction()
 		actn::ResetVents();
 	}
 
-	if ((450u/*deciseconds in an hour*/ - (gameData.time.GetDeciseconds() - gameData.time.GetWholeHourDeciseconds())) <= 10u/*1 second*/) // We have <= 1 seconds before the next hour
+	if ((450u/*deciseconds in an hour*/ - gameData.time.GetDecisecondsSinceHour()) <= (10u/*1 second*/ + (camResponseMS / 100))) // We have <= 1 seconds before the next hour
 	{
 		actn::FuntimeFoxy();
 		Sleep(10);
 	}
+
+	actn::sub::EnterGameState(storedState, storedCamera);
 }

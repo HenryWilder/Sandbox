@@ -55,23 +55,22 @@ public:
 // What gamestate we are in (what we can see on the screen)
 enum class State : unsigned char
 {
-	Office = 0,
-	Camera = 1,
-	Vent = 2,
-	Duct = 3,
+	Camera = 0,
+	Vent = 1,
+	Duct = 2,
+	Office = 3,
 };
 
 enum class Camera : unsigned char
 {
-	PleaseUpdate = 0, // If this is 0 we are working with un-updated data
-	WestHall = 1,
-	EastHall = 2,
-	Closet = 3,
-	Kitchen = 4,
-	PirateCove = 5,
-	ShowtimeStage = 6,
-	PrizeCounter = 7,
-	PartsAndServices = 8,
+	WestHall = 0,
+	EastHall = 1,
+	Closet = 2,
+	Kitchen = 3,
+	PirateCove = 4,
+	ShowtimeStage = 5,
+	PrizeCounter = 6,
+	PartsAndServices = 7,
 };
 
 enum class Vent : unsigned char
