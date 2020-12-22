@@ -6,6 +6,7 @@ void RefreshGameState()
 	UpdateState();
 	ReadGameClock();
 	CheckVentsReset();
+	//LocateOfficeLamp();
 }
 
 namespace actn
@@ -68,23 +69,15 @@ namespace actn
 			switch (state)
 			{
 			case State::Office:
-				if (g_gameState.state != State::Office) CloseMonitorIfOpen();
+				CloseMonitorIfOpen();
 				break;
 			case State::Camera:
-				if (g_gameState.state != State::Camera)
+				OpenCameraIfClosed();
+				if (g_gameState.stateData.cd.camera != cam)
 				{
-					if (g_gameState.state == State::Office)
-					{
-						SimulateKey(VirtualKey::CameraToggle);
-						Sleep(camResponseMS);
-						UpdateState();
-						if (g_gameState.state != State::Camera) SimulateMouseClickAt(GetButtonPos(Button::CameraSystem));
-					}
-					else SimulateMouseClickAt(GetButtonPos(Button::CameraSystem));
-
-					UpdateState();
+					SimulateMouseClickAt(GetButtonPos(CameraButton(cam)));
+					Sleep(1);
 				}
-				if (g_gameState.stateData.cd.camera != cam) SimulateMouseClickAt(GetButtonPos(CameraButton(cam)));
 				break;
 			case State::Duct:
 				break;
@@ -113,9 +106,21 @@ void ExecuteBestAction()
 {
 	GameState::StateData const& stateData = g_gameState.stateData;
 	GameState::GameData const& gameData = g_gameState.gameData;
-	const State storedState = g_gameState.state; // We need a copy of this, not just a reference
-	const Camera storedCamera = g_gameState.stateData.cd.camera; // We need a copy of this, not just a reference
 
+	if (g_gameState.state == State::Office)
+	{
+		CheckOnNMBB();
+		if (gameData.nmBB)
+		{
+			Sleep(10);
+			CheckOnNMBB(); // Double check
+			if (gameData.nmBB)
+			{
+				SimulateKey(VirtualKey::Flashlight);
+				g_gameState.gameData.nmBB = false;
+			}
+		}
+	}
 
 	// Organized in order of importance
 	if (gameData.ventilationNeedsReset)
@@ -128,6 +133,4 @@ void ExecuteBestAction()
 		actn::FuntimeFoxy();
 		Sleep(10);
 	}
-
-	actn::sub::EnterGameState(storedState, storedCamera);
 }

@@ -1,5 +1,6 @@
 #include <Windows.h>
 #include <iostream>
+#include <stdlib.h>
 #pragma once
 
 struct CNorm
@@ -95,7 +96,7 @@ struct GameState
 	{
 		struct OfficeData
 		{
-			signed char officeYaw; // How far left/right we are looking [-1,1]
+			double officeYaw; // How far left/right we are looking [-1,1]
 		};
 		OfficeData od;
 
@@ -128,6 +129,8 @@ struct GameState
 
 		bool doorsClosed[4]; // In order from left to right
 		bool flashlight;
+
+		bool nmBB; // True if nightmare bb is standing
 	};
 	GameData gameData;
 

@@ -87,14 +87,15 @@ CNorm Color::Normal() const
 
 void GameState::DisplayData()
 {
-	printf("\x1b[0;0HTime: %d:%d.%d\n\nStatuses\n========\nVentilation %s\nLeft  door  %s\nFront vent  %s\nRight door  %s\nRight vent  %s\nFlashlight  %s\n\n",
-		(int)(gameData.time.GetMinutes()), (int)(gameData.time.GetSeconds()%60), (int)(gameData.time.GetDeciseconds()%10),
+	printf("\x1b[0;0HTime: %d:%d.%d\n\nStatuses\n========\nVentilation %s\nLeft  door  %s\nFront vent  %s\nRight door  %s\nRight vent  %s\nFlashlight  %s\nNM BB  %s\n",
+		(int)(gameData.time.GetMinutes()), (int)(gameData.time.GetSeconds() % 60), (int)(gameData.time.GetDeciseconds() % 10),
 		gameData.ventilationNeedsReset ? "WARNING" : "good   ",
 		gameData.doorsClosed[0] ? "closed" : "open  ",
 		gameData.doorsClosed[1] ? "closed" : "open  ",
 		gameData.doorsClosed[2] ? "closed" : "open  ",
 		gameData.doorsClosed[3] ? "closed" : "open  ",
-		gameData.flashlight ? "on " : "off"
+		gameData.flashlight ? "on " : "off",
+		gameData.nmBB ? "up  " : "down"
 		);
 	const char* dispState;
 	switch (state)
@@ -140,7 +141,7 @@ void GameState::DisplayData()
 	}
 	else if (state == State::Office)
 	{
-		printf("Yaw: %d", stateData.od.officeYaw);
+		printf("Yaw: %f", stateData.od.officeYaw);
 	}
 	printf("\n\n");
 }
@@ -156,6 +157,7 @@ void GameState::Init()
 	gameData.time = ClockTime();
 	gameData.ventilationNeedsReset = false;
 	gameData.flashlight = false;
+	gameData.nmBB = false;
 }
 
 // Better for determining how close a color is to another, regardless of the scale. (brightness/darkness)

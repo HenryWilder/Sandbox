@@ -78,11 +78,18 @@ void GenerateSamplePoints(POINT* arr, POINT start, long scale)
 	arr[4] = { arr[0].x - scale, arr[0].y };
 }
 
-int TestSamples(Button button, CNorm compare, double threshold)
+/// <summary>
+/// 
+/// </summary>
+/// <param name="center">Point around which to generate the sample points</param>
+/// <param name="compare">Normalized color against which to compare the color at the sample points</param>
+/// <param name="threshold">0..1 double value for the minimum similarity required to consider a sample point a "match"</param>
+/// <returns>Total number of sample points which exceeded the threshold</returns>
+int TestSamples_CNormMethod(POINT center, CNorm compare, double threshold)
 {
 	POINT samplePoint[5];
 
-	GenerateSamplePoints(samplePoint, GetButtonPos(button), 4);
+	GenerateSamplePoints(samplePoint, center, 4);
 
 	int matchCount = 0;
 
@@ -91,6 +98,61 @@ int TestSamples(Button button, CNorm compare, double threshold)
 		CNorm sample = GetPixelColor(samplePoint[i]).Normal();
 
 		if (CDot(sample, compare) > threshold) ++matchCount; // Increment matchCount when a match is found
+	}
+
+	return matchCount;
+}
+
+int TestSamples_CNormMethod(Button button, CNorm compare, double threshold)
+{
+	return TestSamples_CNormMethod(GetButtonPos(button), compare, threshold);
+}
+
+int TestSamples_ColorMethod(POINT center, Color compare, double threshold)
+{
+	/* Ok I need to explain this because it's a little weird.
+	I know it looks like it's just extra steps being added on to the CNorm method, but it's not.
+	The difference is that the colors in this method, while converted to [0..1], are not normalized.
+	It does make a difference.*/
+	
+	CNorm compareVec; // Not actually a normalized color, just a vector3 of doubles.
+	compareVec.r = double(compare.r) / 255.0;
+	compareVec.g = double(compare.g) / 255.0;
+	compareVec.b = double(compare.b) / 255.0;
+
+	POINT samplePoint[5];
+
+	GenerateSamplePoints(samplePoint, center, 4);
+
+	int matchCount = 0;
+
+	for (int i = 0; i < 5; ++i)
+	{
+		Color sample = GetPixelColor(samplePoint[i]);
+		CNorm sampleVec;
+		sampleVec.r = double(sample.r) / 255.0;
+		sampleVec.g = double(sample.g) / 255.0;
+		sampleVec.b = double(sample.b) / 255.0;
+
+		if (CDot(sampleVec, compareVec) > threshold) ++matchCount; // Increment matchCount when a match is found
+	}
+
+	return matchCount;
+}
+
+int TestSamples_GrayMethod(POINT center, unsigned char compare, unsigned char maxDifference)
+{
+	POINT samplePoint[5];
+
+	GenerateSamplePoints(samplePoint, center, 4);
+
+	int matchCount = 0;
+
+	for (int i = 0; i < 5; ++i)
+	{
+		unsigned char sample = GetPixelColor(samplePoint[i]).Gray();
+
+		if (abs(sample - compare) > maxDifference) ++matchCount; // Increment matchCount when a match is found
 	}
 
 	return matchCount;
@@ -110,6 +172,33 @@ int MaxInArray(int* arr, size_t size) // Returns the index of the highest value
 	return indexOfMax;
 }
 
+void LocateOfficeLamp()
+{
+	constexpr int y = 66;
+	constexpr int threshold = 200;
+	constexpr int start = 723;
+	constexpr int width = 585;
+	for (int x = start; x < start + width; ++x)
+	{
+		if (GetPixelColor(x, y).Gray() > threshold)
+		{
+			if (TestSamples_GrayMethod({ x,y }, 255, 20) == 5) // 100% of the samples must be 80% matching. Flickering be damned.
+			{
+				g_gameState.stateData.od.officeYaw = ((double)x - (double)start) / (double)width;
+				break;
+			}
+		}
+	}
+}
+
+void CheckOnNMBB()
+{
+	constexpr Color pants = { 0, 28, 120 };
+	constexpr POINT samplePoint = {1024, 774};
+	constexpr double threshold = 0.98;
+	g_gameState.gameData.nmBB = (CDot(pants, GetPixelColor(samplePoint)) > threshold);
+}
+
 void UpdateState()
 {
 	constexpr double threshold = .99;
@@ -118,7 +207,7 @@ void UpdateState()
 	int statesToTest[3] = { 0,0,0 }; // List of how many samples returned as matches for each of the buttons being tested
 
 	for (int sysBtn = 0; sysBtn < 3; ++sysBtn) {
-		statesToTest[sysBtn] = TestSamples(Button(SystemButton(sysBtn)), clr::sysButtonNrm, threshold);
+		statesToTest[sysBtn] = TestSamples_CNormMethod(SystemButton(sysBtn), clr::sysButtonNrm, threshold);
 	}
 	int indexOfHighestValue = MaxInArray(statesToTest, 3);
 	if (statesToTest[indexOfHighestValue] == 5) // We must have over 50% of the samples returning as matches
@@ -135,7 +224,7 @@ void UpdateState()
 	{
 		int camsToTest[8] = {};
 		for (int camera = 0; camera < 8; ++camera) {
-			camsToTest[camera] = TestSamples(CameraButton(camera), clr::camButtonNrm, threshold);
+			camsToTest[camera] = TestSamples_CNormMethod(CameraButton(camera), clr::camButtonNrm, threshold);
 		}
 		g_gameState.stateData.cd.camera = Camera(MaxInArray(camsToTest, 8)); // If we've confirmed the state then there's no doubt we can identify the camera
 	}
