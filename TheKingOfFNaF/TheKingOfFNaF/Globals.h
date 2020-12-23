@@ -2,10 +2,10 @@
 #include "CustomTypes.h"
 
 // Get a console handle
-extern HWND window;
+extern HWND g_wndConsole;
 
 // Get a handle to device hdc
-extern HDC hConsole;
+extern HDC g_hConsoleDC;
 
 extern int g_screenHeight;
 extern int g_screenWidth;
@@ -14,8 +14,12 @@ extern BYTE* g_screenData;
 
 extern GameState g_gameState;
 
+//extern HWND g_gameWindow;
+//extern HDC g_gameDC;
 extern HDC g_hDesktop; // get the desktop device context
 extern HDC g_hInternal; // create a device context to use ourselves
+
+extern BITMAPINFOHEADER g_bmi;
 
 // create a bitmap
 extern HBITMAP g_hBitmap;

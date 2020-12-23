@@ -145,6 +145,7 @@
     <ClCompile Include="Input.cpp" />
     <ClCompile Include="InputProcessing.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="MultiThread.cpp" />
     <ClCompile Include="Output.cpp" />
   </ItemGroup>
   <ItemGroup>
@@ -153,6 +154,7 @@
     <ClInclude Include="Globals.h" />
     <ClInclude Include="Input.h" />
     <ClInclude Include="InputProcessing.h" />
+    <ClInclude Include="MultiThread.h" />
     <ClInclude Include="Output.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

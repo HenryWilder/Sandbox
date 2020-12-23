@@ -1,7 +1,7 @@
 #include "InputProcessing.h"
 
 // Input should be top-left corner of the number followed by the size
-char ReadNumber(int x, int y, NumberScale size)
+char ReadNumber(int x, int y)
 {
 	enum Sample : unsigned short
 	{
@@ -37,7 +37,10 @@ char ReadNumber(int x, int y, NumberScale size)
 
 	for (int sample = 0; sample < 9; ++sample)
 	{
-		if (GetPixelColor(x + sampleOffsets[sample].x, y + sampleOffsets[sample].y).Gray() > threshold) guess |= sampleIDs[sample];
+		POINT samplePoint;
+		samplePoint.x = x + sampleOffsets[sample].x;
+		samplePoint.y = y + sampleOffsets[sample].y;
+		if (GetPixelColor(samplePoint).Gray() > threshold) guess |= sampleIDs[sample];
 	}
 
 	for (char guessValue = 0; guessValue < 10; ++guessValue)
@@ -50,10 +53,10 @@ char ReadNumber(int x, int y, NumberScale size)
 // Run this about once every frame
 void ReadGameClock()
 {
-	int time = (int)ReadNumber(pnt::clk_decisecX, pnt::clk.y, NumberScale::Small); // Deciseconds
-	int seconds = (int)ReadNumber(pnt::clk_secX, pnt::clk.y, NumberScale::Small); // Seconds (ones)
-	int tensOfSeconds = (int)ReadNumber(pnt::clk_10secX, pnt::clk.y, NumberScale::Small); // Seconds (tens)
-	int minute = (int)ReadNumber(pnt::clk.x, pnt::clk.y, NumberScale::Small); // Minutes
+	int time = (int)ReadNumber(pnt::clk_decisecX, pnt::clk.y); // Deciseconds
+	int seconds = (int)ReadNumber(pnt::clk_secX, pnt::clk.y); // Seconds (ones)
+	int tensOfSeconds = (int)ReadNumber(pnt::clk_10secX, pnt::clk.y); // Seconds (tens)
+	int minute = (int)ReadNumber(pnt::clk.x, pnt::clk.y); // Minutes
 
 	time = time + 10 * seconds + 100 * tensOfSeconds + 600 * minute;
 
@@ -193,6 +196,7 @@ void LocateOfficeLamp()
 
 void CheckOnNMBB()
 {
+	
 	constexpr Color pants = { 0, 28, 120 };
 	constexpr POINT samplePoint = {1024, 774};
 	constexpr double threshold = 0.98;

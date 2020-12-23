@@ -37,10 +37,7 @@ void SimulateMouseMove(long x, long y)
 	SendInput(1, &input, sizeof(input));
 }
 
-void SimulateMouseMove(POINT p)
-{
-	SimulateMouseMove(p.x, p.y);
-}
+void SimulateMouseMove(POINT p) { SimulateMouseMove(p.x, p.y); }
 
 void SimulateMouseGoto(long x, long y)
 {
@@ -54,10 +51,7 @@ void SimulateMouseGoto(long x, long y)
 	SendInput(1, &input, sizeof(input));
 }
 
-void SimulateMouseGoto(POINT p)
-{
-	SimulateMouseGoto(p.x, p.y);
-}
+void SimulateMouseGoto(POINT p) { SimulateMouseGoto(p.x, p.y); }
 
 void SimulateMouseClick()
 {
@@ -85,4 +79,32 @@ void SimulateMouseClickAt(POINT p)
 {
 	SimulateMouseGoto(p);
 	SimulateMouseClick();
+}
+
+void OfficeLookLeft(void)
+{
+	if (g_gameState.state == State::Office) // We cannot look left/right in cameras
+	{
+		SimulateMouseGoto(8, 540);
+		Sleep(500); // 5 deciseconds
+	}
+}
+
+void OfficeLookRight(void)
+{
+	if (g_gameState.state == State::Office) // We cannot look left/right in cameras
+	{
+		SimulateMouseGoto(1910, 540);
+		Sleep(500); // 5 deciseconds
+	}
+}
+
+void EditConsoleBitmap()
+{
+
+}
+
+void DrawConsole()
+{
+	BitBlt(g_hConsoleDC, 200, 10, 500, 500, g_hInternal, 0, 0, SRCCOPY);
 }

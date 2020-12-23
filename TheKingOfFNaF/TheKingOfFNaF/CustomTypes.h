@@ -1,7 +1,7 @@
+#pragma once
 #include <Windows.h>
 #include <iostream>
 #include <stdlib.h>
-#pragma once
 
 struct CNorm
 {

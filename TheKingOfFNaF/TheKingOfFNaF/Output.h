@@ -41,3 +41,10 @@ void SimulateMouseGoto(POINT);
 
 void SimulateMouseClick();
 void SimulateMouseClickAt(POINT);
+
+void OfficeLookLeft();
+void OfficeLookRight();
+
+void EditConsoleBitmap();
+
+void DrawConsole();

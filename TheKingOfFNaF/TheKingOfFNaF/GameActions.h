@@ -3,22 +3,24 @@
 #include "InputProcessing.h"
 #include "Output.h"
 
+void OfficeLookLeft();
+void OfficeLookRight();
+
 // Updates all known game information
-void RefreshGameState();
+void RefreshGameData();
+
+void ConfirmSystem(State state); // TODO: think of a better name
+void OpenCameraIfClosed();
+void OpenMonitorIfClosed(); // Like OpenCameraIfClosed(), but slightly faster because it doesn't take into account the system we're on
+void CloseMonitorIfOpen();
+void EnterGameState(State state, Camera cam = Camera::WestHall);
 
 // Playbook of actions
-namespace actn
+namespace action
 {
-	namespace sub
-	{
-		void ConfirmSystem(State state); // TODO: think of a better name
-		void OpenCameraIfClosed();
-		void OpenMonitorIfClosed(); // Like OpenCameraIfClosed(), but slightly faster because it doesn't take into account the system we're on
-		void CloseMonitorIfOpen();
-		void EnterGameState(State state, Camera cam = Camera::WestHall);
-	}
 	void FuntimeFoxy();
 	void ResetVents();
+	void HandleNMBB();
 }
 
 void ExecuteBestAction();
