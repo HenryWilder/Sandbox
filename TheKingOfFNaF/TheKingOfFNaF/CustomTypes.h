@@ -18,6 +18,8 @@ struct Color
 	unsigned char GreenDev() const;
 	unsigned char BlueDev() const;
 	CNorm Normal() const;
+
+	operator COLORREF() { return RGB(r,g,b); }
 };
 double CDot(Color, Color);
 

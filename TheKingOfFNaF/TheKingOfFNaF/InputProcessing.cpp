@@ -65,8 +65,11 @@ void ReadGameClock()
 
 void CheckVentsReset()
 {
-	if (GetPixelColor(pnt::ofc::ventWarning).RedDev() > 35 ||
-		GetPixelColor(pnt::cam::ventWarning).RedDev() > 35)
+	constexpr POINT o = pnt::ofc::ventWarning;
+	constexpr POINT c = pnt::cam::ventWarning;
+
+	if (GetPixelColor(o).RedDev() > 35 ||
+		GetPixelColor(c).RedDev() > 35)
 	{
 		g_gameState.gameData.ventilationNeedsReset = true;
 	}
@@ -134,10 +137,10 @@ int TestSamples_ColorMethod(POINT center, Color compare, double threshold)
 		Color sample = GetPixelColor(samplePoint[i]);
 		CNorm sampleVec;
 		sampleVec.r = double(sample.r) / 255.0;
-		sampleVec.g = double(sample.g) / 255.0;
-		sampleVec.b = double(sample.b) / 255.0;
+sampleVec.g = double(sample.g) / 255.0;
+sampleVec.b = double(sample.b) / 255.0;
 
-		if (CDot(sampleVec, compareVec) > threshold) ++matchCount; // Increment matchCount when a match is found
+if (CDot(sampleVec, compareVec) > threshold) ++matchCount; // Increment matchCount when a match is found
 	}
 
 	return matchCount;
@@ -196,9 +199,8 @@ void LocateOfficeLamp()
 
 void CheckOnNMBB()
 {
-	
 	constexpr Color pants = { 0, 28, 120 };
-	constexpr POINT samplePoint = {1024, 774};
+	constexpr POINT samplePoint = { 1024, 774 };
 	constexpr double threshold = 0.98;
 	g_gameState.gameData.nmBB = (CDot(pants, GetPixelColor(samplePoint)) > threshold);
 }
@@ -208,14 +210,16 @@ void UpdateState()
 	constexpr double threshold = .99;
 	State state = State::Office;
 
-	int statesToTest[3] = { 0,0,0 }; // List of how many samples returned as matches for each of the buttons being tested
-
 	for (int sysBtn = 0; sysBtn < 3; ++sysBtn) {
-		statesToTest[sysBtn] = TestSamples_CNormMethod(SystemButton(sysBtn), clr::sysButtonNrm, threshold);
+		POINT sample = GetButtonPos(SystemButton(sysBtn));
+
+		CNorm sampleCol = GetPixelColor(sample).Normal();
+
+		if (CDot(sampleCol, clr::sysButtonNrm) > threshold) {
+			state = State(sysBtn);
+			break;
+		}
 	}
-	int indexOfHighestValue = MaxInArray(statesToTest, 3);
-	if (statesToTest[indexOfHighestValue] == 5) // We must have over 50% of the samples returning as matches
-		state = State(indexOfHighestValue);
 
 	g_gameState.state = state; // Update the global state
 
@@ -226,11 +230,15 @@ void UpdateState()
 
 	case State::Camera:
 	{
-		int camsToTest[8] = {};
 		for (int camera = 0; camera < 8; ++camera) {
-			camsToTest[camera] = TestSamples_CNormMethod(CameraButton(camera), clr::camButtonNrm, threshold);
+			POINT sample = GetButtonPos(CameraButton(camera));
+			CNorm sampleCol = GetPixelColor(sample).Normal();
+
+			if (CDot(sampleCol, clr::camButtonNrm) >= threshold) {
+				g_gameState.stateData.cd.camera = Camera(camera);
+				break;
+			}
 		}
-		g_gameState.stateData.cd.camera = Camera(MaxInArray(camsToTest, 8)); // If we've confirmed the state then there's no doubt we can identify the camera
 	}
 		break;
 

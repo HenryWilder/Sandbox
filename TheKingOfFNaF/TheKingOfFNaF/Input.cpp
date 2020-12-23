@@ -12,17 +12,23 @@ unsigned long PixelIndex(long x, long y) { return 4u * (unsigned)((y * (long)g_s
 Color GetPixelColor(long x, long y)
 {
 	unsigned long index = PixelIndex(x, y);
-	return {g_screenData[index + 2u],	// Red
-			g_screenData[index + 1u],	// Green
-			g_screenData[index] };		// Blue
+
+	Color output = {
+		g_screenData[index + 2u],	// Red
+		g_screenData[index + 1u],	// Green
+		g_screenData[index] };		// Blue
+
+	SetPixel(g_hDesktop, x - 1, y - 1, RGB(255, 0, 255));
+	SetPixel(g_hDesktop, x, y - 1, RGB(255, 0, 255));
+	SetPixel(g_hDesktop, x + 1, y - 1, RGB(255, 0, 255));
+	SetPixel(g_hDesktop, x - 1, y, RGB(255, 0, 255));
+	SetPixel(g_hDesktop, x, y, RGB(255, 0, 255));
+	SetPixel(g_hDesktop, x + 1, y, RGB(255, 0, 255));
+	SetPixel(g_hDesktop, x - 1, y + 1, RGB(255, 0, 255));
+	SetPixel(g_hDesktop, x, y + 1, RGB(255, 0, 255));
+	SetPixel(g_hDesktop, x + 1, y + 1, RGB(255, 0, 255));
+
+	return output;
 }
 
 Color GetPixelColor(POINT pos) { return GetPixelColor(pos.x, pos.y); }
-
-void SetPixelColor(long x, long y, Color color, BYTE* data)
-{
-	unsigned long index = PixelIndex(x, y);
-	data[index + 2u] = color.r;	// Red
-	data[index + 1u] = color.g;	// Green
-	data[index] = color.b;		// Blue
-}

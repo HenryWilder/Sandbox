@@ -98,13 +98,3 @@ void OfficeLookRight(void)
 		Sleep(500); // 5 deciseconds
 	}
 }
-
-void EditConsoleBitmap()
-{
-
-}
-
-void DrawConsole()
-{
-	BitBlt(g_hConsoleDC, 200, 10, 500, 500, g_hInternal, 0, 0, SRCCOPY);
-}
