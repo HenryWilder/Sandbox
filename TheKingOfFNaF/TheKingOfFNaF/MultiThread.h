@@ -1,8 +1,13 @@
 #pragma once
 #include "InputProcessing.h"
+#include "GameActions.h"
 #include <thread>
-#include <vector>
 
-void StartupThread(std::atomic<unsigned long long>& atomic, int bit);
+extern bool g_threadsShouldLoop;
+extern bool g_firstTimeScreenUpdate;
 
-unsigned long long SpawnThreads(int count);
+void Produce();
+
+void Consume();
+
+void CreateHelpers();

@@ -27,9 +27,7 @@ extern GameState g_gameState;
 extern HDC g_hDesktop; // get the desktop device context
 extern HDC g_hInternal; // create a device context to use ourselves
 
-extern BITMAPINFOHEADER g_bmi;
-
-// create a bitmap
+// create a bitmap 
 extern HBITMAP g_hBitmap;
 
 //

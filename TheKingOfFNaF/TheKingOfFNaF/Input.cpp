@@ -4,7 +4,16 @@ void UpdateScreencap()
 {
 	BitBlt(g_hInternal, 0, 0, g_screenWidth, g_screenHeight, g_hDesktop, 0, 0, SRCCOPY);
 
-	GetDIBits(g_hDesktop, g_hBitmap, 0, g_screenHeight, g_screenData, (BITMAPINFO*)&g_bmi, DIB_RGB_COLORS);
+	BITMAPINFOHEADER bmi = { 0 };
+	bmi.biSize = sizeof(BITMAPINFOHEADER);
+	bmi.biPlanes = 1;
+	bmi.biBitCount = 32;
+	bmi.biWidth = g_screenWidth;
+	bmi.biHeight = -g_screenHeight;
+	bmi.biCompression = BI_RGB;
+	bmi.biSizeImage = 0; // 3 * ScreenX * ScreenY; (position, not size)
+
+	GetDIBits(g_hDesktop, g_hBitmap, 0, g_screenHeight, g_screenData, (BITMAPINFO*)&bmi, DIB_RGB_COLORS);
 }
 
 unsigned long PixelIndex(long x, long y) { return 4u * (unsigned)((y * (long)g_screenWidth) + x); }

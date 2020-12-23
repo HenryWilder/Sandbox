@@ -15,17 +15,6 @@ GameState g_gameState; // All the information we have about the state of the gam
 HDC g_hDesktop = GetDC(NULL); // get the desktop device context
 HDC g_hInternal = CreateCompatibleDC(g_hDesktop); // create a device context to use ourselves
 
-BITMAPINFOHEADER g_bmi = { sizeof(BITMAPINFOHEADER), 1, 32, (WORD)g_screenWidth, (WORD)(-g_screenHeight), BI_RGB, 0 };
-/*
-bmi.biSize = sizeof(BITMAPINFOHEADER);
-bmi.biPlanes = 1;
-bmi.biBitCount = 32;
-bmi.biWidth = g_screenWidth;
-bmi.biHeight = -g_screenHeight;
-bmi.biCompression = BI_RGB;
-bmi.biSizeImage = 0; // 3 * ScreenX * ScreenY; (position, not size)
-*/
-
 HBITMAP g_hBitmap = CreateCompatibleBitmap(g_hDesktop, g_screenWidth, g_screenHeight);
 
 const POINT buttonPositions[] = {
