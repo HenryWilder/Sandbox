@@ -208,7 +208,7 @@ Color LightBlobFragment(int x, int y)
 template<int width, int height>
 void ApplyShader(const Shader fragment, Image<width, height>* buffer, RECT region = {0, 0, width, height})
 {
-	for (int y = region.bottom; y < region.top; ++y) {
+	for (int y = region.top; y < region.bottom; ++y) {
 		for (int x = region.left; x < region.right; ++x) {
 			buffer->Set(x, y, fragment(x, y));
 		}
@@ -218,7 +218,7 @@ void ApplyShader(const Shader fragment, Image<width, height>* buffer, RECT regio
 template<int width, int height>
 void ApplyPostProcess(Color (*fragment)(int, int, Image<width, height>*), Image<width, height>* input, Image<width, height>* output)
 {
-	for (int y = 0; y < width; ++y) {
+	for (int y = 0; y < height; ++y) {
 		for (int x = 0; x < width; ++x) {
 			output->Set(x, y, fragment(x, y, input));
 		}
@@ -226,10 +226,10 @@ void ApplyPostProcess(Color (*fragment)(int, int, Image<width, height>*), Image<
 }
 
 template<int width, int height>
-void DrawBuffer(HDC context, Image<width, height>* buffer)
+void DrawBuffer(HDC context, Image<width, height>* buffer, RECT region = { 0, 0, width, height })
 {
-	for (int y = 0; y < width; ++y) {
-		for (int x = 0; x < width; ++x) {
+	for (int y = region.top; y < region.bottom; ++y) {
+		for (int x = region.left; x < region.right; ++x) {
 			SetPixelV(context, x, y, buffer->Get(x,y));
 		}
 	}
@@ -240,29 +240,41 @@ int main()
 	HWND console = GetConsoleWindow();
 	HDC hdc = GetDC(console);
 
-	Image<255, 255> buffer;
-	Image<255, 255> frame;
+	Image<127, 127> buffer;
+	Image<127, 127> frame;
 
 	g_scene.lightBlobPoint = LightBlobPoint(g_scene.origin, g_scene.radius, g_scene.light);
 
-	std::thread t0(ApplyShader<255, 255>, LightBlobFragment, &buffer, RECT{0,0,127,127});
-	std::thread t1(ApplyShader<255, 255>, LightBlobFragment, &buffer, RECT{128,0,255,127});
-	std::thread t2(ApplyShader<255, 255>, LightBlobFragment, &buffer, RECT{0,128,127,255});
-	std::thread t3(ApplyShader<255, 255>, LightBlobFragment, &buffer, RECT{128,128,255,255});
+	{
+		std::thread t0(ApplyShader<255, 255>, LightBlobFragment, &frame, RECT{ 0,0,127,127 });
+		std::thread t1(ApplyShader<255, 255>, LightBlobFragment, &frame, RECT{ 128,0,255,127 });
+		std::thread t2(ApplyShader<255, 255>, LightBlobFragment, &frame, RECT{ 0,128,127,255 });
+		std::thread t3(ApplyShader<255, 255>, LightBlobFragment, &frame, RECT{ 128,128,255,255 });
 
-	t0.join();
-	t1.join();
-	t2.join();
-	t3.join();
+		t0.join();
+		t1.join();
+		t2.join();
+		t3.join();
 
-	ApplyShader(LightBlobFragment, &buffer);
+		ApplyPostProcess(GaussianBlurFragment<255, 255>, &buffer, &frame);
 
-	ApplyPostProcess(GaussianBlurFragment<255,255>, &buffer, &frame);
+		t0 = std::thread(DrawBuffer<255, 255>, hdc, &frame, RECT{ 0,0,127,127 });
+		t1 = std::thread(DrawBuffer<255, 255>, hdc, &frame, RECT{ 128,0,255,127 });
+		t2 = std::thread(DrawBuffer<255, 255>, hdc, &frame, RECT{ 0,128,127,255 });
+		t3 = std::thread(DrawBuffer<255, 255>, hdc, &frame, RECT{ 128,128,255,255 });
+	}
 
-	DrawBuffer(hdc, &frame);
 
-	std::thread t4(DrawBuffer<255,255>, hdc, &frame);
-	t4.join();
+	//ApplyShader(LightBlobFragment, &buffer);
+
+	//ApplyPostProcess(GaussianBlurFragment<255,255>, &buffer, &frame);
+
+	//DrawBuffer(hdc, &frame);
+
+	
+	
+	
+	
 
 	ReleaseDC(console, hdc);
 
