@@ -3,6 +3,10 @@
 #include "InputProcessing.h"
 #include "Output.h"
 
+///////////////////////////////////////////////////////////////////////////
+// This is where basic outputs are combined to make more complex actions //
+///////////////////////////////////////////////////////////////////////////
+
 void OfficeLookLeft();
 void OfficeLookRight();
 
@@ -23,4 +27,4 @@ namespace action
 	void HandleNMBB();
 }
 
-void ExecuteBestAction();
+void ActOnGameData();

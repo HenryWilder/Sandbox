@@ -2,6 +2,13 @@
 #include "Globals.h"
 #pragma once
 
+////////////////////////////////////////////////////
+// This is where we send basic output to the game //
+// e.g.                                           //
+// - Press "d" key                                //
+// - Move mouse to { 24, 36 }                     //
+////////////////////////////////////////////////////
+
 enum class VirtualKey : int
 {
 	VK_W = 0x57,

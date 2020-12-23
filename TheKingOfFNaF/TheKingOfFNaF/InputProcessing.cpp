@@ -197,12 +197,12 @@ void LocateOfficeLamp()
 	}
 }
 
-void CheckOnNMBB()
+bool CheckOnNMBB()
 {
 	constexpr Color pants = { 0, 28, 120 };
 	constexpr POINT samplePoint = { 1024, 774 };
 	constexpr double threshold = 0.98;
-	g_gameState.gameData.nmBB = (CDot(pants, GetPixelColor(samplePoint)) > threshold);
+	return (CDot(pants, GetPixelColor(samplePoint)) > threshold);
 }
 
 void UpdateState()

@@ -3,6 +3,10 @@
 #include <iostream>
 #include <stdlib.h>
 
+////////////////////////////////////////////////////
+// Here we declare/define the non-primitive types //
+////////////////////////////////////////////////////
+
 struct CNorm
 {
 	double r, g, b;
@@ -131,8 +135,6 @@ struct GameState
 
 		bool doorsClosed[4]; // In order from left to right
 		bool flashlight;
-
-		bool nmBB; // True if nightmare bb is standing
 	};
 	GameData gameData;
 

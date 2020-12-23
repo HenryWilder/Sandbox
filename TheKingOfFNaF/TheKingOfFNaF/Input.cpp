@@ -18,6 +18,7 @@ Color GetPixelColor(long x, long y)
 		g_screenData[index + 1u],	// Green
 		g_screenData[index] };		// Blue
 
+	/*
 	SetPixel(g_hDesktop, x - 1, y - 1, RGB(255, 0, 255));
 	SetPixel(g_hDesktop, x, y - 1, RGB(255, 0, 255));
 	SetPixel(g_hDesktop, x + 1, y - 1, RGB(255, 0, 255));
@@ -27,6 +28,7 @@ Color GetPixelColor(long x, long y)
 	SetPixel(g_hDesktop, x - 1, y + 1, RGB(255, 0, 255));
 	SetPixel(g_hDesktop, x, y + 1, RGB(255, 0, 255));
 	SetPixel(g_hDesktop, x + 1, y + 1, RGB(255, 0, 255));
+	*/
 
 	return output;
 }

@@ -1,6 +1,10 @@
 #pragma once
 #include "Input.h"
 
+////////////////////////////////////////////////////////////////////////////////////
+// This is where the input we've taken from the game gets turned into useful data //
+////////////////////////////////////////////////////////////////////////////////////
+
 // Input should be top-left corner of the number followed by the size
 char ReadNumber(int x, int y);
 
@@ -22,6 +26,6 @@ int MaxInArray(int* arr, size_t size); // Returns the index of the highest value
 
 void LocateOfficeLamp(); // For finding the yaw of the office
 
-void CheckOnNMBB();
+bool CheckOnNMBB();
 
 void UpdateState();
