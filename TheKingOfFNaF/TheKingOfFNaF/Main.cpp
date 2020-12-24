@@ -25,7 +25,5 @@ int main()
 
 	DeleteDC(g_hInternal); // Destroy our internal display handle
 
-	std::cin.ignore(); // Wait for user input
-
 	return 0; // Must have a return
 }

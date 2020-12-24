@@ -32,7 +32,7 @@ unsigned short ClockTime::GetDecisecondsSinceHour() const
 
 void ClockTime::UpdateTime(unsigned short const& newTime)
 {
-	if (newTime > m_deciseconds)
+	if (newTime > m_deciseconds && newTime < 6000 && newTime > 0 && ((newTime - m_deciseconds) < 10 || m_pingsSinceChange > 10))
 	{
 		m_deciseconds = newTime;
 		m_pingsSinceChange = 0;

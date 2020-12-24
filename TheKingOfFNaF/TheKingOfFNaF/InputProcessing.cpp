@@ -3,37 +3,43 @@
 // Input should be top-left corner of the number followed by the size
 char ReadNumber(int x, int y)
 {
-	enum Sample : unsigned short
-	{
-		Top = 0b000000001,
-		Middle = 0b000000010,
-		Left = 0b000000100,
-		Right = 0b000001000,
-		BottomL = 0b000010000,
-		BottomC = 0b000100000,
-		BottomR = 0b001000000,
-		TopL = 0b010000000,
-		TopR = 0b100000000,
+	constexpr POINT sampleOffsets[] = {
+		{ 5,0 },
+		{ 5,8 },
+		{ 0,8 },
+		{ 10,8 },
+		{ 0,12 },
+		{ 5,12 },
+		{ 10,12 },
+		{ 0,7 },
+		{ 10,7 }
 	};
-	Sample sampleIDs[] = { Top, Middle, Left, Right, BottomL, BottomC, BottomR, TopL, TopR };
-	POINT sampleOffsets[] = { { 5,0 },{ 5,8 },{ 0,8 },{ 10,8 },{ 0,12 },{ 5,12 },{ 10,12 },{ 0,7 },{ 10,7 } };
-	enum SamplesToNumbers : unsigned short
-	{
-		_n1 = 0b000100011,
-		_n2 = 0b001110011,
-		_n3 = 0b000100001,
-		_n4 = 0b010001110,
-		_n5 = 0b100101001,
-		_n6 = 0b010101101,
-		_n7 = 0b000000011,
-		_n8 = 0b000101101,
-		_n9 = 0b100100001,
-		_n0 = 0b110101101,
+	constexpr int sampleIDs[] = { // Bitflags decribing whether the sample offsets match
+		1,
+		2,
+		4,
+		8,
+		16,
+		32,
+		64,
+		128,
+		256,
 	};
-	SamplesToNumbers values[] = { _n0,_n1,_n2,_n3,_n4,_n5,_n6,_n7,_n8,_n9 };
+	constexpr int values[] = {
+		0b110101101, // 0
+		0b000100011, // 1
+		0b001110011, // 2
+		0b000100001, // 3
+		0b010001110, // 4
+		0b100101001, // 5
+		0b010101101, // 6
+		0b000000011, // 7
+		0b000101101, // 8
+		0b100100001, // 9
+	};
 
-	int guess = 0b000000000;
-	unsigned char threshold = 100;
+	int guess = 0;
+	constexpr unsigned char threshold = 100; // Minimum brightness value of the pixel
 
 	for (int sample = 0; sample < 9; ++sample)
 	{
@@ -120,7 +126,7 @@ int TestSamples_ColorMethod(POINT center, Color compare, double threshold)
 	I know it looks like it's just extra steps being added on to the CNorm method, but it's not.
 	The difference is that the colors in this method, while converted to [0..1], are not normalized.
 	It does make a difference.*/
-	
+
 	CNorm compareVec; // Not actually a normalized color, just a vector3 of doubles.
 	compareVec.r = double(compare.r) / 255.0;
 	compareVec.g = double(compare.g) / 255.0;
@@ -137,10 +143,10 @@ int TestSamples_ColorMethod(POINT center, Color compare, double threshold)
 		Color sample = GetPixelColor(samplePoint[i]);
 		CNorm sampleVec;
 		sampleVec.r = double(sample.r) / 255.0;
-sampleVec.g = double(sample.g) / 255.0;
-sampleVec.b = double(sample.b) / 255.0;
+		sampleVec.g = double(sample.g) / 255.0;
+		sampleVec.b = double(sample.b) / 255.0;
 
-if (CDot(sampleVec, compareVec) > threshold) ++matchCount; // Increment matchCount when a match is found
+		if (CDot(sampleVec, compareVec) > threshold) ++matchCount; // Increment matchCount when a match is found
 	}
 
 	return matchCount;
@@ -209,42 +215,29 @@ void UpdateState()
 {
 	constexpr double threshold = .99;
 	State state = State::Office;
-
+	int statesToTest[3] = { 0,0,0 }; // List of how many samples returned as matches for each of the buttons being tested
 	for (int sysBtn = 0; sysBtn < 3; ++sysBtn) {
-		POINT sample = GetButtonPos(SystemButton(sysBtn));
-
-		CNorm sampleCol = GetPixelColor(sample).Normal();
-
-		if (CDot(sampleCol, clr::sysButtonNrm) > threshold) {
-			state = State(sysBtn);
-			break;
-		}
+		statesToTest[sysBtn] = TestSamples_CNormMethod(SystemButton(sysBtn), clr::sysButtonNrm, threshold);
 	}
-
+	int indexOfHighestValue = MaxInArray(statesToTest, 3);
+	if (statesToTest[indexOfHighestValue] == 5) // We must have over 50% of the samples returning as matches
+		state = State(indexOfHighestValue);
 	g_gameState.state = state; // Update the global state
-
 	switch (state)
 	{
 	case State::Office:
 		break;
-
 	case State::Camera:
 	{
+		int camsToTest[8] = {};
 		for (int camera = 0; camera < 8; ++camera) {
-			POINT sample = GetButtonPos(CameraButton(camera));
-			CNorm sampleCol = GetPixelColor(sample).Normal();
-
-			if (CDot(sampleCol, clr::camButtonNrm) >= threshold) {
-				g_gameState.stateData.cd.camera = Camera(camera);
-				break;
-			}
+			camsToTest[camera] = TestSamples_CNormMethod(CameraButton(camera), clr::camButtonNrm, threshold);
 		}
+		g_gameState.stateData.cd.camera = Camera(MaxInArray(camsToTest, 8)); // If we've confirmed the state then there's no doubt we can identify the camera
 	}
-		break;
-
+	break;
 	case State::Vent:
 		break;
-
 	case State::Duct:
 		break;
 	}

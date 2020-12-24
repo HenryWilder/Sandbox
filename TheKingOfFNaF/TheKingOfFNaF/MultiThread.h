@@ -10,4 +10,6 @@ void Produce();
 
 void Consume();
 
+void Direct();
+
 void CreateHelpers();
