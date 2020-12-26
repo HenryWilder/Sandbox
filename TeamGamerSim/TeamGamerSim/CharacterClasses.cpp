@@ -1,58 +1,61 @@
 #include "CharacterClasses.h"
 
-void Class::Turn(POINT delta)
+namespace Class
 {
-	SimulateMouseMove(delta);
-}
+	namespace Scout
+	{
 
-void Class::UpdateMovement(Direction newBearing)
-{
-	switch (newBearing.x) { // Left-right
-	case -1: // Left
-		SimulateKeyPress(VirtualKey::VK_A);
-		if (g_keysDown) SimulateKeyRelease(VirtualKey::VK_D);
-		break;
-	case 0: // Middle
-		if (g_keysDown) SimulateKeyRelease(VirtualKey::VK_D);
-		if (g_keysDown) SimulateKeyRelease(VirtualKey::VK_A);
-		break;
-	case 1: // Right
-		SimulateKeyPress(VirtualKey::VK_D);
-		if (g_keysDown) SimulateKeyRelease(VirtualKey::VK_A);
-		break;
 	}
-	switch (newBearing.y) { // Forward-backward
-	case -1: // Backward
-		SimulateKeyPress(VirtualKey::VK_W);
-		if (g_keysDown) SimulateKeyRelease(VirtualKey::VK_S);
-		break;
-	case 0: // Middle
-		if (g_keysDown) SimulateKeyRelease(VirtualKey::VK_S);
-		if (g_keysDown) SimulateKeyRelease(VirtualKey::VK_W);
-		break;
-	case 1: // Forward
-		SimulateKeyPress(VirtualKey::VK_W);
-		if (g_keysDown) SimulateKeyRelease(VirtualKey::VK_S);
-		break;
+	namespace Soldier
+	{
+
+	}
+	namespace Pyro
+	{
+
+	}
+	namespace Demo
+	{
+
+	}
+	namespace Heavy
+	{
+		void FatScout()
+		{
+		}
+	}
+	namespace Engie
+	{
+
+	}
+	namespace Medic
+	{
+
+	}
+	namespace Sniper
+	{
+
+	}
+	namespace Spy
+	{
+		void CloakAndRecon()
+		{
+			while (true)
+			{
+				UpdateMovement({ 0,1 });
+				Turn({ -50,0 });
+			}
+		}
 	}
 }
 
-void Class::Jump()
-{
-	SimulateKey(VirtualKey::VK_Space);
-}
+Class::type g_myClass;
 
-void Class::WeaponSwitchTo(Weapon switchTo)
+void ChooseClass(int pick)
 {
-	SimulateKey((VirtualKey)((int)VirtualKey::VK_0 + (int)switchTo));
-}
-
-void Class::WeaponFire()
-{
+	--pick;
+	const long x[] = { 333,458,573,768,877,997,1190,1307,1418 };
+	SimulateMouseGoto(x[pick], 127);
 	SimulateMouseClickPrimary();
-}
-
-void Class::WeaponAltFire()
-{
-	SimulateMouseClickSecondary();
+	g_myClass = Class::type(pick);
 }

@@ -1,98 +1,63 @@
 #pragma once
 #include "DataProcessing.h"
-#include "Activities.h"
+#include "Actions.h"
+#include <chrono>
 
-class Class
+namespace Class
 {
-	void Turn(POINT);
-
-	struct Direction {
-		int x, y; // [-1..1]
-	};
-	void UpdateMovement(Direction);
-	void Jump();
-	
-	void Juke();
-	void Dodge();
-	void TakeCover();
-	
-	enum class Weapon
+	enum class type
 	{
-		Primary = 1,
-		Secondary = 2, // This is the sapper on spy
-		Melee = 3,
+		Scout = 0,
+		Soldier = 1,
+		Pyro = 2,
 
-		// Engineer: Construction PDA
-		// Spy: Disgui
-		PDA1 = 4,
-		// Engineer: Destruction PDA
-		PDA2 = 5,
+		Demo = 3,
+		Heavy = 4,
+		Engie = 5,
+
+		Medic = 6,
+		Sniper = 7,
+		Spy = 8,
 	};
-	void WeaponSwitchTo(Weapon);
-	void WeaponFire();
-	void WeaponAltFire();
-	
-	void LocateObjective();
-	void LookForPlayer();
-	void CheckPlayerTeam();
-};
 
-class Scout : Class
-{
+	namespace Scout
+	{
 
-};
+	}
+	namespace Soldier
+	{
 
-class Soldier : Class
-{
+	}
+	namespace Pyro
+	{
 
-};
+	}
+	namespace Demo
+	{
 
-class Trolldier : public Soldier
-{
+	}
+	namespace Heavy
+	{
+		void FatScout();
+	}
+	namespace Engie
+	{
 
-};
+	}
+	namespace Medic
+	{
 
-class Pyro : Class
-{
+	}
+	namespace Sniper
+	{
 
-};
+	}
+	namespace Spy
+	{
+		void CloakAndRecon();
+	}
+}
 
-class Demo : Class
-{
+extern Class::type g_myClass;
 
-};
-
-class Heavy : Class
-{
-
-};
-
-class FatScout : public Heavy
-{
-
-};
-
-class Engie : Class
-{
-
-};
-
-class Medic : Class
-{
-
-};
-
-class Sniper : Class
-{
-
-};
-
-class Spy : Class
-{
-
-};
-
-class CloakAndRecon : public Spy
-{
-
-};
+void ChooseClass(int pick);

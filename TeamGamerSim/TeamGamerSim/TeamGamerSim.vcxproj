@@ -139,20 +139,23 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Actions.cpp" />
     <ClCompile Include="BasicOutput.cpp" />
     <ClCompile Include="CharacterClasses.cpp" />
     <ClCompile Include="CustomTypes.cpp" />
     <ClCompile Include="Globals.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="Multithreading.cpp" />
     <ClCompile Include="Vision.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Activities.h" />
+    <ClInclude Include="Actions.h" />
     <ClInclude Include="BasicOutput.h" />
     <ClInclude Include="CharacterClasses.h" />
     <ClInclude Include="Constants.h" />
     <ClInclude Include="CustomTypes.h" />
     <ClInclude Include="DataProcessing.h" />
+    <ClInclude Include="Empathy.h" />
     <ClInclude Include="Globals.h" />
     <ClInclude Include="Multithreading.h" />
     <ClInclude Include="Vision.h" />

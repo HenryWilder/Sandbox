@@ -1,6 +1,6 @@
 #include "BasicOutput.h"
 
-bool g_keysDown[0xBC + 1] = { };
+bool g_keysDown[0xBC + 1] = {};
 
 void SimulateKeyPress(VirtualKey key)
 {
