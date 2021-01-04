@@ -65,52 +65,41 @@ int main() {
 	std::ofstream outfile("new.txt", std::ofstream::binary);
 
 	{
-		const int BYTES_PER_PIXEL = 3; /// red, green, & blue
-		const int FILE_HEADER_SIZE = 14;
-		const int INFO_HEADER_SIZE = 40;
+		const int bytesPerPixel = 3; /// red, green, & blue
+		const int fileHeaderSize = 14;
+		const int infoHeaderSize = 40;
 
-		int widthInBytes = width * BYTES_PER_PIXEL;
+		int widthInBytes = width * bytesPerPixel;
 
-		unsigned char padding[3] = { 0, 0, 0 };
 		int paddingSize = (4 - (widthInBytes) % 4) % 4;
 
 		int stride = (widthInBytes)+paddingSize;
 
-		int fileSize = FILE_HEADER_SIZE + INFO_HEADER_SIZE + (stride * height);
+		int fileSize = fileHeaderSize + infoHeaderSize + (stride * height);
+		int headerSize = fileHeaderSize + infoHeaderSize;
+		unsigned char bitsPerPix = bytesPerPixel * 8;
 
-		unsigned char header[] = {
-			(unsigned char)('B'),
-			(unsigned char)('M'),
-			(unsigned char)(fileSize >> 000),
-			(unsigned char)(fileSize >> 010),
-			(unsigned char)(fileSize >> 020),
-			(unsigned char)(fileSize >> 030),
-			(unsigned char)(FILE_HEADER_SIZE + INFO_HEADER_SIZE),
-			(unsigned char)(INFO_HEADER_SIZE),
-			(unsigned char)(width >> 000),
-			(unsigned char)(width >> 010),
-			(unsigned char)(width >> 020),
-			(unsigned char)(width >> 030),
-			(unsigned char)(height >> 000),
-			(unsigned char)(height >> 010),
-			(unsigned char)(height >> 020),
-			(unsigned char)(height >> 030),
-			(unsigned char)(1),
-			(unsigned char)(BYTES_PER_PIXEL * 8) // Bits in a pixel
-		};
+		outfile
+			.write("BM", 2)
+			.write((char*)(&fileSize), sizeof(int))
+			.write((char*)(&headerSize), sizeof(int))
+			.write("\0", (fileHeaderSize - (2 + sizeof(int) + sizeof(int)))); // Padding
+		outfile
+			.write((char*)(&infoHeaderSize), sizeof(int))
+			.write((char*)(&width), sizeof(int))
+			.write((char*)(&height), sizeof(int))
+			.write("\1", 1)
+			.write((char*)(&bitsPerPix), 1)
+			.write("\0", (infoHeaderSize - (sizeof(int) + sizeof(int) + sizeof(int) + 1 + 1))); // Padding
 
-		outfile.write(
-			reinterpret_cast<char*>(header), // Convert unsigned to signed without changing the bits
-			sizeof(header));
-
-		if (paddingSize > 0) {
+		if (paddingSize > 0) { // Width or height is not a clean power of 2
 			for (int i = 0; i < height; ++i) {
-				outfile.write((char*)(writeMap + (i * widthInBytes)), widthInBytes);
-				outfile.write("\0\0\0", paddingSize);
+				Color* writeMapRow = &(writeMap[i * widthInBytes]);
+				outfile.write((char*)writeMapRow, widthInBytes); // Row
+				outfile.write("\0", paddingSize); // Padding
 			}
 		}
-		else
-		{
+		else { // Clean powers of 2 for both width & height
 			outfile.write((char*)writeMap, sizeof(writeMap));
 		}
 	}
