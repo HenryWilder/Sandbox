@@ -1,0 +1,7 @@
+0
+:v x l 123
+:v y l 456
+:v y v x
+:f p Apple
+:v x l 234
+:f e
