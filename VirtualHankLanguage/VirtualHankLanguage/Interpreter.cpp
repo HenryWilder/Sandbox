@@ -2,6 +2,14 @@
 
 int g_version = 0;
 
+int CustomVars::_Locate(const char symbol) const
+{
+	for (int i = 0; i < var_names.size(); ++i)
+	{
+		if (symbol == var_names.at(i)) return i;
+	}
+	return INT_MAX;
+}
 bool CustomVars::IsVar(const char symbol) const
 {
 	for (char name : var_names)
@@ -75,6 +83,29 @@ namespace DEBUGMSGNS
 			}
 		}
 	}
+
+	void PrintLine()
+	{
+		int len = file.tellg();
+		while (file.tellg() < std::ios_base::end) {
+			while (isspace(file.peek()))
+			{
+				printf(" ");
+				file >> std::ws;
+			}
+			if (file.peek() == ':') break;
+			if (file.peek() == 'e')
+			{
+				DebugMessage(MSG_DEBUG_LINEINDIC, HLT_FUNC, "e");
+				break;
+			}
+			char symbol = '#';
+			file >> symbol;
+			DebugMessage(MSG_DEBUG_LINEINDIC, HLT_FUNC, "%c", symbol);
+		}
+		file.seekg(len, std::ios_base::beg);
+		DebugMessage(MSG_DEBUG_LINEINDIC, "\n");
+	}
 }
 
 using namespace DEBUGMSGNS;
@@ -90,20 +121,13 @@ int Variable(bool get)
 
 	if (!(get && vars.IsVar(symbol)))
 	{
+		
 		char keyword;
 		file >> keyword;
 		// Determine value to set the var to
-		int value;
-		switch (keyword) // TODO: Initialize variable with function result
+		int value = INT_MAX;
+		switch (keyword)
 		{
-		case 'l': // Initialize variable with literal
-			file >> value;
-			DebugMessage(MSG_DEBUG, "Used the literal ");
-			DebugMessage(MSG_DEBUG, HLT_LIT, "%i", value);
-			DebugMessage(MSG_DEBUG, " as the value for variable ");
-			DebugMessage(MSG_DEBUG, HLT_VAR, "%c", symbol);
-			DebugMessage(MSG_DEBUG, ".\n");
-			break;
 		case 'v': // Initialize variable with another variable
 		{
 			file >> std::ws;
@@ -121,9 +145,17 @@ int Variable(bool get)
 		case 'f': // Initialize variable with function return
 			DebugMessage(MSG_WARNING, "WARNING: Initializing a variable with a function is not yet supported");
 			// TODO: Set vars with functions
+			break;
 		default: // No keyword for initialization
-			DebugMessage(MSG_ERROR, "ERROR: INVALID SYNTAX FOR DECLARING A VAR! Expected 'l', 'v', or 'f'. Read '%c' instead.\n", keyword);
-			value = INT_MAX;
+			DebugMessage(MSG_WARNING, "WARNING: INVALID SYNTAX FOR DECLARING A VAR! Expected 'l', 'v', or 'f'. Read '%c' instead.\n", keyword);
+			break;
+		case 'l': // Initialize variable with literal
+			file >> value;
+			DebugMessage(MSG_DEBUG, "Used the literal ");
+			DebugMessage(MSG_DEBUG, HLT_LIT, "%i", value);
+			DebugMessage(MSG_DEBUG, " as the value for variable ");
+			DebugMessage(MSG_DEBUG, HLT_VAR, "%c", symbol);
+			DebugMessage(MSG_DEBUG, ".\n");
 			break;
 		}
 
@@ -157,6 +189,9 @@ int Param()
 	case 'f': // TODO: Functions as parameters for other functions
 		DebugMessage(MSG_WARNING, "WARNING: Using a function as a parameter for another function is not yet supported");
 		break;
+	default:
+		DebugMessage(MSG_ERROR, "WARNING: Using a function as a parameter for another function is not yet supported");
+		break;
 	}
 	return value;
 }
@@ -167,7 +202,7 @@ int Function()
 	file >> symbol;
 	DebugMessage(MSG_DEBUG_EXTRA, "Read the function \"%c\" symbol for ", symbol);
 
-	switch (symbol) // TODO: Add more functions
+	switch (symbol)
 	{
 	case 'w': // Wait
 	{
@@ -190,9 +225,55 @@ int Function()
 		break;
 	}
 	break;
+	// TODO: Add more functions
 	default:
 		DebugMessage(MSG_DEBUG_EXTRA, "Undefined behavior.\n");
 		break;
+	}
+	return 0;
+}
+
+int Control()
+{
+	char symbol;
+	file >> symbol;
+	switch (symbol)
+	{
+	case 'i': // If
+		/*********************************
+		*
+		*	If statement syntax:
+		*
+		*	:c i <value> [0 = false, anything = true]
+		*	{ :[code to execute] };
+		*
+		**********************************/
+		//TODO
+		Param();
+		break;
+	case 'f': // For
+		/*********************************
+		* 
+		*	For loop syntax:
+		* 
+		*	:c f v [loop var] <value> [starting value] <value> [end value] <value> [amount to increment by each loop]
+		*	{ :[code to repeat] };
+		*	
+		* 
+		**********************************/
+		Variable(false); // Variable
+		Param(); // End value
+		Param(); // Increment amount
+		// TODO
+		break;
+	case 'w': // While
+		// TODO
+		break;
+	case 'b': // Break
+		file.ignore(256, ';');
+		break;
+	default:
+		DebugMessage(MSG_ERROR, "ERROR: CONTROL KEYWORD USED WITHOUT VALID CONTROL SYMBOL.\n");
 	}
 	return 0;
 }
@@ -206,7 +287,32 @@ int InterpretFile(const char* filename)
 	*
 	*   Syntax
 	*   ======
-	*   Variables
+	* 
+	*   Keywords
+	*   ========
+	*   ':' Start of function - Referred to as a "line" in debug
+	*
+	*   'l' Literal	 - read as an integer value
+	*
+	*   'v' Variable - read as the name of a variable
+	*	Note: This will declare a new variable if none with the specified name exists. The variable must be initialized in this case.
+	* 
+	*	'f' Function - read as the name of a function
+	* 
+	*	'c' Control - read as the name of a control statement
+	* 
+	*	'e' Signifies the end of the document
+	*
+	*   Functions in the current version
+	*   ================================
+	*   'm' Move mouse to position
+	*       2 params (int x, int y)
+	*
+	*   'c' Simulate mouse click
+	*       0 params
+	* 
+	*	Variables
+	*	=========
 	*	Note: only integer vars are supported in this version.
 	*   :v [var symbol] <v/l> [init value]	// Declaration
 	*   :v [var symbol] <v/l> [new value]	// Assignment
@@ -225,27 +331,6 @@ int InterpretFile(const char* filename)
 	*   :m v x v y			// variables
 	*	Note: string parameters cannot use variables (all vars are ints) and expect a literal string without any keywords.
 	*
-	*   Keywords
-	*   ========
-	*   ':' Start of function - Referred to as a "line" in debug
-	*
-	*   'l' Literal	 - read as an integer value
-	*
-	*   'v' Variable - read as the name of a variable
-	*	Note: This will declare a new variable if none with the specified name exists. The variable must be initialized in this case.
-	* 
-	*	'f' Function - read as the name of a function
-	* 
-	*	'e' Signifies the end of the document
-	*
-	*   Functions in the current version
-	*   ================================
-	*   'm' Move mouse to position
-	*       2 params (int x, int y)
-	*
-	*   'c' Simulate mouse click
-	*       0 params
-	*
 	***************************************************************************/
 
 	file = std::ifstream(filename); // Set the file
@@ -263,28 +348,10 @@ int InterpretFile(const char* filename)
 
 	while (true) // For each line
 	{
+		file.ignore(256, ':');
 		++line; // I want the lines to be { 1, 2, 3, ... } instead of { 0, 1, 2, ... }
 		DebugMessage(MSG_DEBUG_LINEINDIC, "\n[LINE %i]: ", line);
-		int len = file.tellg();
-		file.ignore(256, ':');
-		while (true) {
-			if (file.peek() == ' ') printf(" ");
-			file >> std::ws;
-			if (file.peek() == ':') break;
-			if (file.peek() == 'e')
-			{
-				DebugMessage(MSG_DEBUG_LINEINDIC, HLT_FUNC, "e");
-				break;
-			}
-			char symbol;
-			file >> symbol;
-			DebugMessage(MSG_DEBUG_LINEINDIC, HLT_FUNC, "%c", symbol);
-		}
-		file.seekg(len, std::ios_base::beg);
-		DebugMessage(MSG_DEBUG_LINEINDIC, "\n");
-		
-
-		file.ignore(256, ':'); // Jump to the next line
+		PrintLine();
 
 		char keyword;
 		file >> keyword;
@@ -295,14 +362,20 @@ int InterpretFile(const char* filename)
 
 		switch (keyword)
 		{
-		case 'f': // Function calls
-			DebugMessage(MSG_DEBUG_EXTRA, "Function call.\n");
-			Function();
-			break;
 		case 'v': // Variable declares/assigns
 			DebugMessage(MSG_DEBUG_EXTRA, "Variable declaration/assignment.\n");
 			Variable(false);
 			break;
+		case 'f': // Function calls
+			DebugMessage(MSG_DEBUG_EXTRA, "Function call.\n");
+			Function();
+			break;
+		case 'c':
+			DebugMessage(MSG_DEBUG_EXTRA, "Control statement.\n");
+			Control();
+			break;
+		case 'n':
+			// TODO: namespace case
 		default:
 			DebugMessage(MSG_DEBUG_EXTRA, "Undefined behavior.\n");
 			DebugMessage(MSG_ERROR, "ERROR: INVALID SYNTAX! Line keyword could not be found. Expected 'f' or 'v'. Read '%c' instead.\n", keyword);

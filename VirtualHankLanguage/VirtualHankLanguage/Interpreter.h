@@ -8,18 +8,11 @@ extern int g_version;
 
 struct CustomVars
 {
+private:
 	std::vector<char> var_names; // Array of var names
 	std::vector<int> var_vals; // Array of values (in same order as names)
-
-	int _Locate(const char symbol) const
-	{
-		for (int i = 0; i < var_names.size(); ++i)
-		{
-			if (symbol == var_names.at(i)) return i;
-		}
-		return INT_MAX;
-	}
-
+	int _Locate(const char symbol) const;
+public:
 	bool IsVar(const char symbol) const;
 	void DeclareVar(const char symbol, const int value = 0);
 	const int GetVar(const char symbol) const;
@@ -34,7 +27,8 @@ namespace DEBUGMSGNS
 		MSG_DEBUG = 1,
 		MSG_DEBUG_PRODUCT = 3,
 		MSG_DEBUG_LINEINDIC = 11,
-		MSG_WARNING = 6,
+		MSG_WARNING = 14,
+		MSG_WARNING_MINOR = 6,
 		MSG_ERROR = 4,
 	} MSG_TYPE; // Messages
 	typedef enum {
