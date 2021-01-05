@@ -2,9 +2,9 @@
 
 void UpdateScreencap()
 {
-	g_activity.producer.TrackOp("BitBlt", );
-
 	BitBlt(g_hInternal, 0, 0, g_screenWidth, g_screenHeight, g_hDesktop, 0, 0, SRCCOPY);
+
+	g_activity.producer.TrackOpPush("BitBlt", g_hInternalRecord, (char)rand());
 
 	BITMAPINFOHEADER bmi = {0};
 	bmi.biSize = sizeof(BITMAPINFOHEADER);
@@ -16,6 +16,9 @@ void UpdateScreencap()
 	bmi.biSizeImage = 0; // 3 * ScreenX * ScreenY; (position, not size)
 
 	GetDIBits(g_hDesktop, g_hBitmap, 0, g_screenHeight, g_screenData, (BITMAPINFO*)&bmi, DIB_RGB_COLORS);
+
+	g_activity.producer.TrackOpPush("GetDIBits", g_screenDataRecord, (char)rand());
+
 	//BitBlt(g_hConsoleDC, 0, 0, g_screenWidth, g_screenHeight, g_hInternal, 0, 0, SRCCOPY);
 }
 

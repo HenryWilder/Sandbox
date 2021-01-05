@@ -43,29 +43,29 @@ namespace tracking
 
 	struct Operation
 	{
-		Operation(const std::string name, Variable* const* vars, const char* newValues);
-		Operation(const std::string name, Variable* const* vars, const int varCount);
+		Operation(const std::string name, Variable* var, const char newValue);
+		Operation(const std::string name, Variable* var);
 		Operation(const std::string name);
 
 		std::string m_opName; // The name of the operation for displaying what's going on
 		int m_time; // When the operation happened
-		std::vector<Variable*> m_variables; // Pointers to memory interacted with in this operation (size 0 or nullptr for n/a)
-		std::vector<size_t> m_relatedRequests; // Indexes in the Memory's m_log vector describing which request(s) this function is related to
+		Variable* m_variable; // Pointers to memory interacted with in this operation (size 0 or nullptr for n/a)
+		size_t m_relatedRequest; // Indexes in the Memory's m_log vector describing which request(s) this function is related to
 	};
 
 	struct Memory
 	{
 		std::vector<Variable> vars;
 		Variable* Find(Address search);
-		void Declare(Variable var);
+		Variable* Declare(Address var);
 	};
 
 	struct Thread
 	{
 		std::vector<Operation> m_operations; // All operations used in this thread
 
-		void TrackOp(const std::string name, Variable* const* vars, const char* newValues);
-		void TrackOp(const std::string name, Variable* const* vars, const int varCount);
+		void TrackOpPush(const std::string name, Variable* var, const char newValue);
+		void TrackOpPull(const std::string name, Variable* var);
 		void TrackOp(const std::string name);
 	};
 
@@ -77,9 +77,9 @@ namespace tracking
 		Memory producerLocal;
 		Memory consumerLocal;
 
-		void DeclareGlobal(Address var) { global.Declare(Variable(var)); }
-		void DeclareProdLocal(Address var) { producerLocal.Declare(Variable(var)); }
-		void DeclareConsLocal(Address var) { consumerLocal.Declare(Variable(var));}
+		Variable* DeclareGlobal(Address var) { return global.Declare(var); }
+		Variable* DeclareProdLocal(Address var) { return producerLocal.Declare(var); }
+		Variable* DeclareConsLocal(Address var) { return consumerLocal.Declare(var);}
 
 		void Print();
 	};

@@ -17,10 +17,7 @@ HBITMAP g_hBitmap = CreateCompatibleBitmap(g_hDesktop, g_screenWidth, g_screenHe
 
 bool loop = true;
 
-void DeclareTrackingVars()
-{
-	g_activity.DeclareGlobal(&g_screenData);
-	g_activity.DeclareGlobal(&g_hDesktop);
-	g_activity.DeclareGlobal(&g_hInternal);
-	g_activity.DeclareGlobal(&g_hBitmap);
-}
+tracking::Variable* g_screenDataRecord = g_activity.DeclareGlobal(&g_screenData);
+tracking::Variable* g_hDesktopRecord = g_activity.DeclareGlobal(&g_hDesktop);
+tracking::Variable* g_hInternalRecord = g_activity.DeclareGlobal(&g_hInternal);
+tracking::Variable* g_hBitmapRecord = g_activity.DeclareGlobal(&g_hBitmap);

@@ -24,35 +24,32 @@ namespace tracking
 
 	size_t Variable::LogPullReq()
 	{
+		size_t lastIndx = m_log.size();
 		m_log.push_back(Pull());
-		return m_log.size() - 1;
+		return lastIndx;
 	}
 
 	size_t Variable::LogPushReq(char newValue)
 	{
+		size_t lastIndx = m_log.size();
 		m_log.push_back(Push(newValue));
-		return m_log.size() - 1;
+		return lastIndx;
 	}
 
-	Operation::Operation(const std::string name, Variable* const* vars, const char* newValues)
+	Operation::Operation(const std::string name, Variable* var, const char newValue)
 	{
 		m_time = GetTimeMS();
 		m_opName = name;
-		int v = 0;
-		do {
-			m_relatedRequests.push_back(vars[v]->LogPushReq(newValues[v]));
-			m_variables.push_back(vars[v]);
-		} while (newValues[v++]);
+		m_relatedRequest = (var->LogPushReq(newValue));
+		m_variable = (var);
 	}
 
-	Operation::Operation(const std::string name, Variable* const* vars, const int varCount)
+	Operation::Operation(const std::string name, Variable* var)
 	{
 		m_time = GetTimeMS();
 		m_opName = name;
-		for (int v = 0; v < varCount; ++v) {
-			m_relatedRequests.push_back(vars[v]->LogPullReq());
-			m_variables.push_back(vars[v]);
-		}
+		m_relatedRequest = (var->LogPullReq());
+		m_variable = (var);
 	}
 
 	Operation::Operation(const std::string name)
@@ -61,13 +58,27 @@ namespace tracking
 		m_opName = name;
 	}
 
-	void Thread::TrackOp(const std::string name, Variable* const* vars, const char* newValues)
+	Variable* Memory::Find(Address search)
 	{
-		m_operations.push_back(Operation(name, vars, newValues));
+		for (int i = 0; i < vars.size(); ++i)
+		{
+			if (search == vars[i].m_address) return &(vars[i]);
+		}
+		return nullptr;
 	}
-	void Thread::TrackOp(const std::string name, Variable* const* vars, const int varCount)
+	Variable* Memory::Declare(Address var)
 	{
-		m_operations.push_back(Operation(name, vars, varCount));
+		vars.push_back(Variable(var));
+		return &(vars.at(vars.size() - 1));
+	}
+
+	void Thread::TrackOpPush(const std::string name, Variable* var, const char newValue)
+	{
+		m_operations.push_back(Operation(name, var, newValue));
+	}
+	void Thread::TrackOpPull(const std::string name, Variable* var)
+	{
+		m_operations.push_back(Operation(name, var));
 	}
 	void Thread::TrackOp(const std::string name)
 	{
@@ -77,13 +88,6 @@ namespace tracking
 	void Data::Print()
 	{
 
-	}
-	Variable* Memory::Find(Address search)
-	{
-		return nullptr;
-	}
-	void Memory::Declare(Address var)
-	{
 	}
 }
 

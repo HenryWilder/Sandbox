@@ -28,4 +28,7 @@ struct Color
 	operator COLORREF() { return RGB(r,g,b);  }
 };
 
-void DeclareTrackingVars();
+extern tracking::Variable* g_screenDataRecord;
+extern tracking::Variable* g_hDesktopRecord;
+extern tracking::Variable* g_hInternalRecord;
+extern tracking::Variable* g_hBitmapRecord;

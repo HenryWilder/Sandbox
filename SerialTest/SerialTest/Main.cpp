@@ -65,7 +65,7 @@ int main() {
 	std::ofstream outfile("new.txt", std::ofstream::binary);
 
 	{
-		const int bytesPerPixel = 3; /// red, green, & blue
+		const int bytesPerPixel = 3; // red, green, & blue
 		const int fileHeaderSize = 14;
 		const int infoHeaderSize = 40;
 
