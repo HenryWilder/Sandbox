@@ -24,6 +24,7 @@
     <ProjectGuid>{f2aca5de-716d-4d38-861d-b690d2ff6ae0}</ProjectGuid>
     <RootNamespace>VirtualHank</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>VirtualHank2</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -139,7 +140,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="VirtualHank.cpp" />
+    <ClCompile Include="Functions.cpp" />
+    <ClCompile Include="Interpreter.cpp" />
+    <ClCompile Include="VirtualHank2.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Functions.h" />
+    <ClInclude Include="Interpreter.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="SharePoint.vhid" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
