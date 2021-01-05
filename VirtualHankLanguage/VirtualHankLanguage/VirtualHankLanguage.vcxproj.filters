@@ -35,9 +35,15 @@
     <ClInclude Include="resource.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="VersionConversion.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="Test.vhid">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="0.vhvf">
       <Filter>Resource Files</Filter>
     </Text>
   </ItemGroup>

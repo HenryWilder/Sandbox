@@ -147,8 +147,10 @@
     <ClInclude Include="Functions.h" />
     <ClInclude Include="Interpreter.h" />
     <ClInclude Include="resource.h" />
+    <ClInclude Include="VersionConversion.h" />
   </ItemGroup>
   <ItemGroup>
+    <Text Include="0.vhvf" />
     <Text Include="Test.vhid" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
