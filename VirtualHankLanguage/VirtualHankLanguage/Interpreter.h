@@ -20,45 +20,36 @@ struct CustomVars
 		return INT_MAX;
 	}
 
-	bool IsVar(const char symbol) const
-	{
-		for (char name : var_names)
-		{
-			if (symbol == name) return true;
-		}
-		return false;
-	}
-	void DeclareVar(const char symbol, const int value = 0)
-	{
-		var_names.push_back(symbol);
-		var_vals.push_back(value);
-	}
-	const int GetVar(const char symbol) const
-	{
-		return var_vals.at(_Locate(symbol));
-	}
-	void SetVar(const char symbol, const int value)
-	{
-		var_vals.at(_Locate(symbol)) = value;
-	}
+	bool IsVar(const char symbol) const;
+	void DeclareVar(const char symbol, const int value = 0);
+	const int GetVar(const char symbol) const;
+	void SetVar(const char symbol, const int value);
 };
 extern CustomVars vars;
-
-const char* FormatText(const char* text, ...);
-
 namespace DEBUGMSGNS
 {
 	typedef enum {
-		MSG_DEFAULT = 15,
+		MSG_DEFAULT = 7,
+		MSG_DEBUG_EXTRA = 8,
+		MSG_DEBUG = 1,
 		MSG_DEBUG_PRODUCT = 3,
-		MSG_DEBUG = 8,
-		MSG_DEBUG_LINEINDIC = 9,
+		MSG_DEBUG_LINEINDIC = 11,
 		MSG_WARNING = 6,
 		MSG_ERROR = 4,
-	} MSG_TYPE;
+	} MSG_TYPE; // Messages
+	typedef enum {
+		HLT_VAR = 11, // Variable
+		HLT_LIT = 2, // Literal
+		HLT_FUNC = 6, // Function
+		HLT_STR = 13, // String
+	} HLT_COLOR; // Highlighting
 
 	extern HANDLE hConsole;
 
+	extern const bool hideExtranious;
+	extern const bool majorOnly;
+
+	void DebugMessage(MSG_TYPE type, HLT_COLOR color, const char* text, ...);
 	void DebugMessage(MSG_TYPE color, const char* text, ...);
 }
 

@@ -1,38 +1,78 @@
 #include "Interpreter.h"
 
-int g_version = 1;
-CustomVars vars;
+int g_version = 0;
 
-const char* FormatText(const char* text, ...)
+bool CustomVars::IsVar(const char symbol) const
 {
-	char buffer[1024] = {};
-	va_list args;
-	va_start(args, text);
-	vsprintf_s(buffer, text, args);
-	va_end(args);
-	return buffer;
+	for (char name : var_names)
+	{
+		if (symbol == name) return true;
+	}
+	return false;
 }
+void CustomVars::DeclareVar(const char symbol, const int value)
+{
+	var_names.push_back(symbol);
+	var_vals.push_back(value);
+}
+const int CustomVars::GetVar(const char symbol) const
+{
+	return var_vals.at(_Locate(symbol));
+}
+void CustomVars::SetVar(const char symbol, const int value)
+{
+	var_vals.at(_Locate(symbol)) = value;
+}
+
+CustomVars vars;
 
 namespace DEBUGMSGNS
 {
 	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
+	
+	const bool hideExtranious = true;
+	const bool majorOnly = false;
+
+	void DebugMessage(MSG_TYPE type, HLT_COLOR color, const char* message, ...)
+	{
+#ifdef _RELEASE
+		if (color == MSG_ERROR)
+#endif
+		{
+			if (!(hideExtranious && type == MSG_DEBUG_EXTRA) && !(majorOnly && type == MSG_DEBUG))
+			{
+				char buffer[1024] = {};
+				va_list args;
+				va_start(args, message);
+				vsprintf_s(buffer, message, args);
+				va_end(args);
+
+				SetConsoleTextAttribute(hConsole, color);
+				printf(buffer);
+				SetConsoleTextAttribute(hConsole, MSG_DEFAULT);
+			}
+		}
+	}
 
 	void DebugMessage(MSG_TYPE color, const char* message, ...)
 	{
-	#ifdef _RELEASE
+#ifdef _RELEASE
 		if (color == MSG_ERROR)
-	#endif
+#endif
 		{
-			char buffer[1024] = {};
-			va_list args;
-			va_start(args, message);
-			vsprintf_s(buffer, message, args);
-			va_end(args);
+			if (!(hideExtranious && color == MSG_DEBUG_EXTRA) && !(majorOnly && color == MSG_DEBUG))
+			{
+				char buffer[1024] = {};
+				va_list args;
+				va_start(args, message);
+				vsprintf_s(buffer, message, args);
+				va_end(args);
 
-			SetConsoleTextAttribute(hConsole, color);
-			printf(buffer);
-			if (color == MSG_ERROR) printf("Program exiting with failure.\n");
-			SetConsoleTextAttribute(hConsole, MSG_DEFAULT);
+				SetConsoleTextAttribute(hConsole, color);
+				printf(buffer);
+				if (color == MSG_ERROR) printf("Program exiting with failure.\n");
+				SetConsoleTextAttribute(hConsole, MSG_DEFAULT);
+			}
 		}
 	}
 }
@@ -46,7 +86,7 @@ int Variable(bool get)
 {
 	char symbol;
 	file >> symbol;
-	DebugMessage(MSG_DEBUG, "Read the variable symbol \"%c\".\n", symbol);
+	DebugMessage(MSG_DEBUG_EXTRA, "Read the variable symbol \"%c\".\n", symbol);
 
 	if (!(get && vars.IsVar(symbol)))
 	{
@@ -58,12 +98,26 @@ int Variable(bool get)
 		{
 		case 'l': // Initialize variable with literal
 			file >> value;
-			DebugMessage(MSG_DEBUG, "Using literal %i as the value for variable %c.\n", value, symbol);
+			DebugMessage(MSG_DEBUG, "Used the literal ");
+			DebugMessage(MSG_DEBUG, HLT_LIT, "%i", value);
+			DebugMessage(MSG_DEBUG, " as the value for variable ");
+			DebugMessage(MSG_DEBUG, HLT_VAR, "%c", symbol);
+			DebugMessage(MSG_DEBUG, ".\n");
 			break;
 		case 'v': // Initialize variable with another variable
+		{
+			file >> std::ws;
+			char symbol1 = file.peek();
 			value = Variable();
-			DebugMessage(MSG_DEBUG, "Using a variable with value %i as the value for variable %c.\n", value, symbol);
+			DebugMessage(MSG_DEBUG, "Used the variable ");
+			DebugMessage(MSG_DEBUG, HLT_VAR, "%c", symbol1);
+			DebugMessage(MSG_DEBUG, " (currently ");
+			DebugMessage(MSG_DEBUG, HLT_LIT, "%i", value);
+			DebugMessage(MSG_DEBUG, ") as the value for variable ", value);
+			DebugMessage(MSG_DEBUG, HLT_VAR, "%c", symbol);
+			DebugMessage(MSG_DEBUG, ".\n");
 			break;
+		}
 		case 'f': // Initialize variable with function return
 			DebugMessage(MSG_WARNING, "WARNING: Initializing a variable with a function is not yet supported");
 			// TODO: Set vars with functions
@@ -91,7 +145,7 @@ int Param()
 {
 	char keyword;
 	file >> keyword;
-	DebugMessage(MSG_DEBUG, "Read the parameter keyword \"%c\"\n", keyword);
+	DebugMessage(MSG_DEBUG_EXTRA, "Read the parameter keyword \"%c\"\n", keyword);
 	int value = INT_MAX;
 	switch (keyword) {
 	case 'l':
@@ -111,13 +165,13 @@ int Function()
 {
 	char symbol;
 	file >> symbol;
-	DebugMessage(MSG_DEBUG, "Read the function \"%c\" symbol for ", symbol);
+	DebugMessage(MSG_DEBUG_EXTRA, "Read the function \"%c\" symbol for ", symbol);
 
 	switch (symbol) // TODO: Add more functions
 	{
 	case 'w': // Wait
 	{
-		DebugMessage(MSG_DEBUG, "Wait.\n");
+		DebugMessage(MSG_DEBUG_EXTRA, "Wait.\n");
 		int time = Param();
 		DebugMessage(MSG_DEBUG_PRODUCT, "Waiting %i ms...\n", time);
 		Sleep(time);
@@ -126,16 +180,18 @@ int Function()
 	}
 	case 'p': // Print
 	{
-		DebugMessage(MSG_DEBUG, "Print.\n");
+		DebugMessage(MSG_DEBUG_EXTRA, "Print.\n");
 		std::string str;
 		file >> str;
 		printf("%s\n", str.c_str());
-		DebugMessage(MSG_DEBUG_PRODUCT, "Printed the string \"%s\".\n", str.c_str());
+		DebugMessage(MSG_DEBUG_PRODUCT, "Printed the string ");
+		DebugMessage(MSG_DEBUG_PRODUCT, HLT_STR, "\"%s\"", str.c_str());
+		DebugMessage(MSG_DEBUG_PRODUCT, ".\n");
 		break;
 	}
 	break;
 	default:
-		DebugMessage(MSG_DEBUG, "Undetermined behavior.\n");
+		DebugMessage(MSG_DEBUG_EXTRA, "Undefined behavior.\n");
 		break;
 	}
 	return 0;
@@ -203,34 +259,52 @@ int InterpretFile(const char* filename)
 		UpdateFile(filename, versionNumber);
 	}
 
-	int line = 1; // For printing errors
+	int line = 0;
 
 	while (true) // For each line
 	{
 		++line; // I want the lines to be { 1, 2, 3, ... } instead of { 0, 1, 2, ... }
-		DebugMessage(MSG_DEBUG_LINEINDIC, "Line %i:\n", line);
+		DebugMessage(MSG_DEBUG_LINEINDIC, "\n[LINE %i]: ", line);
+		int len = file.tellg();
+		file.ignore(256, ':');
+		while (true) {
+			if (file.peek() == ' ') printf(" ");
+			file >> std::ws;
+			if (file.peek() == ':') break;
+			if (file.peek() == 'e')
+			{
+				DebugMessage(MSG_DEBUG_LINEINDIC, HLT_FUNC, "e");
+				break;
+			}
+			char symbol;
+			file >> symbol;
+			DebugMessage(MSG_DEBUG_LINEINDIC, HLT_FUNC, "%c", symbol);
+		}
+		file.seekg(len, std::ios_base::beg);
+		DebugMessage(MSG_DEBUG_LINEINDIC, "\n");
+		
 
 		file.ignore(256, ':'); // Jump to the next line
 
 		char keyword;
 		file >> keyword;
 
-		DebugMessage(MSG_DEBUG, "Read the keyword \"%c\" for ", keyword);
+		DebugMessage(MSG_DEBUG_EXTRA, "Read the keyword \"%c\" for ", keyword);
 
 		if (keyword == 'e') break; // Exit keyword
 
 		switch (keyword)
 		{
 		case 'f': // Function calls
-			DebugMessage(MSG_DEBUG, "Function call.\n");
+			DebugMessage(MSG_DEBUG_EXTRA, "Function call.\n");
 			Function();
 			break;
 		case 'v': // Variable declares/assigns
-			DebugMessage(MSG_DEBUG, "Variable declaration/assignment.\n");
+			DebugMessage(MSG_DEBUG_EXTRA, "Variable declaration/assignment.\n");
 			Variable(false);
 			break;
 		default:
-			DebugMessage(MSG_DEBUG, "Undefined behavior.\n");
+			DebugMessage(MSG_DEBUG_EXTRA, "Undefined behavior.\n");
 			DebugMessage(MSG_ERROR, "ERROR: INVALID SYNTAX! Line keyword could not be found. Expected 'f' or 'v'. Read '%c' instead.\n", keyword);
 			return 1;
 			break;

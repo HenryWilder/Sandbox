@@ -1,11 +1,13 @@
 #pragma once
+#include <fstream>
 #include "Interpreter.h"
 
-void UpdateFile(const char* filename, int fVersion)
+const char* FormatText(const char* text, ...);
+
+struct Change
 {
-	std::ifstream versionFormatFile = std::ifstream(FormatText("%i.vhvf", fVersion));
-	printf(FormatText("%i.vhvf", fVersion));
+	std::string from, to;
+};
+std::ifstream& operator>>(std::ifstream&, Change);
 
-
-	versionFormatFile.close();
-}
+void UpdateFile(const char* filename, int fVersion);

@@ -141,6 +141,7 @@
   <ItemGroup>
     <ClCompile Include="Functions.cpp" />
     <ClCompile Include="Interpreter.cpp" />
+    <ClCompile Include="VersionConversion.cpp" />
     <ClCompile Include="VirtualHankLanguage.cpp" />
   </ItemGroup>
   <ItemGroup>

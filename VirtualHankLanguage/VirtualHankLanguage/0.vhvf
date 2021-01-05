@@ -1,4 +1,4 @@
 1
-v = var
-f = func
-e = end
+v var
+f func
+e end
