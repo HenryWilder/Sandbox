@@ -1,6 +1,7 @@
 #pragma once
 #include <fstream>
 #include <vector>
+#include <utility>
 #include "Functions.h"
 #include "VersionConversion.h"
 
@@ -158,7 +159,7 @@ namespace DEBUGMSGNS
 		std::vector<DebugDataChunk*> m_dataChunks;
 
 		template <typename T>
-		void Add(const T data)
+		void Add(T data)
 		{
 			DebugDataBit<T> chunk(data);
 			Add(&chunk);
@@ -172,35 +173,29 @@ namespace DEBUGMSGNS
 	extern const bool hideExtranious;
 	extern const bool majorOnly;
 
-	void DebugMessage(MSG_TYPE type, HLT_COLOR color, const char* text, ...);
-	void DebugMessage(MSG_TYPE color, const char* text, ...);
+	//void DebugMessage(MSG_TYPE type, HLT_COLOR color, const char* text, ...);
+	//void DebugMessage(MSG_TYPE color, const char* text, ...);
 	void DebugMessage(MSG_TYPE color, const std::string message, const DebugDataBundle& data);
 
 	template <typename T>
-	void ConstructDataBit(DebugDataBundle& bundle, T a)
-	{
-		bundle.Add(a);
-	}
+	void ConstructDataBit(DebugDataBundle& bundle, T a) { bundle.Add(a); }
+
+	void ConstructDataBundle(DebugDataBundle& bundle) {}
 
 	template <typename T, typename ...Args>
-	void ConstructDataBit(DebugDataBundle& bundle, T a, Args... args)
+	void ConstructDataBundle(DebugDataBundle& bundle, T argument, Args... args)
 	{
-		bundle.Add(a);
-		ConstructDataBit(bundle, args);
-	}
-
-	template <typename ...Args>
-	DebugDataBundle ConstructDataBundle(Args... args)
-	{
-		DebugDataBundle bundle;
-		ConstructDataBit<>(bundle, args);
-		return bundle;
+		ConstructDataBit(bundle, argument);
+		//ConstructDataBundle(bundle, args...);
+		int dummy[] = { 0, ((void)ConstructDataBundle(bundle, std::forward<Args>(args)), 0) ... };
 	}
 
 	template <typename ...Args>
 	void PrintDebugMSG(MSG_TYPE type, std::string message, Args... args)
 	{
-		DebugDataBundle bundle = ConstructDataBundle(args);
+		DebugDataBundle bundle;
+		//int dummy[] = { 0, ((void) ConstructDataBundle(bundle, std::forward<Args>(args)), 0) ... }; // Maybe the cause of the compile looping?
+		ConstructDataBundle(bundle, std::forward<Args>(args), ...);
 		DebugMessage(MSG_DEBUG, message, bundle);
 	}
 	void PrintLine();
