@@ -2,32 +2,30 @@
 
 int g_version = 0;
 
-int CustomVars::_Locate(const char symbol) const
+std::ifstream file;
+
+size_t CustomVars::_Locate(VariableSymbol symbol) const
 {
-	for (int i = 0; i < var_names.size(); ++i)
+	for (size_t i = 0; i < var_names.size(); ++i)
 	{
 		if (symbol == var_names.at(i)) return i;
 	}
-	return INT_MAX;
+	return var_names.size();
 }
-bool CustomVars::IsVar(const char symbol) const
+bool CustomVars::IsVar(VariableSymbol symbol) const
 {
-	for (char name : var_names)
-	{
-		if (symbol == name) return true;
-	}
-	return false;
+	return (std::find(var_names.begin(), var_names.end(), symbol) != var_names.end());
 }
-void CustomVars::DeclareVar(const char symbol, const int value)
+void CustomVars::DeclareVar(VariableSymbol symbol, const int value)
 {
 	var_names.push_back(symbol);
 	var_vals.push_back(value);
 }
-const int CustomVars::GetVar(const char symbol) const
+const int CustomVars::GetVar(VariableSymbol symbol) const
 {
 	return var_vals.at(_Locate(symbol));
 }
-void CustomVars::SetVar(const char symbol, const int value)
+void CustomVars::SetVar(VariableSymbol symbol, const int value)
 {
 	var_vals.at(_Locate(symbol)) = value;
 }
@@ -84,6 +82,24 @@ namespace DEBUGMSGNS
 		}
 	}
 
+	void DebugMessage(MSG_TYPE color, const std::string message, const DebugDataBundle& data)
+	{
+		int i = 0;
+		size_t sectionOffset = 0;
+		size_t sectionLength = 0;
+		SetConsoleTextAttribute(hConsole, color);
+		while (sectionOffset + sectionLength < message.rfind('%'))
+		{
+			sectionLength = message.find('%', sectionOffset) - sectionOffset;
+			printf("%s", message.substr(sectionOffset, sectionLength).c_str());
+			sectionOffset += sectionLength;
+			data.m_dataChunks.at(i++)->PrintData();
+			SetConsoleTextAttribute(hConsole, color);
+		}
+		printf("%s", message.substr(sectionOffset, message.length() - sectionOffset).c_str());
+		SetConsoleTextAttribute(hConsole, MSG_DEFAULT);
+	}
+
 	void PrintLine()
 	{
 		int len = file.tellg();
@@ -110,12 +126,10 @@ namespace DEBUGMSGNS
 
 using namespace DEBUGMSGNS;
 
-std::ifstream file;
-
 // If "get" == true, do not assume we are setting the variable unless it is undeclared.
 int Variable(bool get)
 {
-	char symbol;
+	VariableSymbol symbol;
 	file >> symbol;
 	DebugMessage(MSG_DEBUG_EXTRA, "Read the variable symbol \"%c\".\n", symbol);
 
@@ -131,13 +145,22 @@ int Variable(bool get)
 		case 'v': // Initialize variable with another variable
 		{
 			file >> std::ws;
-			char symbol1 = file.peek();
+			VariableSymbol symbol1;
+			// Look at the next variable symbol without consuming it
+			{
+				std::streampos pos = file.tellg();
+				file >> symbol1;
+				file.seekg(pos);
+			}
 			value = Variable();
+
+			PrintDebugMSG(MSG_DEBUG, "Used the variable % (currently %) as the value for variable %", symbol1, value, symbol);
+
 			DebugMessage(MSG_DEBUG, "Used the variable ");
 			DebugMessage(MSG_DEBUG, HLT_VAR, "%c", symbol1);
 			DebugMessage(MSG_DEBUG, " (currently ");
 			DebugMessage(MSG_DEBUG, HLT_LIT, "%i", value);
-			DebugMessage(MSG_DEBUG, ") as the value for variable ", value);
+			DebugMessage(MSG_DEBUG, ") as the value for variable ");
 			DebugMessage(MSG_DEBUG, HLT_VAR, "%c", symbol);
 			DebugMessage(MSG_DEBUG, ".\n");
 			break;
