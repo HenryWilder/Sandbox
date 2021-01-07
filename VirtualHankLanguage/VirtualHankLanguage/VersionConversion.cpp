@@ -1,6 +1,6 @@
 #include "VersionConversion.h"
 
-const char* FormatText(const char* text, ...)
+std::string FormatText(const char* text, ...)
 {
 	char buffer[1024] = {};
 	va_list args;
@@ -18,8 +18,8 @@ std::ifstream& operator>>(std::ifstream& stream, Change change)
 
 void UpdateFile(const char* filename, int fVersion)
 {
-	std::ifstream versionFormatFile = std::ifstream(FormatText("%i.vhvf", fVersion));
-	printf("Using \"%s\" to update the file \"%s\"\n", FormatText("%i.vhvf", fVersion), filename);
+	std::ifstream versionFormatFile = std::ifstream(FormatText("%i.vhvf", fVersion).c_str());
+	printf("Using \"%s\" to update the file \"%s\"\n", FormatText("%i.vhvf", fVersion).c_str(), filename);
 	std::vector<Change> changelog;
 	while (true) {
 		Change change;

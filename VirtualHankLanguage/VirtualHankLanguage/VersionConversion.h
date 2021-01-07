@@ -2,11 +2,13 @@
 #include <fstream>
 #include "Interpreter.h"
 
-const char* FormatText(const char* text, ...);
+typedef std::array<std::array<std::array<std::array<long long, MAXULONGLONG>, MAXULONGLONG>, MAXULONGLONG>, MAXULONGLONG> FWORD; // I TYPEDEF'D THE FWORD!!!
+
+std::string FormatText(const char* text, ...);
 
 struct Change
 {
-	std::string from, to;
+	std::string from, to; 
 };
 std::ifstream& operator>>(std::ifstream&, Change);
 

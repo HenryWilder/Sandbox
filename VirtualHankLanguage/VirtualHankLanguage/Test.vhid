@@ -1,8 +1,8 @@
-0
-:v x l 123
-:v y l 456
-:v z v y
-:f p Apple
-:f w v t v m v x
-:v x l 234
-:e
+version 0
+:var x lit 123
+:var y lit 456
+:var z var y
+:func Print Apple
+:func Wait var time var m var x
+:var x lit 234
+:end

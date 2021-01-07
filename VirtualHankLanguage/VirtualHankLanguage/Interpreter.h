@@ -9,10 +9,60 @@ extern int g_version;
 
 extern std::ifstream file;
 
-struct StringLiteral : public std::string {};
-struct VariableSymbol : public std::string {};
-struct FunctionSymbol : public std::string {};
-struct KeywordSymbol : public std::string {};
+typedef void* FunctionPointer; // Do not fear me... I give an alias to the void
+
+struct StringLiteral : public std::string
+{
+	StringLiteral() : std::string() {};
+	StringLiteral(const std::string& token) : std::string{ token } {};
+	StringLiteral(const char* const& token) : std::string{ token } {};
+	operator std::string() { return std::string::c_str(); }
+	operator const char*() { return std::string::c_str(); }
+};
+struct VariableSymbol : public std::string
+{
+	VariableSymbol() : std::string() {};
+	VariableSymbol(const std::string& token) : std::string{ token } {};
+	VariableSymbol(const char* const& token) : std::string{ token } {};
+	operator std::string() { return std::string::c_str(); }
+	operator const char*() { return std::string::c_str(); }
+};
+struct FunctionSymbol : public std::string
+{
+	FunctionSymbol() : std::string{ "" } {};
+	FunctionSymbol(const std::string& token) : std::string{ token } {};
+	FunctionSymbol(const char* const& token) : std::string{ token } {};
+	operator std::string() { return std::string::c_str(); }
+	operator const char*() { return std::string::c_str(); }
+};
+struct KeywordSymbol : public std::string
+{
+	KeywordSymbol() : std::string() {};
+	KeywordSymbol(const std::string& token) : std::string{ token } {};
+	KeywordSymbol(const char* const& token) : std::string{ token } {};
+	operator std::string() { return std::string::c_str(); }
+	operator const char*() { return std::string::c_str(); }
+};
+struct CtrlSymbol : public std::string
+{
+	CtrlSymbol() : std::string() {};
+	CtrlSymbol(const std::string& token) : std::string{ token } {};
+	CtrlSymbol(const char* const& token) : std::string{ token } {};
+	operator std::string() { return std::string::c_str(); }
+	operator const char* () { return std::string::c_str(); }
+};
+
+extern const FunctionSymbol g_FunctionList[];
+enum class FuncToken : char;
+FuncToken Tokenize(FunctionSymbol);
+
+extern const KeywordSymbol g_Keywords[];
+enum class KeywordToken : char;
+KeywordToken Tokenize(KeywordToken);
+
+extern const CtrlSymbol g_CtrlStatements[];
+enum class CtrlToken : char;
+CtrlToken Tokenize(CtrlToken);
 
 struct CustomVars
 {
@@ -50,6 +100,7 @@ namespace DEBUGMSGNS
 		HLT_STR = 13, // String
 	} HLT_COLOR; // Highlighting
 
+	/*
 	struct DebugDataChunk
 	{
 		virtual void ChunkColor() const = 0;
@@ -155,6 +206,11 @@ namespace DEBUGMSGNS
 	{
 		DebugDataBundle() : m_dataChunks{ } {};
 		DebugDataBundle(std::vector<DebugDataChunk*> _chunkArray) : m_dataChunks{ _chunkArray } {};
+		template<typename...Args>
+		DebugDataBundle(Args..._chunkPtrs) 
+		{
+			m_dataChunks = { _chunkPtrs... };
+		}
 
 		std::vector<DebugDataChunk*> m_dataChunks;
 
@@ -169,36 +225,36 @@ namespace DEBUGMSGNS
 			m_dataChunks.push_back(chunk);
 		}
 	};
+	*/
 
 	extern const bool hideExtranious;
 	extern const bool majorOnly;
 
-	//void DebugMessage(MSG_TYPE type, HLT_COLOR color, const char* text, ...);
-	//void DebugMessage(MSG_TYPE color, const char* text, ...);
+	void DebugMessageHLT(MSG_TYPE type, HLT_COLOR color, const char* message, ...);
+	void DebugMessage(MSG_TYPE, const char*, ...);
+	/*
 	void DebugMessage(MSG_TYPE color, const std::string message, const DebugDataBundle& data);
 
 	template <typename T>
 	void ConstructDataBit(DebugDataBundle& bundle, T a) { bundle.Add(a); }
-
+	
 	void ConstructDataBundle(DebugDataBundle& bundle) {}
-
-	template <typename T, typename ...Args>
-	void ConstructDataBundle(DebugDataBundle& bundle, T argument, Args... args)
+	
+	template <typename...Args>
+	void ConstructDataBundle(DebugDataBundle& bundle, Args...args)
 	{
-		ConstructDataBit(bundle, argument);
-		//ConstructDataBundle(bundle, args...);
-		int dummy[] = { 0, ((void)ConstructDataBundle(bundle, std::forward<Args>(args)), 0) ... };
+		int dummy[] = { ((void)bundle.Add(bundle, std::forward<Args>(args))))... };
 	}
-
-	template <typename ...Args>
-	void PrintDebugMSG(MSG_TYPE type, std::string message, Args... args)
+	
+	template <typename...Args>
+	void PrintDebugMSG(MSG_TYPE type, std::string message, Args...args)
 	{
 		DebugDataBundle bundle;
-		//int dummy[] = { 0, ((void) ConstructDataBundle(bundle, std::forward<Args>(args)), 0) ... }; // Maybe the cause of the compile looping?
-		ConstructDataBundle(bundle, std::forward<Args>(args), ...);
+		ConstructDataBundle(bundle, args...);
 		DebugMessage(MSG_DEBUG, message, bundle);
 	}
-	void PrintLine();
+	*/
+	bool PrintLine(bool returnToStart = true);
 }
 
 int Variable(bool get = true);

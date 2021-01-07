@@ -4,11 +4,73 @@ int g_version = 0;
 
 std::ifstream file;
 
+const FunctionSymbol g_FunctionList[] = {
+	"Print",
+	"Wait",
+	"Click"
+};
+enum class FuncToken : char
+{
+	Print = 0,
+	Wait,
+	Click,
+	ERR,
+};
+FuncToken Tokenize(FunctionSymbol function)
+{
+	for (int i = 0; i < sizeof(g_FunctionList); ++i) { if (function == g_FunctionList[i]) return FuncToken(i); }
+	return FuncToken::ERR;
+}
+
+const CtrlSymbol g_CtrlStatements[] = {
+	"if",
+	"for",
+	"while",
+	"break",
+};
+enum class CtrlToken : char
+{
+	ctrl_if = 0,
+	ctrl_for,
+	ctrl_while,
+	ctrl_break,
+	ERR,
+};
+CtrlToken Tokenize(CtrlSymbol statement)
+{
+	for (int i = 0; i < sizeof(g_CtrlStatements); ++i) { if (statement == g_CtrlStatements[i]) return CtrlToken(i); }
+	return CtrlToken::ERR;
+}
+
+const KeywordSymbol g_Keywords[] = {
+	"var",
+	"lit",
+	"func",
+	"ctrl",
+	"end",
+	"namspc" // TODO
+};
+enum class KeywordToken : char
+{
+	var = 0,
+	lit,
+	func,
+	ctrl,
+	end,
+	namspc,
+	ERR,
+};
+KeywordToken Tokenize(KeywordSymbol keyword)
+{
+	for (int i = 0; i < sizeof(g_Keywords); ++i) { if (keyword == g_Keywords[i]) return KeywordToken(i); }
+	return KeywordToken::ERR;
+}
+
 size_t CustomVars::_Locate(VariableSymbol symbol) const
 {
 	for (size_t i = 0; i < var_names.size(); ++i)
 	{
-		if (symbol == var_names.at(i)) return i;
+		if (StringEquals(symbol.c_str(), var_names.at(i).c_str())) return i;
 	}
 	return var_names.size();
 }
@@ -39,7 +101,7 @@ namespace DEBUGMSGNS
 	const bool hideExtranious = true;
 	const bool majorOnly = false;
 
-	void DebugMessage(MSG_TYPE type, HLT_COLOR color, const char* message, ...)
+	void DebugMessageHLT(MSG_TYPE type, HLT_COLOR color, const char* message, ...)
 	{
 #ifdef _RELEASE
 		if (color == MSG_ERROR)
@@ -81,7 +143,7 @@ namespace DEBUGMSGNS
 			}
 		}
 	}
-
+	/*
 	void DebugMessage(MSG_TYPE color, const std::string message, const DebugDataBundle& data)
 	{
 		int i = 0;
@@ -99,28 +161,53 @@ namespace DEBUGMSGNS
 		printf("%s", message.substr(sectionOffset, message.length() - sectionOffset).c_str());
 		SetConsoleTextAttribute(hConsole, MSG_DEFAULT);
 	}
+	*/
 
-	void PrintLine()
+	bool PrintLine(bool returnToStart)
 	{
-		int len = file.tellg();
-		while (file.tellg() < std::ios_base::end) {
-			while (isspace(file.peek()))
+		std::streampos pos = file.tellg();
+		bool endOfDoc = false;
+		while (true)
+		{
+			char next = file.peek();
+			if (next == ':') break; // Stop printing at start of next line
+
+			// Consume whitespace
+			while (next == ' ' || next == '\n')
 			{
-				printf(" ");
 				file >> std::ws;
+				next = file.peek();
+				printf(" ");
 			}
-			if (file.peek() == ':') break;
-			if (file.peek() == 'e')
+
+			if (next == ':') break; // Stop printing at start of next line
+
+			// Get next symbol
+			std::string symbol;
+			file >> symbol;
+			
+			// End of document will have no newline, so we need to exit the loop when we reach it
+			if (StringEquals(symbol.c_str(), "end"))
 			{
-				DebugMessage(MSG_DEBUG_LINEINDIC, HLT_FUNC, "e");
+				DebugMessageHLT(MSG_DEBUG_LINEINDIC, HLT_FUNC, "end");
+				endOfDoc = true;
 				break;
 			}
-			char symbol = '#';
-			file >> symbol;
-			DebugMessage(MSG_DEBUG_LINEINDIC, HLT_FUNC, "%c", symbol);
+			else
+			{
+				HLT_COLOR highlight = HLT_VAR;
+				if (Tokenize(KeywordSymbol(symbol)) != KeywordToken::ERR) highlight = HLT_FUNC;
+				if (Tokenize(FunctionSymbol(symbol)) != FuncToken::ERR) highlight = HLT_LIT;
+				if (Tokenize(CtrlSymbol(symbol)) != CtrlToken::ERR) highlight = HLT_STR;
+
+				// Print symbol
+				DebugMessageHLT(MSG_DEBUG_LINEINDIC, highlight, "%s", symbol.c_str());
+			}
 		}
-		file.seekg(len, std::ios_base::beg);
+
+		if (returnToStart) file.seekg(pos, std::ios_base::beg);
 		DebugMessage(MSG_DEBUG_LINEINDIC, "\n");
+		return endOfDoc;
 	}
 }
 
@@ -131,18 +218,22 @@ int Variable(bool get)
 {
 	VariableSymbol symbol;
 	file >> symbol;
-	DebugMessage(MSG_DEBUG_EXTRA, "Read the variable symbol \"%c\".\n", symbol);
+	DebugMessage(MSG_DEBUG_EXTRA, "Read the variable symbol \"%s\", which has ", symbol.c_str());
+	if (vars.IsVar(symbol)) DebugMessage(MSG_DEBUG_EXTRA, "a value of %i.\n", vars.GetVar(symbol));
+	else DebugMessage(MSG_DEBUG_EXTRA, "not yet been declared. Now declaring it as a new var.\n");
 
 	if (!(get && vars.IsVar(symbol)))
 	{
 		
-		char keyword;
+		KeywordSymbol keyword;
 		file >> keyword;
+		DebugMessage(MSG_DEBUG_EXTRA, "Read the keyword %s, ", keyword.c_str());
+		KeywordToken keywordTokn = Tokenize(keyword);
 		// Determine value to set the var to
 		int value = INT_MAX;
-		switch (keyword)
+		switch (keywordTokn)
 		{
-		case 'v': // Initialize variable with another variable
+		case KeywordToken::var: // Initialize variable with another variable
 		{
 			file >> std::ws;
 			VariableSymbol symbol1;
@@ -150,66 +241,81 @@ int Variable(bool get)
 			{
 				std::streampos pos = file.tellg();
 				file >> symbol1;
+				DebugMessage(MSG_DEBUG_EXTRA, "followed by the Variable symbol, \"%s\".\n", symbol1.c_str());
 				file.seekg(pos);
 			}
 			value = Variable();
 
+			/*
+			DebugDataBit<VariableSymbol> s1(symbol1);
+			DebugDataBit<int> v(value);
+			DebugDataBit<VariableSymbol> s(symbol);
+			DebugDataBundle bundle({ &s1,&v,&s });
+			DebugMessage(MSG_DEBUG, "Used the variable % (currently %) as the value for variable %", DebugDataBundle(&s1,&v,&s));
+
 			PrintDebugMSG(MSG_DEBUG, "Used the variable % (currently %) as the value for variable %", symbol1, value, symbol);
+			*/
 
 			DebugMessage(MSG_DEBUG, "Used the variable ");
-			DebugMessage(MSG_DEBUG, HLT_VAR, "%c", symbol1);
+			DebugMessageHLT(MSG_DEBUG, HLT_VAR, "%s", symbol1.c_str());
 			DebugMessage(MSG_DEBUG, " (currently ");
-			DebugMessage(MSG_DEBUG, HLT_LIT, "%i", value);
+			DebugMessageHLT(MSG_DEBUG, HLT_LIT, "%i", value);
 			DebugMessage(MSG_DEBUG, ") as the value for variable ");
-			DebugMessage(MSG_DEBUG, HLT_VAR, "%c", symbol);
+			DebugMessageHLT(MSG_DEBUG, HLT_VAR, "%s", symbol.c_str());
 			DebugMessage(MSG_DEBUG, ".\n");
 			break;
 		}
-		case 'f': // Initialize variable with function return
+		case KeywordToken::func: // Initialize variable with function return
+			DebugMessage(MSG_DEBUG_EXTRA, "for Function.\n");
 			DebugMessage(MSG_WARNING, "WARNING: Initializing a variable with a function is not yet supported");
 			// TODO: Set vars with functions
 			break;
-		default: // No keyword for initialization
-			DebugMessage(MSG_WARNING, "WARNING: INVALID SYNTAX FOR DECLARING A VAR! Expected 'l', 'v', or 'f'. Read '%c' instead.\n", keyword);
-			break;
-		case 'l': // Initialize variable with literal
+		case KeywordToken::lit: // Initialize variable with literal
 			file >> value;
+			DebugMessage(MSG_DEBUG_EXTRA, "followed by the value %i.\n", value);
 			DebugMessage(MSG_DEBUG, "Used the literal ");
-			DebugMessage(MSG_DEBUG, HLT_LIT, "%i", value);
+			DebugMessageHLT(MSG_DEBUG, HLT_LIT, "%i", value);
 			DebugMessage(MSG_DEBUG, " as the value for variable ");
-			DebugMessage(MSG_DEBUG, HLT_VAR, "%c", symbol);
+			DebugMessageHLT(MSG_DEBUG, HLT_VAR, "%s", symbol.c_str());
 			DebugMessage(MSG_DEBUG, ".\n");
+			break;
+		default: // No keyword for initialization
+			DebugMessage(MSG_DEBUG_EXTRA, "for an error to occur.\n");
+			DebugMessage(MSG_WARNING, "WARNING: INVALID SYNTAX FOR DECLARING A VAR! Expected 'lit', 'var', or 'func'. Read '%s' instead.\n", keyword.c_str());
 			break;
 		}
 
 		if (vars.IsVar(symbol)) // Variable exists
 		{
-			DebugMessage(MSG_DEBUG_PRODUCT, "Set the variable %c with new value %i (Previously %i).\n", symbol, value, vars.GetVar(symbol));
+			DebugMessage(MSG_DEBUG_PRODUCT, "Set the variable %s with new value %i (Previously %i).\n", symbol.c_str(), value, vars.GetVar(symbol));
 			vars.SetVar(symbol, value);
 		}
 		else // Variable does not exist, initialize
 		{
 			vars.DeclareVar(symbol, value);
-			DebugMessage(MSG_DEBUG_PRODUCT, "Declared new variable %c with init value %i.\n", symbol, value);
+			DebugMessage(MSG_DEBUG_PRODUCT, "Declared new variable %s with init value %i.\n", symbol.c_str(), value);
 		}
 	}
+	DebugMessage(MSG_DEBUG_EXTRA, "Returning the value of %s (currently %i).\n", symbol.c_str(), vars.GetVar(symbol));
 	return vars.GetVar(symbol);
 }
 
 int Param()
 {
-	char keyword;
+	KeywordSymbol keyword;
 	file >> keyword;
-	DebugMessage(MSG_DEBUG_EXTRA, "Read the parameter keyword \"%c\"\n", keyword);
+	DebugMessage(MSG_DEBUG_EXTRA, "Read the parameter keyword \"%s\"\n", keyword.c_str());
+	KeywordToken keywordTokn = Tokenize(keyword);
 	int value = INT_MAX;
-	switch (keyword) {
-	case 'l':
+	switch (keywordTokn) {
+	case KeywordToken::lit:
 		file >> value;
+		DebugMessage(MSG_DEBUG_EXTRA, "Used the literal value %i as a parameter\n", value);
 		break;
-	case 'v':
+	case KeywordToken::var:
 		value = Variable();
 		break;
-	case 'f': // TODO: Functions as parameters for other functions
+	case KeywordToken::func: // TODO: Functions as parameters for other functions
 		DebugMessage(MSG_WARNING, "WARNING: Using a function as a parameter for another function is not yet supported");
 		break;
 	default:
@@ -221,13 +327,15 @@ int Param()
 
 int Function()
 {
-	char symbol;
+	FunctionSymbol symbol;
 	file >> symbol;
-	DebugMessage(MSG_DEBUG_EXTRA, "Read the function \"%c\" symbol for ", symbol);
+	DebugMessage(MSG_DEBUG_EXTRA, "Read the function \"%s\" symbol for ", symbol.c_str());
 
-	switch (symbol)
+	FuncToken token = Tokenize(symbol);
+
+	switch (token)
 	{
-	case 'w': // Wait
+	case FuncToken::Wait: // Wait
 	{
 		DebugMessage(MSG_DEBUG_EXTRA, "Wait.\n");
 		int time = Param();
@@ -236,14 +344,14 @@ int Function()
 		DebugMessage(MSG_DEBUG, "Finished wait.\n");
 		break;
 	}
-	case 'p': // Print
+	case FuncToken::Print: // Print
 	{
 		DebugMessage(MSG_DEBUG_EXTRA, "Print.\n");
 		std::string str;
 		file >> str;
 		printf("%s\n", str.c_str());
 		DebugMessage(MSG_DEBUG_PRODUCT, "Printed the string ");
-		DebugMessage(MSG_DEBUG_PRODUCT, HLT_STR, "\"%s\"", str.c_str());
+		DebugMessageHLT(MSG_DEBUG_PRODUCT, HLT_STR, "\"%s\"", str.c_str());
 		DebugMessage(MSG_DEBUG_PRODUCT, ".\n");
 		break;
 	}
@@ -256,13 +364,15 @@ int Function()
 	return 0;
 }
 
+// TODO
 int Control()
 {
-	char symbol;
+	CtrlSymbol symbol;
 	file >> symbol;
-	switch (symbol)
+	CtrlToken ctrlSymbol = Tokenize(symbol);
+	switch (ctrlSymbol)
 	{
-	case 'i': // If
+	case CtrlToken::ctrl_if: // If
 		/*********************************
 		*
 		*	If statement syntax:
@@ -274,7 +384,7 @@ int Control()
 		//TODO
 		Param();
 		break;
-	case 'f': // For
+	case CtrlToken::ctrl_for: // For
 		/*********************************
 		* 
 		*	For loop syntax:
@@ -289,10 +399,10 @@ int Control()
 		Param(); // Increment amount
 		// TODO
 		break;
-	case 'w': // While
+	case CtrlToken::ctrl_while: // While
 		// TODO
 		break;
-	case 'b': // Break
+	case CtrlToken::ctrl_break: // Break
 		file.ignore(256, ';');
 		break;
 	default:
@@ -315,49 +425,77 @@ int InterpretFile(const char* filename)
 	*   ========
 	*   ':' Start of function - Referred to as a "line" in debug
 	*
-	*   'l' Literal	 - read as an integer value
+	*   "lit" Literal	 - read as an integer value
 	*
-	*   'v' Variable - read as the name of a variable
+	*   "var" Variable - read as the name of a variable
 	*	Note: This will declare a new variable if none with the specified name exists. The variable must be initialized in this case.
 	* 
-	*	'f' Function - read as the name of a function
+	*	"func" Function - read as the name of a function
 	* 
-	*	'c' Control - read as the name of a control statement
+	*	"ctrl" Control - read as the name of a control statement
 	* 
-	*	'e' Signifies the end of the document
+	*	"end" Signifies the end of the document
 	*
 	*   Functions in the current version
 	*   ================================
-	*   'm' Move mouse to position
+	*   "Mouse"
+	*		Move mouse to position (x, y)
 	*       2 params (int x, int y)
 	*
-	*   'c' Simulate mouse click
+	*   "Click"
+	*		Simulate mouse click
 	*       0 params
+	* 
+	*	"Wait"
+	*		Wait x milliseconds
+	*		1 param (int x)
+	* 
+	*	"Print"
+	*		Print the string to the console
+	*		1 param (const char* string)
 	* 
 	*	Variables
 	*	=========
 	*	Note: only integer vars are supported in this version.
-	*   :v [var symbol] <v/l> [init value]	// Declaration
-	*   :v [var symbol] <v/l> [new value]	// Assignment
-	*	:f [function symbol] v [var symbol] // Var as parameter
+	*   :var [var symbol] <var/lit> [init value]	// Declaration
+	*   :var [var symbol] <var/lit> [new value]		// Assignment
+	*	:func [function symbol] var [var symbol]	// Var as parameter
 	*	ex:
-	*	:v x 123			// Declaration
-	*	:v x 456			// Assignment
-	*	:f w v x			// Parameter
+	*	:var x lit 123			// Declaration
+	*	:var x lit 456			// Assignment
+	*	:func w var x			// Parameter
 	*
 	*   Function call
-	*   :[function symbol]														// No parameters
-	*   :[function symbol] <v/l> [var symbol/value]								// 1 Parameter
-	*   :[function symbol] <v/l> [var symbol/value] <v/l> [var symbol/value]	// 2 Parameters
+	*   :[function symbol]																// No parameters
+	*   :[function symbol] <var/lit> [var symbol/value]									// 1 Parameter
+	*   :[function symbol] <var/lit> [var symbol/value] <var/lit> [var symbol/value]	// 2 Parameters
 	*   ex:
-	*   :m l 123 l 456		// literals
-	*   :m v x v y			// variables
-	*	Note: string parameters cannot use variables (all vars are ints) and expect a literal string without any keywords.
+	*   :Mouse lit 123 lit 456		// literals
+	*   :Mouse var x var y			// variables
+	*   :Print "Foo"				// string
+	*	Note: string parameters cannot use variables (all vars are ints) and expect
+	*	a string without the lit keywords.
 	*
 	***************************************************************************/
 
 	file = std::ifstream(filename); // Set the file
 
+	// Print whole document
+	{
+		printf("%s\n", filename);
+		int line = 1;
+		while (true)
+		{
+			bool end = PrintLine(false);
+			file.ignore(256, ':');
+			if (end) break;
+			else printf("[ %i ] :", line++);
+		}
+		printf("\n");
+		file.seekg(0);
+	}
+
+	file.ignore(256,' ');
 	int versionNumber;
 	file >> versionNumber;
 	DebugMessage(MSG_DEBUG, "Executing Virtual Hank Instruction Document \"%s\" using version number %i.\n", filename, versionNumber);
@@ -376,34 +514,38 @@ int InterpretFile(const char* filename)
 		DebugMessage(MSG_DEBUG_LINEINDIC, "\n[LINE %i]: ", line);
 		PrintLine();
 
-		char keyword;
+		KeywordSymbol keyword;
 		file >> keyword;
 
-		DebugMessage(MSG_DEBUG_EXTRA, "Read the keyword \"%c\" for ", keyword);
+		DebugMessage(MSG_DEBUG_EXTRA, "Read the keyword \"%s\" for ", keyword.c_str());
 
-		if (keyword == 'e') break; // Exit keyword
+		KeywordToken keywordTokn = Tokenize(keyword);
 
-		switch (keyword)
+		if (keywordTokn == KeywordToken::end) break; // Exit keyword
+		else
 		{
-		case 'v': // Variable declares/assigns
-			DebugMessage(MSG_DEBUG_EXTRA, "Variable declaration/assignment.\n");
-			Variable(false);
-			break;
-		case 'f': // Function calls
-			DebugMessage(MSG_DEBUG_EXTRA, "Function call.\n");
-			Function();
-			break;
-		case 'c':
-			DebugMessage(MSG_DEBUG_EXTRA, "Control statement.\n");
-			Control();
-			break;
-		case 'n':
-			// TODO: namespace case
-		default:
-			DebugMessage(MSG_DEBUG_EXTRA, "Undefined behavior.\n");
-			DebugMessage(MSG_ERROR, "ERROR: INVALID SYNTAX! Line keyword could not be found. Expected 'f' or 'v'. Read '%c' instead.\n", keyword);
-			return 1;
-			break;
+			switch (keywordTokn)
+			{
+			case KeywordToken::var: // Variable declares/assigns
+				DebugMessage(MSG_DEBUG_EXTRA, "Variable declaration/assignment.\n");
+				Variable(false);
+				break;
+			case KeywordToken::func: // Function calls
+				DebugMessage(MSG_DEBUG_EXTRA, "Function call.\n");
+				Function();
+				break;
+			case KeywordToken::ctrl:
+				DebugMessage(MSG_DEBUG_EXTRA, "Control statement.\n");
+				Control();
+				break;
+			case KeywordToken::namspc:
+				// TODO: namespace case
+			default:
+				DebugMessage(MSG_DEBUG_EXTRA, "Undefined behavior.\n");
+				DebugMessage(MSG_ERROR, "ERROR: INVALID SYNTAX! Line keyword could not be found. Expected 'func' or 'var'. Read '%s' instead.\n", keyword);
+				return 1;
+				break;
+			}
 		}
 	}
 
