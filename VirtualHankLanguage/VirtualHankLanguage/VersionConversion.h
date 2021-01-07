@@ -2,7 +2,7 @@
 #include <fstream>
 #include "Interpreter.h"
 
-typedef std::array<std::array<std::array<std::array<long long, MAXULONGLONG>, MAXULONGLONG>, MAXULONGLONG>, MAXULONGLONG> FWORD; // I TYPEDEF'D THE FWORD!!!
+//typedef std::array<std::array<std::array<std::array<long long, MAXULONGLONG>, MAXULONGLONG>, MAXULONGLONG>, MAXULONGLONG> FWORD; // I TYPEDEF'D THE FWORD!!!
 
 std::string FormatText(const char* text, ...);
 

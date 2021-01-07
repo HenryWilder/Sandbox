@@ -1,8 +1,8 @@
-version 0
-:var x lit 123
-:var y lit 456
-:var z var y
-:func Print Apple
-:func Wait var time var m var x
-:var x lit 234
-:end
+version 0					#Tell the interpreter what version to read this as
+:var x 123					#Declare the var x with value 123
+:var y 456					#Declare the var y with value 456
+:var z y					#Set the var z with value of y
+:Print "Apple"				#Print the string "Apple"
+:Wait var time var m x		#Declare the var m with the value of x, then time with m, then wait "time" milliseconds
+:x 234						#Set the existing var x to the new value 234
+:end						#End the program

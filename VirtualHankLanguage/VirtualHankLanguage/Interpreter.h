@@ -9,97 +9,175 @@ extern int g_version;
 
 extern std::ifstream file;
 
+// @TODO: Implement void FunctionPointers for advanced shit
 typedef void* FunctionPointer; // Do not fear me... I give an alias to the void
+
+struct Symbol : public std::string
+{
+	Symbol() : std::string() {};
+	Symbol(std::string const& token) : std::string{ token } {};
+	Symbol(const char* const& token) : std::string{ token } {};
+
+	operator std::string() const { return (*(std::string*)(this)); }
+	operator const char* () const { return this->c_str(); }
+};
 
 struct StringLiteral : public std::string
 {
 	StringLiteral() : std::string() {};
-	StringLiteral(const std::string& token) : std::string{ token } {};
+	StringLiteral(std::string const& token) : std::string{ token } {};
 	StringLiteral(const char* const& token) : std::string{ token } {};
-	operator std::string() { return std::string::c_str(); }
-	operator const char*() { return std::string::c_str(); }
+
+	operator std::string() const { return (*(std::string*)(this)); }
+	operator const char* () const { return this->c_str(); }
 };
-struct VariableSymbol : public std::string
-{
-	VariableSymbol() : std::string() {};
-	VariableSymbol(const std::string& token) : std::string{ token } {};
-	VariableSymbol(const char* const& token) : std::string{ token } {};
-	operator std::string() { return std::string::c_str(); }
-	operator const char*() { return std::string::c_str(); }
-};
+
+// @SPAGHETTI: I feel like this could possibly be done cleaner with templates? Maybe? or a base type could work too.
 struct FunctionSymbol : public std::string
 {
 	FunctionSymbol() : std::string{ "" } {};
-	FunctionSymbol(const std::string& token) : std::string{ token } {};
+	FunctionSymbol(std::string const& token) : std::string{ token } {};
 	FunctionSymbol(const char* const& token) : std::string{ token } {};
-	operator std::string() { return std::string::c_str(); }
-	operator const char*() { return std::string::c_str(); }
+	
+	operator std::string() const { return (*(std::string*)(this)); }
+	operator const char* () const { return this->c_str(); }
 };
-struct KeywordSymbol : public std::string
-{
-	KeywordSymbol() : std::string() {};
-	KeywordSymbol(const std::string& token) : std::string{ token } {};
-	KeywordSymbol(const char* const& token) : std::string{ token } {};
-	operator std::string() { return std::string::c_str(); }
-	operator const char*() { return std::string::c_str(); }
-};
-struct CtrlSymbol : public std::string
-{
-	CtrlSymbol() : std::string() {};
-	CtrlSymbol(const std::string& token) : std::string{ token } {};
-	CtrlSymbol(const char* const& token) : std::string{ token } {};
-	operator std::string() { return std::string::c_str(); }
-	operator const char* () { return std::string::c_str(); }
-};
-
 extern const FunctionSymbol g_FunctionList[];
 enum class FuncToken : char;
 FuncToken Tokenize(FunctionSymbol);
+bool ValidFunction(const FunctionSymbol);
+bool ValidFunction(const std::string);
+bool ValidFunction(const char*);
 
+struct KeywordSymbol : public std::string
+{
+	KeywordSymbol() : std::string() {};
+	KeywordSymbol(std::string const& token) : std::string{ token } {};
+	KeywordSymbol(const char* const& token) : std::string{ token } {};
+
+	operator std::string() const { return (*(std::string*)(this)); }
+	operator const char* () const { return this->c_str(); }
+};
 extern const KeywordSymbol g_Keywords[];
 enum class KeywordToken : char;
-KeywordToken Tokenize(KeywordToken);
+KeywordToken Tokenize(const KeywordSymbol);
+bool ValidKeyword(const KeywordSymbol);
+bool ValidKeyword(const std::string);
+bool ValidKeyword(const char*);
 
+struct CtrlSymbol : public std::string
+{
+	CtrlSymbol() : std::string() {};
+	CtrlSymbol(std::string const& token) : std::string{ token } {};
+	CtrlSymbol(const char* const& token) : std::string{ token } {};
+
+	operator std::string() const { return (*(std::string*)(this)); }
+	operator const char*() const { return this->c_str(); }
+};
 extern const CtrlSymbol g_CtrlStatements[];
 enum class CtrlToken : char;
-CtrlToken Tokenize(CtrlToken);
+CtrlToken Tokenize(const CtrlSymbol);
+bool ValidCtrl(const CtrlSymbol);
+bool ValidCtrl(const std::string);
+bool ValidCtrl(const char*);
 
+bool IsNumber(const char first);
+bool IsNumber(const char* input);
+bool IsNumber(const std::string input);
+
+// @TODO: Try implementing more types than just "int".
+struct VariableSymbol : public std::string
+{
+	VariableSymbol() : std::string() {};
+	VariableSymbol(std::string const& token) : std::string{ token } {};
+	VariableSymbol(const char* const& token) : std::string{ token } {};
+
+	operator std::string() const { return (*(std::string*)(this)); }
+	operator const char*() const { return this->c_str(); }
+
+private:
+	// HACK: Dynamic_cast<>() requires at least one virtual function to work... so here it is I guess?...
+	// Remove it if you ever find a use for a virtual function in this class.
+	virtual void Dummy() const {}
+};
+template<typename Type = int>
+class VariableSymbolSpec : public VariableSymbol
+{
+public:
+	VariableSymbolSpec() : VariableSymbol(), m_value{} {};
+	VariableSymbolSpec(std::string const& token) : VariableSymbol{ token }, m_value{} {};
+	VariableSymbolSpec(VariableSymbol const& token) : VariableSymbol{ token }, m_value{} {};
+	VariableSymbolSpec(std::string const& token, Type value) : VariableSymbol{ token }, m_value{ value } {};
+	VariableSymbolSpec(VariableSymbol const& token, Type value) : VariableSymbol{ token }, m_value{ value } {};
+private:
+	Type m_value;
+	// HACK: See VariableSymbol
+	virtual void Dummy() const {}
+
+public:
+	const int GetValue() const { return m_value; }
+	void SetValue(const int& value) { m_value = value; }
+};
+
+// SPAGHETTI: A lot of the VariableSymbol parameters could probably be better replaced with std::strings, to make things less confused.
 struct CustomVars
 {
 private:
-	std::vector<VariableSymbol> var_names; // Array of var names
-	std::vector<int> var_vals; // Array of values (in same order as names)
-	size_t _Locate(const VariableSymbol symbol) const;
+	std::vector<VariableSymbol*> m_vars; // Array of var names
+	size_t _Locate(const VariableSymbol& symbol) const;
 
 public:
-	bool IsVar(const VariableSymbol symbol) const;
-	void DeclareVar(const VariableSymbol symbol, const int value = 0);
-	const int GetVar(const VariableSymbol symbol) const;
-	void SetVar(const VariableSymbol symbol, const int value);
+	~CustomVars()
+	{
+		for (VariableSymbol*& var : m_vars) { delete var; }
+		if (m_vars.size()) m_vars.clear();
+	}
+
+	bool IsVar(const VariableSymbol& symbol) const;
+
+	template<typename Type = int>
+	void DeclareVar(const VariableSymbol& symbol, const Type& value = NULL)
+	{
+		VariableSymbolSpec<Type>* var = new VariableSymbolSpec<Type>(symbol, value);
+		m_vars.push_back(var);
+		//printf("\nDeclared var\n");
+	}
+	template<typename Type = int>
+	const Type GetVar(const VariableSymbol& symbol) const
+	{
+		VariableSymbol* const& element = m_vars.at(_Locate(symbol));
+		VariableSymbolSpec<Type>* var = dynamic_cast<VariableSymbolSpec<Type>*>(element);
+		//printf("\nReturned var\n");
+		if (var) return var->GetValue();
+		else return ERROR;
+	}
+	template<typename Type = int>
+	void SetVar(const VariableSymbol& symbol, const Type& value)
+	{
+		VariableSymbolSpec<Type>* var = dynamic_cast<VariableSymbolSpec<Type>*>(m_vars.at(_Locate(symbol)));
+		if (var) var->SetValue(value);
+		else printf("ENCOUNTERED AN ERROR SETTING VAR");
+		//printf("\nSet a var\n");
+	}
+
+	void ClearAll(); // For debugging
 };
 extern CustomVars vars;
+bool ValidVar(const VariableSymbol&);
+bool ValidVar(const std::string&);
+bool ValidVar(const char*&);
+
+enum class SymbolType;
+SymbolType FindSymbolType(std::string);
 
 namespace DEBUGMSGNS
 {
 	extern HANDLE hConsole;
 
-	typedef enum {
-		MSG_DEFAULT = 7,
-		MSG_DEBUG_EXTRA = 8,
-		MSG_DEBUG = 1,
-		MSG_DEBUG_PRODUCT = 3,
-		MSG_DEBUG_LINEINDIC = 11,
-		MSG_WARNING = 14,
-		MSG_WARNING_MINOR = 6,
-		MSG_ERROR = 4,
-	} MSG_TYPE; // Messages
-	typedef enum {
-		HLT_VAR = 11, // Variable
-		HLT_LIT = 2, // Literal
-		HLT_FUNC = 6, // Function
-		HLT_STR = 13, // String
-	} HLT_COLOR; // Highlighting
+	enum class MSGTYPE; // Messages
+	enum class HLT; // Highlighting
 
+	// BROKEN: Was gonna make a more reasonable way of doing debug messages than with variadic templates, but uh...
 	/*
 	struct DebugDataChunk
 	{
@@ -230,10 +308,10 @@ namespace DEBUGMSGNS
 	extern const bool hideExtranious;
 	extern const bool majorOnly;
 
-	void DebugMessageHLT(MSG_TYPE type, HLT_COLOR color, const char* message, ...);
-	void DebugMessage(MSG_TYPE, const char*, ...);
+	void DebugMessageHLT(MSGTYPE, HLT, const char*, ...);
+	void DebugMessage(MSGTYPE, const char*, ...);
 	/*
-	void DebugMessage(MSG_TYPE color, const std::string message, const DebugDataBundle& data);
+	void DebugMessage(MSGTYPE color, const std::string message, const DebugDataBundle& data);
 
 	template <typename T>
 	void ConstructDataBit(DebugDataBundle& bundle, T a) { bundle.Add(a); }
@@ -247,7 +325,7 @@ namespace DEBUGMSGNS
 	}
 	
 	template <typename...Args>
-	void PrintDebugMSG(MSG_TYPE type, std::string message, Args...args)
+	void PrintDebugMSG(MSGTYPE type, std::string message, Args...args)
 	{
 		DebugDataBundle bundle;
 		ConstructDataBundle(bundle, args...);
