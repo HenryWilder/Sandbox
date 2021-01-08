@@ -32,17 +32,35 @@ struct StringLiteral : public std::string
 	operator const char* () const { return this->c_str(); }
 };
 
+// TODO: Make this work
+class FuncBase
+{
+private:
+	FunctionPointer m_function;
+	int m_paramCount;
+
+public:
+	FuncBase() : m_function{ nullptr } {};
+	FuncBase(FunctionPointer funcPtr, int params) : m_function{ funcPtr }, m_paramCount{ params } {};
+
+	void Execute() const
+	{
+
+	}
+};
+
 // @SPAGHETTI: I feel like this could possibly be done cleaner with templates? Maybe? or a base type could work too.
 struct FunctionSymbol : public std::string
 {
 	FunctionSymbol() : std::string{ "" } {};
 	FunctionSymbol(std::string const& token) : std::string{ token } {};
 	FunctionSymbol(const char* const& token) : std::string{ token } {};
-	
+
 	operator std::string() const { return (*(std::string*)(this)); }
 	operator const char* () const { return this->c_str(); }
 };
-extern const FunctionSymbol g_FunctionList[];
+extern const FunctionSymbol g_FunctionSymbolList[];
+extern const FuncBase g_FunctionClassList[];
 enum class FuncToken : char;
 FuncToken Tokenize(FunctionSymbol);
 bool ValidFunction(const FunctionSymbol);

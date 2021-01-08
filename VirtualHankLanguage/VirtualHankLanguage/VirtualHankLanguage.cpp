@@ -1,7 +1,7 @@
 #include <iostream>
 #include "Functions.h"
 #include "Interpreter.h"
-
+#include "GUI.h"
 
 const char* versionNumber = R"TXT(Version 0.00.1)TXT";
 
@@ -72,6 +72,30 @@ POINT operator+(const POINT& p1, const POINT& p2)
 
 int main()
 {
+    SayComm("Hello comms!");
+    SayComm("Hello comms!");
+    SayDebug("Hello debug!");
+    SayPretty(R"TXT(                                     :X-
+                                                                                                        :X###
+                                                                                                      ;@####@
+                                                                                                    ;M######X
+                                                                                                  -@########$
+                                                                                                .$##########@
+                                                                                               =M############-
+                                                                                              +##############$
+                                                                                            .H############$=.
+                                                                               ,/:         ,M##########M;.
+                                                                            -+@###;       =##########M;
+                                                                         =%M#######;     :#########M/
+                                                                      -$M###########;   :########/
+                                                                       ,;X###########; =#######$.
+                                                                           ;H#########+######M=
+                                                                             ,+#############+
+                                                                                /M########@-)TXT");
+    DrawOverlay();
+    std::cin.ignore();
+    return 0;
+
     InterpretFile("Test.vhid");
     return 0;
 

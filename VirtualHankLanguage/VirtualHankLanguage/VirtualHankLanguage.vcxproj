@@ -140,12 +140,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Functions.cpp" />
+    <ClCompile Include="GUI.cpp" />
     <ClCompile Include="Interpreter.cpp" />
     <ClCompile Include="VersionConversion.cpp" />
     <ClCompile Include="VirtualHankLanguage.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Functions.h" />
+    <ClInclude Include="GUI.h" />
     <ClInclude Include="Interpreter.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="VersionConversion.h" />

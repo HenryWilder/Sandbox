@@ -4,7 +4,8 @@ int g_version = 0;
 
 std::ifstream file;
 
-const FunctionSymbol g_FunctionList[] = {
+const FunctionSymbol g_FunctionSymbolList[] =
+{
 	"\\*%#$__FUNCTION_TYPE_ERROR__",
 	"Print",
 	"Wait",
@@ -12,6 +13,17 @@ const FunctionSymbol g_FunctionList[] = {
 	"Click",
 	"Keypress",
 	"Open",
+};
+const FuncBase g_FunctionClassList[] =
+{
+	FuncBase(), // ERR
+	FuncBase(),	// Print
+	FuncBase(),	// Wait
+	FuncBase(),	// MouseTo
+	FuncBase(),	// Click
+	FuncBase(),	// Keypress
+	FuncBase(),	// Open
+
 };
 enum class FuncToken : char
 {
@@ -25,14 +37,15 @@ enum class FuncToken : char
 };
 FuncToken Tokenize(FunctionSymbol function)
 {
-	for (int i = 0; i < sizeof(g_FunctionList); ++i) { if (function == g_FunctionList[i]) return FuncToken(i); }
+	for (int i = 0; i < sizeof(g_FunctionSymbolList); ++i) { if (function == g_FunctionSymbolList[i]) return FuncToken(i); }
 	return FuncToken::ERR;
 }
 bool ValidFunction(const FunctionSymbol function) { return (Tokenize(function) != FuncToken::ERR); }
 bool ValidFunction(const std::string function) { return ValidFunction(FunctionSymbol(function)); }
 bool ValidFunction(const char* function) { return ValidFunction(FunctionSymbol(function)); }
 
-const KeywordSymbol g_Keywords[] = {
+const KeywordSymbol g_Keywords[] =
+{
 	"\\^%#&__KEYWORD_TYPE_ERR__",
 	"var",
 	"lit",
@@ -51,7 +64,7 @@ enum class KeywordToken : char
 	end,
 	namspc,
 };
-KeywordToken Tokenize(const KeywordSymbol keyword) // BROKEN: This keeps coming back for some reason...
+KeywordToken Tokenize(const KeywordSymbol keyword) // BROKEN: This keeps coming back for some reason... Says keyword is an "error-type" or something.
 {
 	for (int i = 0; i < sizeof(g_Keywords); ++i) { if (keyword == g_Keywords[i]) return KeywordToken(i); }
 	return KeywordToken::ERR;
@@ -60,7 +73,8 @@ bool ValidKeyword(const KeywordSymbol keyword) { return (Tokenize(keyword) != Ke
 bool ValidKeyword(const std::string keyword) { return ValidKeyword(KeywordSymbol(keyword)); }
 bool ValidKeyword(const char* keyword) { return ValidKeyword(KeywordSymbol(keyword)); }
 
-const CtrlSymbol g_CtrlStatements[] = {
+const CtrlSymbol g_CtrlStatements[] =
+{
 	"\\$%^@__CTRL_TYPE_ERR__",
 	"if",
 	"for",
