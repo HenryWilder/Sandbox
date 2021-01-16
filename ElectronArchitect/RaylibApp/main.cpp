@@ -1,6 +1,11 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <vector>
+#include "Transistor.h"
+#include "Wire.h"
+
+struct Transistor;
+struct Wire;
 
 Vector2 Vector2Snap(const Vector2& vector, float gridSize)
 {
@@ -9,98 +14,6 @@ Vector2 Vector2Snap(const Vector2& vector, float gridSize)
         ((float)((int)((vector.y / gridSize) + 0.5f)) * gridSize)
     };
 }
-
-enum class WireDirection : char
-{
-    XFirst = 0,
-    YFirst,
-    Direct,
-};
-
-void DrawSnappedLine(Vector2 start, Vector2 end, Color color, WireDirection direction)
-{
-    switch (direction)
-    {
-    case WireDirection::XFirst:
-        DrawLineV(start, { start.x, end.y }, color);
-        DrawLineV({ start.x, end.y }, end, color);
-        break;
-    case WireDirection::YFirst:
-        DrawLineV(start, { end.x, start.y }, color);
-        DrawLineV({ end.x, start.y }, end, color);
-        break;
-    case WireDirection::Direct:
-        DrawLineV(start, end, color);
-        break;
-    }
-}
-
-bool Vector2Equal(const Vector2& a, const Vector2& b)
-{
-    return
-        abs(a.x - b.x) < 2.0f &&
-        abs(a.y - b.y) < 2.0f;
-}
-
-// Just transmits signals from start to end
-struct Wire
-{
-    Wire() : startPos{}, endPos{}, fromWire{ nullptr }, toWire{ nullptr }, direction{}, active{} {};
-
-    Wire(Vector2 _startPos, Vector2 _endPos, WireDirection _direction, std::vector<Wire*>* wireArr = nullptr)
-    {
-        startPos = _startPos;
-        endPos = _endPos;
-        direction = _direction;
-
-        fromWire = nullptr;
-        toWire = nullptr;
-
-        if (wireArr) SearchConnectableWires(wireArr);
-
-        active = false;
-        if (fromWire) active = fromWire->active;
-    };
-
-    Vector2 startPos, endPos;
-    Wire* fromWire;
-    Wire* toWire;
-    WireDirection direction;
-    bool active;
-
-    void Draw()
-    {
-        Color color;
-        if (this->active) color = RED;
-        else color = WHITE;
-        DrawSnappedLine(startPos, endPos, color, direction);
-    }
-
-    void SearchConnectableWires(std::vector<Wire*>* wireArr)
-    {
-        for (Wire* search : *wireArr)
-        {
-            if (Vector2Equal(search->endPos, this->startPos))
-            {
-                this->fromWire = search;
-                search->toWire = this;
-            }
-            if (fromWire) break;
-        }
-        for (Wire* search : *wireArr)
-        {
-            if (Vector2Equal(this->endPos, search->startPos))
-            {
-                this->toWire = search;
-                search->fromWire = this;
-            }
-            if (toWire) break;
-        }
-        if (fromWire) fromWire->active = true;
-        if (toWire) toWire->active = true;
-        if (fromWire || toWire) this->active = true;
-    }
-};
 
 struct InputMode
 {
@@ -119,12 +32,26 @@ struct InputMode
     Data data;
 };
 
+struct Undo
+{
+    Undo() : start{ }, end{ }, direction{ }, valid{ false } { };
+    Undo(Vector2 _start, Vector2 _end, WireDirection _direction) : start{ _start }, end{ _end }, direction{ _direction }, valid{ true } { };
+    Undo(Wire* wire) : start{ wire->startPos }, end{ wire->endPos }, direction{ wire->direction }, valid{ true } { };
+
+    Vector2 start, end;
+    WireDirection direction;
+    bool valid;
+};
+
 int main(void)
 {
     const int WindowWidth = 1280;
     const int WindowHeight = 720;
 
     std::vector<Wire*> wires;
+    std::vector<Transistor*> transistors;
+
+    Undo undoneAction = Undo();
 
     auto Vector2InvertY = [&WindowHeight](Vector2 vector) {
         return Vector2{ vector.x, WindowHeight - vector.y };
@@ -148,50 +75,88 @@ int main(void)
         {
         case InputMode::Mode::None:
         {
-            if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
-            {
-                mode.mode = InputMode::Mode::Gate;
-            }
-
+            // Pressed
+            // M1
             if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
             {
                 wireStart = cursorPos;
                 mode.mode = InputMode::Mode::Wire;
+            }
+            // M2
+            if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
+            {
+                mode.mode = InputMode::Mode::Gate;
             }
         }
         break;
 
         case InputMode::Mode::Wire:
         {
+            // Pressed
+            // M2
+            if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
+            {
+                mode.data.wireDirection = (WireDirection)(((char)mode.data.wireDirection + 1) % 3); // Should % the number of wire directions
+            }
+
+            // Released
+            // M1
             if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
             {
-                Wire* newWire = new Wire;
-                newWire->startPos = wireStart;
-                newWire->endPos = cursorPos;
-                newWire->direction = mode.data.wireDirection;
-                newWire->active = false;
+                Wire* newWire = new Wire(wireStart, cursorPos, mode.data.wireDirection, &transistors);
                 wires.push_back(newWire);
 
                 mode.mode = InputMode::Mode::None;
-            }
-            if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
-            {
-                mode.data.wireDirection = (WireDirection)(((char)mode.data.wireDirection + 1) % 4);
             }
         }
         break;
 
         case InputMode::Mode::Gate:
         {
+            // Pressed
+            // M1
+            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+            {
+                for (Transistor* transistor : transistors)
+                {
+                    if (Vector2Equal(cursorPos, transistor->pos))
+                    {
+                        DrawCircleV(cursorPos, 8.0f, YELLOW);
+                        transistor->type = (Transistor::Type)(((int)(transistor->type) + 1) % 2); // Should % the number of transistor types
+                        break;
+                    }
+                }
+            }
+            // M2
             if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
             {
                 mode.mode = InputMode::Mode::None;
-                break;
             }
         }
         break;
 
         }
+
+        if (wires.size() && IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_Z))
+        {
+            if (IsKeyDown(KEY_LEFT_SHIFT)) // Redo
+            {
+                if (undoneAction.valid)
+                {
+                    Wire* newWire = new Wire(undoneAction.start, undoneAction.end, undoneAction.direction, &transistors);
+                    wires.push_back(newWire);
+                    undoneAction = Undo();
+                }
+            }
+            else if (!IsKeyDown(KEY_LEFT_SHIFT)) // Undo
+            {
+                undoneAction = Undo(wires[wires.size() - 1]);
+                delete wires[wires.size() - 1];
+                wires.pop_back();
+            }
+        }
+
+        for (Transistor* transistor : transistors) { transistor->Evaluate(); }
 
         // Draw
         //---------------------------------------------
@@ -221,11 +186,21 @@ int main(void)
         // Draw the current architecture
         for (Wire* wire : wires) { wire->Draw(); }
 
+        for (Transistor* transistor : transistors) { transistor->Draw(); }
+
         EndDrawing();
+
+        for (Transistor* transistor : transistors) { transistor->FrameReset(); }
     }
 
     // Return memory to heap
     //--------------------------
+
+    for (Transistor* transistor : transistors)
+    {
+        delete transistor;
+    }
+    transistors.clear();
 
     for (Wire* wire : wires)
     {

@@ -91,6 +91,12 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Transistor.cpp" />
+    <ClCompile Include="Wire.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Transistor.h" />
+    <ClInclude Include="Wire.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
