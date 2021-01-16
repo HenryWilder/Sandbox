@@ -32,6 +32,7 @@ struct Wire
     bool active;
 
     void Draw();
+    void Highlight(Color color, int width);
 
     void SearchConnectableTransistors(std::vector<Transistor*>* transistorArr);
 };

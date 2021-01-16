@@ -77,12 +77,17 @@ int main(void)
 
     InputMode mode = {};
 
+    //Shader circuitPostProc = LoadShader(0, "pretty.frag");
+    //RenderTexture2D wireTexture = LoadRenderTexture(WindowWidth, WindowHeight);
+
+    SetTargetFPS(60);
+
     while (!WindowShouldClose())
     {
         // Update vars
         //---------------------------------------------
         cursorPos = GetMousePosition();
-        cursorPos = Vector2Snap(cursorPos, 8.0f);
+        cursorPos = Vector2Snap(cursorPos, 4.0f);
 
         switch (mode.mode)
         {
@@ -149,6 +154,17 @@ int main(void)
 
                 DrawRectangleRec(selectionSpace, ColorAlpha(YELLOW, 0.2f));
                 DrawRectangleLines(selectionSpace.x, selectionSpace.y, selectionSpace.width, selectionSpace.height, YELLOW);
+
+                for (Wire* wire : wires)
+                {
+                    if ((wire->startPos.x > selectionSpace.x) && (wire->startPos.x < (selectionSpace.x + selectionSpace.width)) &&
+                        (wire->startPos.y > selectionSpace.y) && (wire->startPos.y < (selectionSpace.y + selectionSpace.height)) &&
+                        (wire->endPos.x > selectionSpace.x) && (wire->endPos.x < (selectionSpace.x + selectionSpace.width)) &&
+                        (wire->endPos.y > selectionSpace.y) && (wire->endPos.y < (selectionSpace.y + selectionSpace.height)))
+                    {
+                        wire->Highlight(YELLOW, 4);
+                    }
+                }
             }
             else if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
             {
@@ -164,7 +180,8 @@ int main(void)
                         (wire->endPos.x > selectionSpace.x) && (wire->endPos.x < (selectionSpace.x + selectionSpace.width)) &&
                         (wire->endPos.y > selectionSpace.y) && (wire->endPos.y < (selectionSpace.y + selectionSpace.height)))
                     {
-                        component.wires.push_back(*wire); // TODO
+                        wire->Highlight(YELLOW, 4);
+                        //component.wires.push_back(*wire); // TODO
                     }
                 }
             }
@@ -172,12 +189,33 @@ int main(void)
             if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
             {
                 mode.mode = InputMode::Mode::None;
-            }            
+            }
+
+            // Show branches
+            for (Transistor* transistor : transistors)
+            {
+                if (Vector2Equal(cursorPos, transistor->pos))
+                {
+                    transistor->Highlight(YELLOW, 16);
+
+                    for (Wire* wire : transistor->inputs)
+                    {
+                        wire->Highlight(BLUE, 4);
+                    }
+                    for (Wire* wire : transistor->outputs)
+                    {
+                        wire->Highlight(GREEN, 4);
+                    }
+
+                    break;
+                }
+            }
         }
         break;
 
         }
 
+        // Undo/redo
         if (wires.size() && IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_Z))
         {
             if (IsKeyDown(KEY_LEFT_SHIFT)) // Redo
@@ -191,13 +229,50 @@ int main(void)
             }
             else if (!IsKeyDown(KEY_LEFT_SHIFT)) // Undo
             {
-                undoneAction = Undo(wires[wires.size() - 1]);
-                delete wires[wires.size() - 1];
+                Wire* wireToUndo = wires[wires.size() - 1];
+                undoneAction = Undo(wireToUndo);
+                if (!wireToUndo->inTransistor->HasConnections())
+                {
+                    for (int i = 0; i < transistors.size(); ++i)
+                    {
+                        if (transistors[i] == wireToUndo->inTransistor)
+                        {
+                            transistors.erase(transistors.begin() + i);
+                            break;
+                        }
+                    }
+                    delete wireToUndo->inTransistor;
+                }
+                if (!wireToUndo->outTransistor->HasConnections())
+                {
+                    for (int i = 0; i < transistors.size(); ++i)
+                    {
+                        if (transistors[i] == wireToUndo->outTransistor)
+                        {
+                            transistors.erase(transistors.begin() + i);
+                            break;
+                        }
+                    }
+                    delete wireToUndo->outTransistor;
+                }
+                delete wireToUndo;
                 wires.pop_back();
             }
         }
 
-        for (Transistor* transistor : transistors) { transistor->Evaluate(); }
+        // Evaluation
+        {
+            std::vector<Transistor*> evaluationList;
+            for (Transistor* transistor : transistors)
+            {
+                if (transistor->inputs.size() == 0) evaluationList.push_back(transistor); // Start of a branch
+            }
+
+            for (Transistor* transistor : evaluationList)
+            {
+                transistor->Evaluate();
+            }
+        }
 
         // Draw
         //---------------------------------------------
@@ -225,8 +300,29 @@ int main(void)
         }
 
         // Draw the current architecture
-        for (Wire* wire : wires) { wire->Draw(); }
+        // Wires
+        //BeginTextureMode(wireTexture);
 
+        { // We want to draw the active wires on top
+            std::vector<Wire*> activeWires;
+            for (Wire* wire : wires)
+            {
+                if (wire->active) activeWires.push_back(wire);
+                else wire->Draw();
+            }
+            for (Wire* wire : activeWires) { wire->Draw(); }
+        }
+
+        //EndTextureMode();
+
+        // Post processing
+        //BeginShaderMode(circuitPostProc);
+
+        //DrawTextureRec(wireTexture.texture, Rectangle{0.0f, 0.0f, (float)wireTexture.texture.width, -1.0f * (float)wireTexture.texture.height}, {0,0}, WHITE);
+
+        //EndShaderMode();
+
+        // Transistors
         for (Transistor* transistor : transistors) { transistor->Draw(); }
 
         EndDrawing();
@@ -236,6 +332,8 @@ int main(void)
 
     // Return memory to heap
     //--------------------------
+    //UnloadShader(circuitPostProc);
+    //UnloadRenderTexture(wireTexture);
 
     for (Transistor* transistor : transistors)
     {

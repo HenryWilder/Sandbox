@@ -29,6 +29,7 @@ struct Transistor
     void Evaluate();
 
     void Draw();
+    void Highlight(Color color, int size);
 
     void FrameReset();
 };

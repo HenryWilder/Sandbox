@@ -19,6 +19,17 @@ void DrawSnappedLine(Vector2 start, Vector2 end, Color color, WireDirection dire
     }
 }
 
+void DrawSnappedLine(Vector2 start, Vector2 end, Color color, WireDirection direction, int width)
+{
+    for (int x = ((-1 * width) / 2); x < (width / 2); ++x)
+    {
+        for (int y = ((-1 * width) / 2); y < (width / 2); ++y)
+        {
+            DrawSnappedLine({ start.x + (float)x, start.y + (float)y }, { end.x + (float)x, end.y + (float)y }, color, direction);
+        }
+    }
+}
+
 bool Vector2Equal(const Vector2& a, const Vector2& b)
 {
     return
@@ -93,4 +104,9 @@ void Wire::Draw()
     if (this->active) color = RED;
     else color = WHITE;
     DrawSnappedLine(startPos, endPos, color, direction);
+}
+
+void Wire::Highlight(Color color, int width)
+{
+    DrawSnappedLine(startPos, endPos, color, direction, width);
 }

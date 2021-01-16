@@ -5,6 +5,16 @@
 #include "Wire.h"
 #include "Transistor.h"
 
+// TODO
+struct ComponentTransistor
+{
+	std::vector<ComponentTransistor*> inputs;
+	std::vector<ComponentTransistor*> outputs;
+	Transistor::Type type;
+
+	void Evaluate();
+};
+
 // Note that these are blueprints on how to create the described component, not an instance of the component itself.
 struct Abstraction
 {

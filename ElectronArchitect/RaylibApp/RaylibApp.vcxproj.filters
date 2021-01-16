@@ -4,10 +4,14 @@
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Wire.cpp" />
     <ClCompile Include="Transistor.cpp" />
+    <ClCompile Include="Abstraction.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Wire.h" />
     <ClInclude Include="Transistor.h" />
     <ClInclude Include="Abstraction.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="pretty.frag" />
   </ItemGroup>
 </Project>
