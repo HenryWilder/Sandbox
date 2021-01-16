@@ -8,5 +8,6 @@
   <ItemGroup>
     <ClInclude Include="Wire.h" />
     <ClInclude Include="Transistor.h" />
+    <ClInclude Include="Abstraction.h" />
   </ItemGroup>
 </Project>

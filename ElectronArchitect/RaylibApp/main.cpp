@@ -3,6 +3,7 @@
 #include <vector>
 #include "Transistor.h"
 #include "Wire.h"
+#include "Abstraction.h"
 
 struct Transistor;
 struct Wire;
@@ -43,6 +44,16 @@ struct Undo
     bool valid;
 };
 
+Rectangle RecVec2(Vector2 start, Vector2 end)
+{
+    Rectangle rec;
+    rec.x = __min(start.x, end.x);
+    rec.width = __max(start.x, end.x) - rec.x;
+    rec.y = __min(start.y, end.y);
+    rec.height = __max(start.y, end.y) - rec.y;
+    return rec;
+}
+
 int main(void)
 {
     const int WindowWidth = 1280;
@@ -61,6 +72,8 @@ int main(void)
 
     Vector2 cursorPos = { -100.0f, -100.0f };
     Vector2 wireStart = { -100.0f, -100.0f };
+    Vector2 selectionStart = {};
+    Vector2 selectionEnd = {};
 
     InputMode mode = {};
 
@@ -126,12 +139,40 @@ int main(void)
                         break;
                     }
                 }
+                selectionStart = cursorPos;
+            }
+            // TODO: component Abstraction
+            else if (IsMouseButtonDown(MOUSE_LEFT_BUTTON))
+            {
+                selectionEnd = cursorPos;
+                Rectangle selectionSpace = RecVec2(selectionStart, selectionEnd);
+
+                DrawRectangleRec(selectionSpace, ColorAlpha(YELLOW, 0.2f));
+                DrawRectangleLines(selectionSpace.x, selectionSpace.y, selectionSpace.width, selectionSpace.height, YELLOW);
+            }
+            else if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+            {
+                selectionEnd = cursorPos;
+                Rectangle selectionSpace = RecVec2(selectionStart, selectionEnd);
+
+                Abstraction component;
+
+                for (Wire* wire : wires)
+                {
+                    if ((wire->startPos.x > selectionSpace.x) && (wire->startPos.x < (selectionSpace.x + selectionSpace.width)) &&
+                        (wire->startPos.y > selectionSpace.y) && (wire->startPos.y < (selectionSpace.y + selectionSpace.height)) &&
+                        (wire->endPos.x > selectionSpace.x) && (wire->endPos.x < (selectionSpace.x + selectionSpace.width)) &&
+                        (wire->endPos.y > selectionSpace.y) && (wire->endPos.y < (selectionSpace.y + selectionSpace.height)))
+                    {
+                        component.wires.push_back(*wire); // TODO
+                    }
+                }
             }
             // M2
             if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
             {
                 mode.mode = InputMode::Mode::None;
-            }
+            }            
         }
         break;
 
