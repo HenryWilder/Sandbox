@@ -13,26 +13,29 @@ enum class WireDirection : char
 };
 
 void DrawSnappedLine(Vector2 start, Vector2 end, Color color, WireDirection direction);
+void DrawSnappedLine(Vector2 start, Vector2 end, Color color, WireDirection direction, int width);
 
 bool Vector2Equal(const Vector2& a, const Vector2& b);
 
 // Just transmits signals from start to end
 struct Wire
 {
-    Wire() : startPos{}, endPos{}, direction{}, active{} {};
+    Wire() : inTransistor{ nullptr }, outTransistor{ nullptr }, direction{ (WireDirection)(NULL) }, active{ false } {};
 
     Wire(Vector2 _startPos, Vector2 _endPos, WireDirection _direction, std::vector<Transistor*>* transistorArr);
 
     ~Wire();
 
-    Vector2 startPos, endPos;
     Transistor* inTransistor;
     Transistor* outTransistor;
     WireDirection direction;
     bool active;
 
-    void Draw();
-    void Highlight(Color color, int width);
+    Vector2 GetStartPos() const;
+    Vector2 GetEndPos() const;
 
-    void SearchConnectableTransistors(std::vector<Transistor*>* transistorArr);
+    void Draw() const;
+    void Highlight(Color color, int width) const;
+
+    void SearchConnectableTransistors(Vector2 startPos, Vector2 endPos, std::vector<Transistor*>* transistorArr);
 };

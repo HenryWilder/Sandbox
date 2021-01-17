@@ -26,7 +26,7 @@ void Transistor::Draw()
     }
 }
 
-void Transistor::Highlight(Color color, int size)
+void Transistor::Highlight(Color color, int size) const
 {
     switch (type)
     {
@@ -40,7 +40,17 @@ void Transistor::Highlight(Color color, int size)
     }
 }
 
-bool Transistor::HasConnections()
+bool Transistor::OutputOnly() const
+{
+    return (inputs.size() == 0);
+}
+
+bool Transistor::InputOnly() const
+{
+    return (outputs.size() == 0);
+}
+
+bool Transistor::ConnectsExternally() const
 {
     return ((inputs.size() > 1) || (outputs.size() > 1));
 }
@@ -49,27 +59,33 @@ void Transistor::Evaluate()
 {
     if (!b_evaluatedThisFrame)
     {
-        bool evaluation = false;
-
-        for (Wire* inputWire : inputs)
+        if (!b_beingEvaluated)
         {
-            if (!inputWire->inTransistor->b_evaluatedThisFrame) inputWire->inTransistor->Evaluate();
+            b_beingEvaluated = true;
+            bool evaluation = false;
 
-            if (inputWire->active)
+            for (Wire* inputWire : inputs)
             {
-                evaluation = true;
-                break;
+                if (!inputWire->inTransistor->b_evaluatedThisFrame) inputWire->inTransistor->Evaluate();
+
+                if (inputWire->active)
+                {
+                    evaluation = true;
+                    break;
+                }
             }
-        }
 
-        if (type == Type::Invert) evaluation = !evaluation;
+            if (type == Type::Invert) evaluation = !evaluation;
 
-        b_evaluatedThisFrame = true;
+            b_evaluatedThisFrame = true;
 
-        for (Wire* outputWire : outputs)
-        {
-            outputWire->active = evaluation;
-            outputWire->outTransistor->Evaluate();
+            for (Wire* outputWire : outputs)
+            {
+                outputWire->active = evaluation;
+                outputWire->outTransistor->Evaluate();
+            }
+
+            b_beingEvaluated = false;
         }
     }
 }

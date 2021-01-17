@@ -8,27 +8,37 @@
 // TODO
 struct ComponentTransistor
 {
-	std::vector<ComponentTransistor*> inputs;
-	std::vector<ComponentTransistor*> outputs;
+	std::vector<int> inputs;	// List of indexes in the array
+	std::vector<int> outputs;	// List of indexes in the array
 	Transistor::Type type;
-
-	void Evaluate();
 };
 
-// Note that these are blueprints on how to create the described component, not an instance of the component itself.
-struct Abstraction
+struct AbstractComponent // Blueprint for component
 {
-	// Copies
-	std::vector<Transistor> transistors; // Make sure to push back these first so that they can have their properties taken correctly
-	std::vector<Wire> wires;
+	AbstractComponent(std::vector<Transistor*> base);
 
-	// These are pointers to the transistors in the previous vector; they refer to which transistors should be present on the outside of the component
-	std::vector<Transistor*> inputs;
-	std::vector<Transistor*> outputs;
+	std::vector<ComponentTransistor> internals;
+	std::vector<int> inputs;	// List of indexes in the array
+	std::vector<int> outputs;	// List of indexes in the array
 
-	// Effectively recreates the actions of manually placing each component into the world.
-	void Paste(Vector2 position)
+	void Spawn(Vector2 position);
+};
+
+struct Component
+{
+	~Component()
 	{
-		// TODO
+		delete[] internals;
+		delete[] inputs;
+		delete[] outputs;
 	}
+
+	int internalCount, inputCount, outputCount; // Fixed size once created
+	ComponentTransistor* internals;
+	Transistor* inputs;
+	Transistor* outputs;
+
+	void Evaluate();
+
+	void Draw();
 };

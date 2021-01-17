@@ -37,7 +37,7 @@ struct Undo
 {
     Undo() : start{ }, end{ }, direction{ }, valid{ false } { };
     Undo(Vector2 _start, Vector2 _end, WireDirection _direction) : start{ _start }, end{ _end }, direction{ _direction }, valid{ true } { };
-    Undo(Wire* wire) : start{ wire->startPos }, end{ wire->endPos }, direction{ wire->direction }, valid{ true } { };
+    Undo(Wire* wire) : start{ wire->GetStartPos() }, end{ wire->GetEndPos() }, direction{ wire->direction }, valid{ true } { };
 
     Vector2 start, end;
     WireDirection direction;
@@ -155,35 +155,11 @@ int main(void)
                 DrawRectangleRec(selectionSpace, ColorAlpha(YELLOW, 0.2f));
                 DrawRectangleLines(selectionSpace.x, selectionSpace.y, selectionSpace.width, selectionSpace.height, YELLOW);
 
-                for (Wire* wire : wires)
-                {
-                    if ((wire->startPos.x > selectionSpace.x) && (wire->startPos.x < (selectionSpace.x + selectionSpace.width)) &&
-                        (wire->startPos.y > selectionSpace.y) && (wire->startPos.y < (selectionSpace.y + selectionSpace.height)) &&
-                        (wire->endPos.x > selectionSpace.x) && (wire->endPos.x < (selectionSpace.x + selectionSpace.width)) &&
-                        (wire->endPos.y > selectionSpace.y) && (wire->endPos.y < (selectionSpace.y + selectionSpace.height)))
-                    {
-                        wire->Highlight(YELLOW, 4);
-                    }
-                }
+                // TODO
             }
             else if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
             {
-                selectionEnd = cursorPos;
-                Rectangle selectionSpace = RecVec2(selectionStart, selectionEnd);
-
-                Abstraction component;
-
-                for (Wire* wire : wires)
-                {
-                    if ((wire->startPos.x > selectionSpace.x) && (wire->startPos.x < (selectionSpace.x + selectionSpace.width)) &&
-                        (wire->startPos.y > selectionSpace.y) && (wire->startPos.y < (selectionSpace.y + selectionSpace.height)) &&
-                        (wire->endPos.x > selectionSpace.x) && (wire->endPos.x < (selectionSpace.x + selectionSpace.width)) &&
-                        (wire->endPos.y > selectionSpace.y) && (wire->endPos.y < (selectionSpace.y + selectionSpace.height)))
-                    {
-                        wire->Highlight(YELLOW, 4);
-                        //component.wires.push_back(*wire); // TODO
-                    }
-                }
+                // TODO
             }
             // M2
             if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
@@ -231,7 +207,7 @@ int main(void)
             {
                 Wire* wireToUndo = wires[wires.size() - 1];
                 undoneAction = Undo(wireToUndo);
-                if (!wireToUndo->inTransistor->HasConnections())
+                if (!wireToUndo->inTransistor->ConnectsExternally())
                 {
                     for (int i = 0; i < transistors.size(); ++i)
                     {
@@ -243,7 +219,7 @@ int main(void)
                     }
                     delete wireToUndo->inTransistor;
                 }
-                if (!wireToUndo->outTransistor->HasConnections())
+                if (!wireToUndo->outTransistor->ConnectsExternally())
                 {
                     for (int i = 0; i < transistors.size(); ++i)
                     {
@@ -265,7 +241,7 @@ int main(void)
             std::vector<Transistor*> evaluationList;
             for (Transistor* transistor : transistors)
             {
-                if (transistor->inputs.size() == 0) evaluationList.push_back(transistor); // Start of a branch
+                if (transistor->OutputOnly()) evaluationList.push_back(transistor); // Start of a branch
             }
 
             for (Transistor* transistor : evaluationList)
