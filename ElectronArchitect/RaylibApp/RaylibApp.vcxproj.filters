@@ -5,13 +5,18 @@
     <ClCompile Include="Wire.cpp" />
     <ClCompile Include="Transistor.cpp" />
     <ClCompile Include="Abstraction.cpp" />
+    <ClCompile Include="Serialization.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Wire.h" />
     <ClInclude Include="Transistor.h" />
     <ClInclude Include="Abstraction.h" />
+    <ClInclude Include="Serialization.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="pretty.frag" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="saved_diagram.txt" />
   </ItemGroup>
 </Project>

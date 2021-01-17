@@ -4,6 +4,7 @@
 #include "Transistor.h"
 #include "Wire.h"
 #include "Abstraction.h"
+#include "Serialization.h"
 
 struct Transistor;
 struct Wire;
@@ -153,7 +154,7 @@ int main(void)
                 Rectangle selectionSpace = RecVec2(selectionStart, selectionEnd);
 
                 DrawRectangleRec(selectionSpace, ColorAlpha(YELLOW, 0.2f));
-                DrawRectangleLines(selectionSpace.x, selectionSpace.y, selectionSpace.width, selectionSpace.height, YELLOW);
+                DrawRectangleLines((int)(selectionSpace.x + 0.5f), (int)(selectionSpace.y + 0.5f), (int)(selectionSpace.width + 0.5f), (int)(selectionSpace.height + 0.5f), YELLOW);
 
                 // TODO
             }
@@ -191,48 +192,63 @@ int main(void)
 
         }
 
-        // Undo/redo
-        if (wires.size() && IsKeyDown(KEY_LEFT_CONTROL) && IsKeyPressed(KEY_Z))
+        // Key comboes
+        if (wires.size() && IsKeyDown(KEY_LEFT_CONTROL))
         {
-            if (IsKeyDown(KEY_LEFT_SHIFT)) // Redo
+            // Save
+            if (IsKeyPressed(KEY_S))
             {
-                if (undoneAction.valid)
-                {
-                    Wire* newWire = new Wire(undoneAction.start, undoneAction.end, undoneAction.direction, &transistors);
-                    wires.push_back(newWire);
-                    undoneAction = Undo();
-                }
+                Save(&transistors);
             }
-            else if (!IsKeyDown(KEY_LEFT_SHIFT)) // Undo
+            // Load
+            if (IsKeyPressed(KEY_L))
             {
-                Wire* wireToUndo = wires[wires.size() - 1];
-                undoneAction = Undo(wireToUndo);
-                if (!wireToUndo->inTransistor->ConnectsExternally())
+                Load(&transistors, &wires);
+            }
+
+            // Undo/redo
+            if (IsKeyPressed(KEY_Z))
+            {
+                if (IsKeyDown(KEY_LEFT_SHIFT)) // Redo
                 {
-                    for (int i = 0; i < transistors.size(); ++i)
+                    if (undoneAction.valid)
                     {
-                        if (transistors[i] == wireToUndo->inTransistor)
-                        {
-                            transistors.erase(transistors.begin() + i);
-                            break;
-                        }
+                        Wire* newWire = new Wire(undoneAction.start, undoneAction.end, undoneAction.direction, &transistors);
+                        wires.push_back(newWire);
+                        undoneAction = Undo();
                     }
-                    delete wireToUndo->inTransistor;
                 }
-                if (!wireToUndo->outTransistor->ConnectsExternally())
+                else if (!IsKeyDown(KEY_LEFT_SHIFT)) // Undo
                 {
-                    for (int i = 0; i < transistors.size(); ++i)
+                    Wire* wireToUndo = wires[wires.size() - 1];
+                    undoneAction = Undo(wireToUndo);
+                    if (!wireToUndo->inTransistor->ConnectsExternally())
                     {
-                        if (transistors[i] == wireToUndo->outTransistor)
+                        for (int i = 0; i < transistors.size(); ++i)
                         {
-                            transistors.erase(transistors.begin() + i);
-                            break;
+                            if (transistors[i] == wireToUndo->inTransistor)
+                            {
+                                transistors.erase(transistors.begin() + i);
+                                break;
+                            }
                         }
+                        delete wireToUndo->inTransistor;
                     }
-                    delete wireToUndo->outTransistor;
+                    if (!wireToUndo->outTransistor->ConnectsExternally())
+                    {
+                        for (int i = 0; i < transistors.size(); ++i)
+                        {
+                            if (transistors[i] == wireToUndo->outTransistor)
+                            {
+                                transistors.erase(transistors.begin() + i);
+                                break;
+                            }
+                        }
+                        delete wireToUndo->outTransistor;
+                    }
+                    delete wireToUndo;
+                    wires.pop_back();
                 }
-                delete wireToUndo;
-                wires.pop_back();
             }
         }
 

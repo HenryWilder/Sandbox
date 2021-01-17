@@ -1,4 +1,6 @@
 #include "Abstraction.h"
+#include "Wire.h"
+
 
 AbstractComponent::AbstractComponent(std::vector<Transistor*> base)
 {

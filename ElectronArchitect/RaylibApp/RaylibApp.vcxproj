@@ -92,16 +92,21 @@
   <ItemGroup>
     <ClCompile Include="Abstraction.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="Serialization.cpp" />
     <ClCompile Include="Transistor.cpp" />
     <ClCompile Include="Wire.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Abstraction.h" />
+    <ClInclude Include="Serialization.h" />
     <ClInclude Include="Transistor.h" />
     <ClInclude Include="Wire.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="pretty.frag" />
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="saved_diagram.txt" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
