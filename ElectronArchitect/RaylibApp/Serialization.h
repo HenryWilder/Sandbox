@@ -7,6 +7,6 @@
 struct Wire;
 struct Transistor;
 
-void Save(std::vector<Transistor*>*);
+void Save(const std::vector<Transistor*>*);
 
 void Load(std::vector<Transistor*>*, std::vector<Wire*>*);

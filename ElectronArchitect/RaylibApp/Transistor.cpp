@@ -52,7 +52,7 @@ bool Transistor::InputOnly() const
 
 bool Transistor::ConnectsExternally() const
 {
-    return ((inputs.size() > 1) || (outputs.size() > 1));
+    return ((outputs.size() + inputs.size()) > 1);
 }
 
 void Transistor::Evaluate()
