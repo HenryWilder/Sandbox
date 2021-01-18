@@ -11,6 +11,8 @@ struct Transistor
     {
         Simple = 0, // Same as "OR"
         Invert,     // Same as "NOR"
+
+        Size // Used for %
     };
 
     Transistor() : type{ Type::Simple }, pos{ }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false } { };

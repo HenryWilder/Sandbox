@@ -55,8 +55,11 @@ std::ostream& operator<<(std::ostream& file, const WireDirection& direction)
 		file << 'y';
 		break;
 
-	case WireDirection::Direct:
-		file << 'd';
+	case WireDirection::DiagStart:
+		file << 's';
+		break;
+	case WireDirection::DiagEnd:
+		file << 'e';
 		break;
 	}
 	return file;
@@ -73,56 +76,66 @@ std::istream& operator>>(std::istream& file, WireDirection& direction)
 	case 'y':
 		direction = WireDirection::YFirst;
 		break;
-	case 'd':
-		direction = WireDirection::Direct;
+	case 's':
+		direction = WireDirection::DiagStart;
+		break;
+	case 'e':
+		direction = WireDirection::DiagEnd;
 		break;
 	}
 	return file;
 }
 
-
 void Save(const std::vector<Transistor*>* fromArr)
 {
-	/******************************
-	* 
-	*	version 0
-	*	t <pos.x> <pos.y> <type>\
-	*	<number of inputs> <input 1 index> <input 2 index> <...> <input n index>\
-	*	<number of outputs> <output 1 index> <output 1 wire direction> <output 2 index> <output 1 wire direction> <...> <output n index> <output n wire direction>
-	* 
-	******************************/
-
 	std::ofstream saveFile("saved_diagram.txt", std::ofstream::out | std::ofstream::trunc);
 	saveFile << "version 0\n";
 
-	saveFile << "s " << fromArr->size() << "\n";
+	saveFile << "c " << fromArr->size() << "\n";
 
 	for (Transistor* const& transistor : *fromArr)
 	{
 		saveFile << "t " << transistor->pos << " " << transistor->type << " ";
 
-		// INPUTS
-		saveFile << "i " << transistor->inputs.size() << " ";
-		for (Wire* const& inputWire : transistor->inputs)
-		{
-			auto found = std::find(fromArr->begin(), fromArr->end(), inputWire->inTransistor); // Find the input
-			size_t foundIndex = std::distance(fromArr->begin(), found); // Find the index of the located element
+		/*********************************
+		* 
+		*	Connections are output only.
+		* 
+		*	a--->b--->c
+		*	-a(b)
+		*	-b(c)
+		*	-c
+		*	
+		*	a--.
+		*		\
+		*		 :-->c
+		*		/
+		*	b--'
+		*	-a(c)
+		*	-b(c)
+		*	-c
+		* 
+		*		 .-->b
+		*		/
+		*	a--:
+		*		\
+		*		 '-->c
+		*	-a(b,c)
+		*	-b
+		*	-c
+		* 
+		*********************************/
 
-			saveFile << "[ " << foundIndex << " ] "; // Write the index
-		}
-
-		
-		// OUTPUTS
-		saveFile << "o " << transistor->outputs.size() << " ";
+		saveFile << transistor->outputs.size() << " ";
 		for (Wire* const& outputWire : transistor->outputs)
 		{
-			auto found = std::find(fromArr->begin(), fromArr->end(), outputWire->outTransistor); // Find the input
-			size_t foundIndex = std::distance(fromArr->begin(), found); // Find the index of the located element
+			auto found = std::find(fromArr->begin(), fromArr->end(), outputWire->outTransistor); // Find the input's relative position in the list
+			size_t foundIndex = std::distance(fromArr->begin(), found); // Get the index from the pointer
 
 			saveFile << "[ " << foundIndex << " "  << outputWire->direction << " ] "; // The wire direction will only be on the output side of the line.
 		}
 
-		saveFile << '\n';
+		saveFile << '\n'; // Newline for next transistor
 	}
 
 	saveFile.close();
@@ -131,91 +144,50 @@ void Save(const std::vector<Transistor*>* fromArr)
 void Load(std::vector<Transistor*>* toArr, std::vector<Wire*>* wireArr)
 {
 	std::ifstream loadFile("saved_diagram.txt", std::ifstream::in);
-	// These vectors are local so that indexes can be absolute
+	// These vectors are local so that indexes can be relative. We don't know how many wires/transistors may already be in the parameter vectors.
+	// Then again, I could probably just store an offset. Idk. I don't wanna risk it.
 	std::vector<Transistor*> transistors;
 	std::vector<Wire*> wires;
-	std::vector<size_t> linkIndexes; // TODO: Is this needed?
 
 	// Get the number of transistors
-	loadFile.ignore(256, 's');
-	size_t transistorCount = 0;
+	loadFile.ignore(256, 'c');
+	size_t transistorCount;
 	loadFile >> transistorCount;
 
 	// Populate the transistor vector
 	// This will allow us to accurately obtain pointers from indexes
+	// This NEEDS to happen BEFORE the next loop so that the connections can be linked correctly! Stop trying to optimize it out, dumbass!!
 	for (int i = 0; i < transistorCount; ++i)
 	{
 		Transistor* transistor = new Transistor(); // These transistors will be used outside this function, so we want to allocate memory for them.
 		transistors.push_back(transistor);
+		toArr->push_back(transistor); // Push the transistor to the output array; we've already got it allocated now, anyway.
 	}
 
-	for (Transistor* transistor : transistors)
+	for (Transistor* thisLineTransistor : transistors) // The transistor on the line being read
 	{
-		loadFile.ignore(256, 't');
-		
-		loadFile >> transistor->pos;
-		loadFile >> transistor->type;
+		size_t outputCount;
+		loadFile.ignore(256, 't') >> thisLineTransistor->pos  >> thisLineTransistor->type >> outputCount;
 
-		size_t inputCount = 0;
-		loadFile >> inputCount;
-		// INPUT LIST
-		for (size_t i = 0; i < inputCount; ++i) // For each input
-		{
-			size_t inputTransistorIndex;
-			loadFile >> inputTransistorIndex;
-			Transistor*& inputTransistor = transistors[inputTransistorIndex];
-
-			// TODO: Think through how this is going actually work sequencially. When and how will the wires be initialized and how can we know whether one is already connecting to us?
-			Wire* newWire = nullptr;
-			for (Wire* wire : inputTransistor->outputs)
-			{
-				if (wire->outTransistor == transistor) // Searching for self as output to wire
-				{
-					newWire = wire;
-					break;
-				}
-			}
-			if (!newWire) // If an existing wire was not found, create one.
-			{
-				newWire = new Wire();
-				newWire->inTransistor = inputTransistor;
-				newWire->outTransistor = transistor;
-				transistor->inputs.push_back(newWire);
-			}
-		}
-
-		// TODO
-		size_t outputCount = 0;
-		loadFile >> outputCount;
+		// Connections
 		for (size_t i = 0; i < outputCount; ++i) // For each output
 		{
-			size_t outputTransistorIndex = 0;
-			loadFile >> outputTransistorIndex;
-			Wire* newWire = nullptr;
-			for (Wire* wire : transistors[outputTransistorIndex]->inputs)
-			{
-				if (wire->inTransistor == transistor) // Searching for self as input to wire
-				{
-					newWire = wire;
-					break;
-				}
-			}
-			if (!newWire) // If an existing wire was not found, create one.
-			{
-				newWire = new Wire();
-				newWire->inTransistor = transistor;
-				newWire->outTransistor = transistors[outputTransistorIndex];
-				transistor->inputs.push_back(newWire);
-			}
+			size_t outputTransistorIndex;
+			loadFile.ignore(256, '[') >> outputTransistorIndex;
+			Transistor* connectedTransistor = transistors[outputTransistorIndex]; // Being used pretty much as just an alias. Saves the extra step/confusion of having the "[...]" in two places.
+
+			// Each connection will have a 1:1 wire to connection ratio. If a connection is listed, then it's our first encounter with it.
+			Wire* newWire = new Wire();
+			wireArr->push_back(newWire); // Now that its been allocated and given a pointer, it can be pushed to the output array without any issue.
+
+			newWire->inTransistor = thisLineTransistor;
+			thisLineTransistor->outputs.push_back(newWire);
+			newWire->outTransistor = connectedTransistor;
+			connectedTransistor->inputs.push_back(newWire);
 
 			loadFile >> newWire->direction;
 		}
 	}
 
 	loadFile.close();
-
-	for (Transistor* transistor : transistors)
-	{
-		toArr->push_back(transistor);
-	}
 }

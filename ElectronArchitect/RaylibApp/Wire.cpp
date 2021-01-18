@@ -5,15 +5,15 @@ void DrawSnappedLine(Vector2 start, Vector2 end, Color color, WireDirection dire
 {
     switch (direction)
     {
-    case WireDirection::XFirst:
-        DrawLineV(start, { start.x, end.y }, color);
-        DrawLineV({ start.x, end.y }, end, color);
-        break;
-    case WireDirection::YFirst:
+    default: case WireDirection::XFirst:
         DrawLineV(start, { end.x, start.y }, color);
         DrawLineV({ end.x, start.y }, end, color);
         break;
-    case WireDirection::Direct:
+    case WireDirection::YFirst:
+        DrawLineV(start, { start.x, end.y }, color);
+        DrawLineV({ start.x, end.y }, end, color);
+        break;
+    case WireDirection::DiagStart:
     {
         float shortestLength = __min(abs(end.x - start.x), abs(end.y - start.y));
         Vector2 angledPos = { start.x + ((end.x > start.x ? 1.0f : -1.0f) * shortestLength), start.y + ((end.y > start.y ? 1.0f : -1.0f) * shortestLength) };
@@ -21,6 +21,14 @@ void DrawSnappedLine(Vector2 start, Vector2 end, Color color, WireDirection dire
         DrawLineV(angledPos, end, color);
     }
         break;
+    case WireDirection::DiagEnd:
+    {
+        float shortestLength = __min(abs(end.x - start.x), abs(end.y - start.y));
+        Vector2 angledPos = { start.x + ((end.x > start.x ? 1.0f : -1.0f) * shortestLength), start.y + ((end.y > start.y ? 1.0f : -1.0f) * shortestLength) };
+        DrawLineV(start, angledPos, color);
+        DrawLineV(angledPos, end, color);
+    }
+    break;
     }
 }
 

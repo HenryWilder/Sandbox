@@ -59,6 +59,7 @@ int main(void)
 {
     const int WindowWidth = 1280;
     const int WindowHeight = 720;
+    const float gridSize = 4.0f;
 
     std::vector<Wire*> wires;
     std::vector<Transistor*> transistors;
@@ -88,7 +89,7 @@ int main(void)
         // Update vars
         //---------------------------------------------
         cursorPos = GetMousePosition();
-        cursorPos = Vector2Snap(cursorPos, 4.0f);
+        cursorPos = Vector2Snap(cursorPos, gridSize);
 
         switch (mode.mode)
         {
@@ -115,7 +116,7 @@ int main(void)
             // M2
             if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
             {
-                mode.data.wireDirection = (WireDirection)(((char)mode.data.wireDirection + 1) % 3); // Should % the number of wire directions
+                mode.data.wireDirection = (WireDirection)(((char)mode.data.wireDirection + 1) % (char)WireDirection::Size); // Should % the number of wire directions
             }
 
             // Released
@@ -141,7 +142,7 @@ int main(void)
                     if (Vector2Equal(cursorPos, transistor->pos))
                     {
                         DrawCircleV(cursorPos, 8.0f, YELLOW);
-                        transistor->type = (Transistor::Type)(((int)(transistor->type) + 1) % 2); // Should % the number of transistor types
+                        transistor->type = (Transistor::Type)(((int)(transistor->type) + 1) % (int)Transistor::Type::Size); // Should % the number of transistor types
                         break;
                     }
                 }

@@ -9,7 +9,10 @@ enum class WireDirection : char
 {
     XFirst = 0,
     YFirst,
-    Direct,
+    DiagStart,
+    DiagEnd,
+
+    Size // Total directions (for %)
 };
 
 void DrawSnappedLine(Vector2 start, Vector2 end, Color color, WireDirection direction);
