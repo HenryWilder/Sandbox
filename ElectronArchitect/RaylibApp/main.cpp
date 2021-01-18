@@ -59,7 +59,7 @@ int main(void)
 {
     const int WindowWidth = 1280;
     const int WindowHeight = 720;
-    const float gridSize = 4.0f;
+    const float gridSize = 8.0f;
 
     std::vector<Wire*> wires;
     std::vector<Transistor*> transistors;
@@ -296,7 +296,7 @@ int main(void)
         // Wires
         //BeginTextureMode(wireTexture);
 
-        { // We want to draw the active wires on top
+        { // We want to draw the active wires on top of the inactive ones
             std::vector<Wire*> activeWires;
             for (Wire* wire : wires)
             {

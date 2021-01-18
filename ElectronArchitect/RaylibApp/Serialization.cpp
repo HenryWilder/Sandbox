@@ -9,7 +9,6 @@ std::ostream& operator<<(std::ostream& file, const Vector2& vector)
 }
 std::istream& operator>>(std::istream& file, Vector2& vector)
 {
-
 	file >> vector.x >> vector.y;
 	return file;
 }

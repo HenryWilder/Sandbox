@@ -24,7 +24,7 @@ void DrawSnappedLine(Vector2 start, Vector2 end, Color color, WireDirection dire
     case WireDirection::DiagEnd:
     {
         float shortestLength = __min(abs(end.x - start.x), abs(end.y - start.y));
-        Vector2 angledPos = { start.x + ((end.x > start.x ? 1.0f : -1.0f) * shortestLength), start.y + ((end.y > start.y ? 1.0f : -1.0f) * shortestLength) };
+        Vector2 angledPos = { end.x - ((end.x > start.x ? 1.0f : -1.0f) * shortestLength), end.y - ((end.y > start.y ? 1.0f : -1.0f) * shortestLength) };
         DrawLineV(start, angledPos, color);
         DrawLineV(angledPos, end, color);
     }
@@ -113,7 +113,7 @@ Wire::~Wire()
     {
         if (inTransistor->outputs[i] == this) inTransistor->outputs.erase(inTransistor->outputs.begin() + i);
     }
-
+    
     for (int i = 0; i < outTransistor->inputs.size(); ++i)
     {
         if (outTransistor->inputs[i] == this) outTransistor->inputs.erase(outTransistor->inputs.begin() + i);
