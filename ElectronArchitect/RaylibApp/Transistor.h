@@ -3,6 +3,14 @@
 #include <raymath.h>
 #include <vector>
 
+Vector2 operator*(Vector2 a, Vector2 b);
+Vector2 operator*(Vector2 a, float scale);
+Vector2 operator+(Vector2 a, Vector2 b);
+Vector2 operator-(Vector2 a, Vector2 b);
+Vector2 Vector2Midpoint(Vector2 start, Vector2 end);
+
+void DrawDirectionTriangle(Vector2 from, Vector2 at, Vector2 position, Color color);
+
 struct Wire;
 
 struct Transistor
@@ -11,6 +19,8 @@ struct Transistor
     {
         Simple = 0, // Same as "OR"
         Invert,     // Same as "NOR"
+        Combine,    // Same as "AND"
+        Choose,     // Same as "XOR"
 
         Size // Used for %
     };

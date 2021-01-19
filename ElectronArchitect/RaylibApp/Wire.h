@@ -15,6 +15,8 @@ enum class WireDirection : char
     Size // Total directions (for %)
 };
 
+Vector2 JointPos(Vector2 start, Vector2 end, WireDirection direction);
+
 void DrawSnappedLine(Vector2 start, Vector2 end, Color color, WireDirection direction);
 void DrawSnappedLine(Vector2 start, Vector2 end, Color color, WireDirection direction, int width);
 
@@ -36,6 +38,9 @@ struct Wire
 
     Vector2 GetStartPos() const;
     Vector2 GetEndPos() const;
+    Vector2 GetJointPos() const;
+
+    bool IsPointOnLine(Vector2 point) const;
 
     void Draw() const;
     void Highlight(Color color, int width) const;

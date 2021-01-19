@@ -1,35 +1,47 @@
 #include "Wire.h"
 #include "Transistor.h"
 
-void DrawSnappedLine(Vector2 start, Vector2 end, Color color, WireDirection direction)
+Vector2 JointPos(Vector2 start, Vector2 end, WireDirection direction)
 {
+    float xLength = abs(end.x - start.x);
+    float yLength = abs(end.y - start.y);
+    float shortestLength = (xLength < yLength ? xLength : yLength);
+    Vector2 shortPos;
+    if (end.x > start.x) shortPos.x = shortestLength;
+    else shortPos.x = -1.0f * shortestLength;
+    if (end.y > start.y) shortPos.y = shortestLength;
+    else shortPos.y = -1.0f * shortestLength;
+
     switch (direction)
     {
     default: case WireDirection::XFirst:
-        DrawLineV(start, { end.x, start.y }, color);
-        DrawLineV({ end.x, start.y }, end, color);
+        return { end.x, start.y };
         break;
     case WireDirection::YFirst:
-        DrawLineV(start, { start.x, end.y }, color);
-        DrawLineV({ start.x, end.y }, end, color);
+        return { start.x, end.y };
         break;
     case WireDirection::DiagStart:
-    {
-        float shortestLength = __min(abs(end.x - start.x), abs(end.y - start.y));
-        Vector2 angledPos = { start.x + ((end.x > start.x ? 1.0f : -1.0f) * shortestLength), start.y + ((end.y > start.y ? 1.0f : -1.0f) * shortestLength) };
-        DrawLineV(start, angledPos, color);
-        DrawLineV(angledPos, end, color);
-    }
+        return (start + shortPos);
         break;
     case WireDirection::DiagEnd:
-    {
-        float shortestLength = __min(abs(end.x - start.x), abs(end.y - start.y));
-        Vector2 angledPos = { end.x - ((end.x > start.x ? 1.0f : -1.0f) * shortestLength), end.y - ((end.y > start.y ? 1.0f : -1.0f) * shortestLength) };
-        DrawLineV(start, angledPos, color);
-        DrawLineV(angledPos, end, color);
+        return (end - shortPos);
+        break;
     }
-    break;
-    }
+}
+
+Vector2 Wire::GetJointPos() const
+{
+    return JointPos(GetStartPos(), GetEndPos(), direction);
+}
+
+void DrawSnappedLine(Vector2 start, Vector2 end, Color color, WireDirection direction)
+{
+    Vector2 jointPos;
+
+    jointPos = JointPos(start, end, direction);
+
+    DrawLineV(start, jointPos, color);
+    DrawLineV(jointPos, end, color);
 }
 
 void DrawSnappedLine(Vector2 start, Vector2 end, Color color, WireDirection direction, int width)
@@ -80,6 +92,22 @@ void Wire::SearchConnectableTransistors(Vector2 startPos, Vector2 endPos, std::v
             break;
         }
     }
+}
+
+bool Wire::IsPointOnLine(Vector2 point) const
+{
+    Vector2 joint = GetJointPos();
+
+    float segmentLen[2] = {
+        Vector2Distance(GetStartPos(), joint),
+        Vector2Distance(joint, GetEndPos())
+    };
+    float pointDist[3] = {
+        Vector2Distance(point, GetStartPos()),
+        Vector2Distance(point, joint),
+        Vector2Distance(point, GetEndPos())
+    };
+    return (((pointDist[0] + pointDist[1]) <= segmentLen[0]) || ((pointDist[1] + pointDist[2]) <= segmentLen[1]));
 }
 
 Wire::Wire(Vector2 _startPos, Vector2 _endPos, WireDirection _direction, std::vector<Transistor*>* transistorArr)

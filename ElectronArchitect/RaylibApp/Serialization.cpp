@@ -23,6 +23,12 @@ std::ostream& operator<<(std::ostream& file, const Transistor::Type& type)
 	case Transistor::Type::Invert:
 		file << '!';
 		break;
+	case Transistor::Type::Combine:
+		file << '&';
+		break;
+	case Transistor::Type::Choose:
+		file << '^';
+		break;
 	}
 	return file;
 }
@@ -37,6 +43,12 @@ std::istream& operator>>(std::istream& file, Transistor::Type& transistorType)
 		break;
 	case '!':
 		transistorType = Transistor::Type::Invert;
+		break;
+	case '&':
+		transistorType = Transistor::Type::Combine;
+		break;
+	case '^':
+		transistorType = Transistor::Type::Choose;
 		break;
 	}
 	return file;

@@ -4,7 +4,7 @@
 
 AbstractComponent::AbstractComponent(std::vector<Transistor*> const* base)
 {
-    std::vector<Transistor*> local;
+    std::vector<Transistor*> abstraction;
     // Preparing the vector prior to storing
     for (Transistor* transistor : *base) // Note that "base" is our own copy. Not a pointer.
     {
@@ -45,7 +45,7 @@ AbstractComponent::AbstractComponent(std::vector<Transistor*> const* base)
         else
         {
             // TODO: This definitely won't work.
-            local.push_back(transistor);
+            abstraction.push_back(transistor);
         }
     }
 
