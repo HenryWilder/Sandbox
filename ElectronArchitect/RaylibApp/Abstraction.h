@@ -14,7 +14,7 @@ struct ComponentTransistor
 
 struct AbstractComponent // Blueprint for component
 {
-	AbstractComponent(std::vector<Transistor*> base);
+	AbstractComponent(std::vector<Transistor*> const* base);
 
 	std::vector<ComponentTransistor> internals;
 
