@@ -12,6 +12,7 @@
     <ClInclude Include="Transistor.h" />
     <ClInclude Include="Abstraction.h" />
     <ClInclude Include="Serialization.h" />
+    <ClInclude Include="Circuit.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="pretty.frag" />

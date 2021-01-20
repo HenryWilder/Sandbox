@@ -94,6 +94,11 @@ void Wire::SearchConnectableTransistors(Vector2 startPos, Vector2 endPos, std::v
     }
 }
 
+float Wire::GetLength() const
+{
+    return abs(Vector2Length(GetJointPos() - GetStartPos())) + abs(Vector2Length(GetEndPos() + GetJointPos()));
+}
+
 bool Wire::IsPointOnLine(Vector2 point) const
 {
     Vector2 joint = GetJointPos();
@@ -151,9 +156,19 @@ Wire::~Wire()
 void Wire::Draw() const
 {
     Color color;
-    if (this->active) color = RED;
+    if (active) color = RED;
     else color = WHITE;
     DrawSnappedLine(inTransistor->pos, outTransistor->pos, color, direction);
+
+    // TODO: Make moving current
+    //if (active)
+    //{
+    //    if ()
+    //    for (int t = 0; t < GetLength(); ++t)
+    //    {
+    //        DrawCircle();
+    //    }
+    //}
 }
 
 void Wire::Highlight(Color color, int width) const

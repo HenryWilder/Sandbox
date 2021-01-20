@@ -4,12 +4,47 @@
 #include <vector>
 #include "Transistor.h"
 
+/*******************
+*
+*	Circuit:
+*	>---&--->
+*       |
+*	>---'
+* 
+*	Component:
+*	   -------
+*	  |       |
+*	-->       >--
+*	  |  AND  |
+*	-->       |
+*	  |       |
+*	   -------
+*
+*******************/
+
 // TODO
 struct ComponentTransistor
 {
-	std::vector<int> inputs;	// List of indexes in the array (array is not self-contained)
-	std::vector<int> outputs;	// List of indexes in the array (array is not self-contained)
-	Transistor::Type type;
+	ComponentTransistor() : inputCount{ 0 }, outputCount{ 0 }, inputs{ nullptr }, outputs{ nullptr }, type{ TransistorType::Simple }, b_active{ false }, b_evaluated{ false } {};
+	ComponentTransistor(Transistor* base) // Still need to set inputs and outputs
+	{
+		inputCount = base->inputs.size();
+		outputCount = base->outputs.size();
+		type = base->type;
+
+		inputs = nullptr;
+		outputs = nullptr;
+		b_active = false;
+		b_evaluated = false;
+	}
+
+	int inputCount; // 4
+	int outputCount; // 4
+	ComponentTransistor* inputs; // 8
+	ComponentTransistor* outputs; // 8
+	TransistorType type; // 1
+	bool b_active; // 1
+	bool b_evaluated; // 1
 };
 
 struct AbstractComponent // Blueprint for component
@@ -21,17 +56,34 @@ struct AbstractComponent // Blueprint for component
 	void Spawn(Vector2 position);
 };
 
-struct Component
+void MakeAbstract(std::vector<Transistor*> const* selection);
+
+struct ComponentPort
 {
+	Vector2 pos;
+	Transistor* connection;
+	void Draw();
+};
+
+class Component
+{
+public:
 	// No custom constructor. It will be handled by the blueprint.
 	~Component()
 	{
 		delete[] internals;
+		delete[] inputs;
+		delete[] outputs;
 	}
 
-	Vector2 position;
-	int internalCount; // Fixed size once created
-	ComponentTransistor* internals; // Inputs and outputs are implied by the io of the transistors
+	int inputCount;
+	int outputCount;
+	int internalCount;
+	Vector2 pos;
+	Rectangle casing;
+	ComponentPort* inputs;
+	ComponentPort* outputs;
+	ComponentTransistor* internals; // Fixed size once created
 
 	void Evaluate();
 

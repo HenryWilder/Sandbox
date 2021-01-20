@@ -98,6 +98,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Abstraction.h" />
+    <ClInclude Include="Circuit.h" />
     <ClInclude Include="Serialization.h" />
     <ClInclude Include="Transistor.h" />
     <ClInclude Include="Wire.h" />

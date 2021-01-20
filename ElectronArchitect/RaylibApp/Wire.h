@@ -39,6 +39,7 @@ struct Wire
     Vector2 GetStartPos() const;
     Vector2 GetEndPos() const;
     Vector2 GetJointPos() const;
+    float GetLength() const;
 
     bool IsPointOnLine(Vector2 point) const;
 

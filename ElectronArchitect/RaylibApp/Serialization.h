@@ -2,7 +2,6 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <vector>
-#include <fstream>
 
 struct Wire;
 struct Transistor;

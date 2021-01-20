@@ -117,6 +117,7 @@ int main(void)
 
     std::vector<Wire*> wires;
     std::vector<Transistor*> transistors;
+    std::vector<Transistor*> selection;
 
     auto deleteWire = [&transistors, &wires](Wire* wire)
     {
@@ -164,6 +165,7 @@ int main(void)
     InitWindow(WindowWidth, WindowHeight, "Electron Architect");
 
     Vector2 cursorPos = { -100.0f, -100.0f };
+    Vector2 cursorPosDelta = { };
     Vector2 wireStart = { -100.0f, -100.0f };
     Vector2 selectionStart = {};
     Vector2 selectionEnd = {};
@@ -179,8 +181,12 @@ int main(void)
     {
         // Update vars
         //---------------------------------------------
-        cursorPos = GetMousePosition();
-        cursorPos = Vector2Snap(cursorPos, gridSize);
+        {
+            Vector2 cursorPosLast = cursorPos;
+            cursorPos = GetMousePosition();
+            cursorPos = Vector2Snap(cursorPos, gridSize);
+            cursorPosDelta = cursorPos - cursorPosLast;
+        }
 
         Transistor* transistorHovering = nullptr;
         for (Transistor* transistor : transistors) {
@@ -211,7 +217,7 @@ int main(void)
                     Transistor* endTransistor = wireHovering->outTransistor;
                     BreakWireOutput(wireHovering);
                     Transistor* splitTransistor = new Transistor();
-                    splitTransistor->type = Transistor::Type::Simple;
+                    splitTransistor->type = TransistorType::Simple;
                     splitTransistor->pos = cursorPos;
                     transistors.push_back(splitTransistor);
                     SolderTransistorInput(splitTransistor, wireHovering);
@@ -261,8 +267,8 @@ int main(void)
                 if (transistorHovering)
                 {
                     DrawCircleV(cursorPos, 8.0f, YELLOW);
-                    if (transistorHovering->OutputOnly()) transistorHovering->type = (Transistor::Type)(((int)(transistorHovering->type) + 1) % 2); // If the transistor has no inputs, toggle between simple & invert
-                    else transistorHovering->type = (Transistor::Type)(((int)(transistorHovering->type) + 1) % (int)Transistor::Type::Size); // Should % the number of transistor types
+                    if (transistorHovering->OutputOnly()) transistorHovering->type = (TransistorType)(((int)(transistorHovering->type) + 1) % 2); // If the transistor has no inputs, toggle between simple & invert
+                    else transistorHovering->type = (TransistorType)(((int)(transistorHovering->type) + 1) % (int)TransistorType::Size); // Should % the number of transistor types
                 }
                 else if (wireHovering)
                 {
@@ -276,41 +282,91 @@ int main(void)
             {
                 selectionEnd = cursorPos;
                 Rectangle selectionSpace = RecVec2(selectionStart, selectionEnd);
+                for (Transistor* check : transistors)
+                {
+                    if (CheckCollisionPointRec(check->pos, selectionSpace))
+                    {
+                        check->Highlight(YELLOW, 8);
+                    }
+                }
 
                 DrawRectangleRec(selectionSpace, ColorAlpha(YELLOW, 0.2f));
-                DrawRectangleLines((int)(selectionSpace.x + 0.5f), (int)(selectionSpace.y + 0.5f), (int)(selectionSpace.width + 0.5f), (int)(selectionSpace.height + 0.5f), YELLOW);
+                DrawRectangleLinesEx(selectionSpace, 2, YELLOW);
 
                 // TODO
             }
             else if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
             {
-                // TODO
+                Rectangle selectionSpace = RecVec2(selectionStart, selectionEnd);
+                selection.clear();
+                if (!Vector2Equal(selectionStart, selectionEnd))
+                {
+                    for (Transistor* check : transistors)
+                    {
+                        if (CheckCollisionPointRec(check->pos, selectionSpace)) selection.push_back(check);
+                    }
+                }
             }
             // M2
             if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
             {
+                selection.clear();
                 mode.mode = InputMode::Mode::None;
             }
 
+            if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON))
+            {
+                mode.data.move.dragingTransistor = nullptr;
+                if (IsKeyDown(KEY_LEFT_ALT))
+                {
+                    std::vector<Transistor*> selectionCopy;
+                    for (size_t i = 0; i < selection.size(); ++i)
+                    {
+                        Transistor* copy = new Transistor();
+                        copy->pos = selection[i]->pos;
+                        copy->type = selection[i]->type;
+                        selectionCopy.push_back(copy);
+                        transistors.push_back(copy);
+                    }
+                    for (size_t i = 0; i < selection.size(); ++i)
+                    {
+                        // Make inputs relative
+                        for (Wire* inputWire : selection[i]->inputs)
+                        {
+                            for (size_t index = 0; index < selection.size(); ++index)
+                            {
+                                if (selection[index] == inputWire->inTransistor)
+                                {
+                                    wires.push_back(FormTtTConnection(selectionCopy[index], selectionCopy[i], inputWire->direction));
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    for (size_t i = 0; i < selection.size(); ++i)
+                    {
+                        selection[i] = selectionCopy[i];
+                    }
+                }
+                mode.mode = InputMode::Mode::Move;
+            }
+
+            for (Transistor* select : selection)
+            {
+                select->Highlight(BLACK, 12);
+                select->Highlight(YELLOW, 8);
+            }
             // Show branches
             if (transistorHovering)
             {
-                transistorHovering->Highlight(YELLOW, 16);
+                transistorHovering->Highlight(BLACK, 12);
+                transistorHovering->Highlight(YELLOW, 8);
 
-                for (Wire* wire : transistorHovering->inputs)
-                {
-                    wire->Highlight(BLUE, 4);
-                }
-                for (Wire* wire : transistorHovering->outputs)
-                {
-                    wire->Highlight(GREEN, 4);
-                }
+                for (Wire* wire : transistorHovering->inputs) { wire->Highlight(BLUE, 4); }
+                for (Wire* wire : transistorHovering->outputs) { wire->Highlight(GREEN, 4); }
             }
             // Show selectable wire
-            if (wireHovering)
-            {
-                wireHovering->Highlight(YELLOW, 4);
-            }
+            else if (wireHovering) wireHovering->Highlight(YELLOW, 4);
         }
         break;
 
@@ -318,6 +374,7 @@ int main(void)
             if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON))
             {
                 if (mode.data.move.dragingTransistor) mode.data.move.dragingTransistor->pos = cursorPos;
+                else for (Transistor* select : selection) { select->pos = select->pos + cursorPosDelta; }
             }
 
             if (IsMouseButtonReleased(MOUSE_MIDDLE_BUTTON))
@@ -426,12 +483,28 @@ int main(void)
         // Columns
         for(int x = 0; x < WindowWidth; x += gridSize)
         {
-            DrawLine(x, 0, x, WindowHeight, { 255,255,255,20 });
+            if (x == cursorPos.x)
+            {
+                unsigned char alpha = 32;
+                if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) alpha = 64;
+                DrawLine(x - 1, 0, x - 1, WindowHeight, { 255,255,255, (alpha / (unsigned)'\2') });
+                DrawLine(x, 0, x, WindowHeight, { 255,255,255, alpha });
+                DrawLine(x + 1, 0, x + 1, WindowHeight, { 255,255,255, (alpha / (unsigned)'\2') });
+            }
+            else DrawLine(x, 0, x, WindowHeight, { 255,255,255,16 });
         }
         // Rows
         for (int y = 0; y < WindowHeight; y += gridSize)
         {
-            DrawLine(0, y, WindowWidth, y, { 255,255,255,20 });
+            if (y == cursorPos.y)
+            {
+                unsigned char alpha = 32;
+                if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) alpha = 64;
+                DrawLine(0, y - 1, WindowWidth, y - 1, { 255,255,255, (alpha / (unsigned)'\2') });
+                DrawLine(0, y, WindowWidth, y, { 255,255,255, alpha });
+                DrawLine(0, y + 1, WindowWidth, y + 1, { 255,255,255, (alpha / (unsigned)'\2') });
+            }
+            else DrawLine(0, y, WindowWidth, y, { 255,255,255,16 });
         }
 
         // Draw cursor

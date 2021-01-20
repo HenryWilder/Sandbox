@@ -1,6 +1,7 @@
 #include "Serialization.h"
 #include "Transistor.h"
 #include "Wire.h"
+#include <fstream>
 
 std::ostream& operator<<(std::ostream& file, const Vector2& vector)
 {
@@ -13,44 +14,16 @@ std::istream& operator>>(std::istream& file, Vector2& vector)
 	return file;
 }
 
-std::ostream& operator<<(std::ostream& file, const Transistor::Type& type)
+std::ostream& operator<<(std::ostream& file, const TransistorType& type)
 {
-	switch (type)
-	{
-	default: case Transistor::Type::Simple:
-		file << '|';
-		break;
-	case Transistor::Type::Invert:
-		file << '!';
-		break;
-	case Transistor::Type::Combine:
-		file << '&';
-		break;
-	case Transistor::Type::Choose:
-		file << '^';
-		break;
-	}
+	file << GateToSymbol(type);
 	return file;
 }
-std::istream& operator>>(std::istream& file, Transistor::Type& transistorType)
+std::istream& operator>>(std::istream& file, TransistorType& transistorType)
 {
 	char transistorTypeSymbol;
 	file >> transistorTypeSymbol;
-	switch (transistorTypeSymbol)
-	{
-	default: case '|':
-		transistorType = Transistor::Type::Simple;
-		break;
-	case '!':
-		transistorType = Transistor::Type::Invert;
-		break;
-	case '&':
-		transistorType = Transistor::Type::Combine;
-		break;
-	case '^':
-		transistorType = Transistor::Type::Choose;
-		break;
-	}
+	transistorType = SymbolToGate(transistorTypeSymbol);
 	return file;
 }
 
