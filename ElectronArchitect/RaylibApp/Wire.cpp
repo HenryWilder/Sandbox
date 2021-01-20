@@ -75,7 +75,7 @@ void Wire::SearchConnectableTransistors(Vector2 startPos, Vector2 endPos)
 {
     for (Transistor* searchStart : Transistor::allTransistors)
     {
-        if (Vector2Equal(searchStart->pos, startPos))
+        if (Vector2Equal(searchStart->pos, startPos) && (!searchStart->b_hidden))
         {
             inTransistor = searchStart;
             searchStart->outputs.push_back(this);
@@ -84,7 +84,7 @@ void Wire::SearchConnectableTransistors(Vector2 startPos, Vector2 endPos)
     }
     for (Transistor* searchEnd : Transistor::allTransistors)
     {
-        if (Vector2Equal(searchEnd->pos, endPos))
+        if (Vector2Equal(searchEnd->pos, endPos) && (!searchEnd->b_hidden))
         {
             outTransistor = searchEnd;
             searchEnd->inputs.push_back(this);
@@ -144,29 +144,26 @@ Wire::Wire(Vector2 _startPos, Vector2 _endPos, WireDirection _direction)
     }
 
     active = false;
+    hidden = false;
 }
 
 void Wire::Draw() const
 {
-    Color color;
-    if (active) color = RED;
-    else color = WHITE;
-    DrawSnappedLine(inTransistor->pos, outTransistor->pos, color, direction);
-
-    // TODO: Make moving current
-    //if (active)
-    //{
-    //    if ()
-    //    for (int t = 0; t < GetLength(); ++t)
-    //    {
-    //        DrawCircle();
-    //    }
-    //}
+    if (!hidden)
+    {
+        Color color;
+        if (active) color = RED;
+        else color = WHITE;
+        DrawSnappedLine(inTransistor->pos, outTransistor->pos, color, direction);
+    }
 }
 
 void Wire::Highlight(Color color, float width) const
 {
-    DrawSnappedLineEx(inTransistor->pos, outTransistor->pos, width, color, direction);
+    if (!hidden)
+    {
+        DrawSnappedLineEx(inTransistor->pos, outTransistor->pos, width, color, direction);
+    }
 }
 
 std::vector<Wire*> Wire::allWires;

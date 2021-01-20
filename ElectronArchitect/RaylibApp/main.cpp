@@ -146,6 +146,12 @@ void DeleteWire(Wire* wire)
     delete wire;
 }
 
+/************************************************************
+* 
+*   START OF PROGRAM
+* 
+************************************************************/
+
 int main(void)
 {
     Undo undoneAction = Undo();
@@ -226,9 +232,16 @@ int main(void)
             cursorPosDelta = cursorPos - cursorPosLast;
         }
 
+        Component* componentHovering = nullptr;
+        for (Component* component : Component::allComponents) {
+            if (CheckCollisionPointRec(cursorPos, component->casing)) {
+                componentHovering = component;
+                break;
+            }
+        }
         Transistor* transistorHovering = nullptr;
         for (Transistor* transistor : Transistor::allTransistors) {
-            if (Vector2Equal(cursorPos, transistor->pos)) {
+            if (Vector2Equal(cursorPos, transistor->pos) && !transistor->b_hidden) {
                 transistorHovering = transistor;
                 break;
             }
@@ -293,9 +306,27 @@ int main(void)
 
         case InputMode::Mode::Gate:
         {
-            if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON) && selection.empty() && transistorHovering)
+            if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON) && selection.empty()) // Select a single transistor for moving
             {
-                selection.push_back(transistorHovering);
+                if (transistorHovering)
+                {
+                    selection.push_back(transistorHovering);
+                }
+                else if (componentHovering)
+                {
+                    for (size_t i = 0; i < componentHovering->internalCount; ++i)
+                    {
+                        selection.push_back(componentHovering->internals[i]);
+                    }
+                    for (size_t i = 0; i < componentHovering->inputCount; ++i)
+                    {
+                        selection.push_back(componentHovering->inputs[i]);
+                    }
+                    for (size_t i = 0; i < componentHovering->outputCount; ++i)
+                    {
+                        selection.push_back(componentHovering->outputs[i]);
+                    }
+                }
                 b_moveActive = true;
             }
             if ((IsKeyPressed(KEY_DELETE) || IsKeyPressed(KEY_BACKSPACE)) && !selection.empty()) // Delete selection
@@ -341,18 +372,23 @@ int main(void)
             if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
             {
                 ClearSelection();
-                if (transistorHovering)
+                if (transistorHovering)// Change Transistor mode
                 {
                     DrawCircleV(cursorPos, 8.0f, YELLOW);
                     if (transistorHovering->OutputOnly()) transistorHovering->type = (TransistorType)(((int)(transistorHovering->type) + 1) % 2); // If the transistor has no inputs, toggle between simple & invert
                     else transistorHovering->type = (TransistorType)(((int)(transistorHovering->type) + 1) % (int)TransistorType::Size); // Should % the number of transistor types
+                    selectionStart = cursorPos;
                 }
-                else if (wireHovering)
+                else if (wireHovering) // Delete wire
                 {
                     DeleteWire(wireHovering);
                     wireHovering = nullptr;
                 }
-                selectionStart = cursorPos;
+                else if (componentHovering) // Delete component
+                {
+                    Erase(Component::allComponents, componentHovering);
+                    delete componentHovering;
+                }
             }
             // TODO: component Abstraction
             else if (IsMouseButtonDown(MOUSE_LEFT_BUTTON))
@@ -386,6 +422,10 @@ int main(void)
 
         if (b_moveActive) // Dragging
         {
+            for (Transistor* elem : selection)
+            {
+                if (elem->containingComponent) elem->containingComponent->UpdateCasing();
+            }
             if (IsMouseButtonReleased(MOUSE_MIDDLE_BUTTON))
             {
                 if (!b_selectionIsExplicit) ClearSelection();
@@ -510,34 +550,35 @@ int main(void)
         BeginDrawing();
         BeginMode2D(camera);
 
-        ClearBackground(BLACK);
+        ClearBackground({ 8,8,8, 255 });
 
         DrawRectangleRec(selectionSpace, ColorAlpha(YELLOW, 0.2f));
         {
-            const float gridSize = 50.0f;
-            const float gridEnd = (gridSize * g_gridSize);
-            const float gridStart = (gridEnd * -1.0f);
+            const float gridScale = 50.0f;
+            Vector2 gridSpace = Vector2{ (gridScale * g_gridSize), (gridScale * g_gridSize) };
+            Vector2 gridEnd = cursorPos + gridSpace;
+            Vector2 gridStart = cursorPos + (gridSpace * -1.0f);
             // Columns
-            for (float x = gridStart; x < gridEnd; x += g_gridSize)
+            for (float x = gridStart.x; x <= gridEnd.x; x += g_gridSize)
             {
-                if (x == cursorPos.x)
+                if (x == cursorPos.x || x == 0.0f)
                 {
                     unsigned char alpha = 32;
                     if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON) || IsMouseButtonDown(MOUSE_LEFT_BUTTON)) alpha = 48;
-                    DrawLineEx({ x, gridStart }, { x, gridEnd }, 2, { 255,255,255, alpha });
+                    DrawLineEx({ x, gridStart.y }, { x, gridEnd.y }, 2, { 255,255,255, alpha });
                 }
-                else DrawLine(x, gridStart, x, gridEnd, { 255,255,255,16 });
+                else DrawLineV({ x, gridStart.y }, { x, gridEnd.y }, { 255,255,255,16 });
             }
             // Rows
-            for (float y = gridStart; y < gridEnd; y += g_gridSize)
+            for (float y = gridStart.y; y <= gridEnd.y; y += g_gridSize)
             {
-                if (y == cursorPos.y)
+                if (y == cursorPos.y || y == 0.0f)
                 {
                     unsigned char alpha = 32;
                     if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON) || IsMouseButtonDown(MOUSE_LEFT_BUTTON)) alpha = 48;
-                    DrawLineEx({ gridStart, y }, { gridEnd, y }, 2, { 255,255,255, alpha });
+                    DrawLineEx({ gridStart.x, y }, { gridEnd.x, y }, 2, { 255,255,255, alpha });
                 }
-                else DrawLine(gridStart, y, gridEnd, y, { 255,255,255,16 });
+                else DrawLineV({ gridStart.x, y }, { gridEnd.x, y }, { 255,255,255,16 });
             }
         }
         for (Transistor* check : Transistor::allTransistors)
@@ -604,6 +645,14 @@ int main(void)
             for (Wire* wire : activeWires) { wire->Draw(); }
         }
 
+        for (Component* component : Component::allComponents) // Draw component casings
+        {
+            component->Draw();
+        }
+
+        if (componentHovering && !(transistorHovering || b_moveActive)) componentHovering->Highlight({32,32,0,255});
+        else if (transistorHovering) transistorHovering->Highlight(YELLOW, 8.0f);
+
         //EndTextureMode();
 
         // Post processing
@@ -637,6 +686,9 @@ int main(void)
 
     for (Wire* wire : Wire::allWires) { delete wire; }
     Wire::allWires.clear();
+
+    for (Component* component : Component::allComponents) { delete component; }
+    Component::allComponents.clear();
 
     return 0;
 }

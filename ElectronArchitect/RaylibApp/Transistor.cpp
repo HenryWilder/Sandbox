@@ -1,6 +1,7 @@
 #include "Transistor.h"
 #include "Globals.h"
 #include "Wire.h"
+#include "Abstraction.h"
 
 Vector2 operator*(Vector2 a, Vector2 b) { return { a.x * b.x, a.y * b.y }; }
 Vector2 operator*(Vector2 a, float scale) { return { a.x * scale, a.y * scale }; }

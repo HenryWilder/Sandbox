@@ -12,6 +12,7 @@ Vector2 Vector2Midpoint(Vector2 start, Vector2 end);
 void DrawDirectionTriangle(Vector2 from, Vector2 at, Vector2 position, Color color, float scale);
 
 struct Wire;
+struct Component;
 
 enum class TransistorType : char
 {
@@ -30,17 +31,19 @@ void DrawTransistorIcon(TransistorType type, Vector2 pos, Color color, float siz
 
 struct Transistor
 {
-    Transistor() : type{ TransistorType::Simple }, pos{ }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }{ };
-    Transistor(TransistorType _type) : type{ _type }, pos{ }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }{ };
-    Transistor(Vector2 _pos) : type{ TransistorType::Simple }, pos{ _pos }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }{ };
-    Transistor(TransistorType _type, Vector2 _pos) : type{ _type }, pos{ _pos }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }{ };
+    Transistor() : type{ TransistorType::Simple }, pos{ }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ };
+    Transistor(TransistorType _type) : type{ _type }, pos{ }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ };
+    Transistor(Vector2 _pos) : type{ TransistorType::Simple }, pos{ _pos }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ };
+    Transistor(TransistorType _type, Vector2 _pos) : type{ _type }, pos{ _pos }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ };
 
     static std::vector<Transistor*> allTransistors;
     std::vector<Wire*> inputs;
     std::vector<Wire*> outputs;
     Vector2 pos;
     TransistorType type;
-    bool b_drawnThisFrame, b_evaluatedThisFrame, b_beingEvaluated, evaluation;
+    bool b_drawnThisFrame, b_evaluatedThisFrame, b_beingEvaluated, evaluation, b_hidden;
+
+    Component* containingComponent;
 
     bool OutputOnly() const;    // Is the start of a tree
     bool InputOnly() const;     //Is the end of a tree
