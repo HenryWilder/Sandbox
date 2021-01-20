@@ -1,4 +1,5 @@
 #include "Wire.h"
+#include "Globals.h"
 #include "Transistor.h"
 
 Vector2 JointPos(Vector2 start, Vector2 end, WireDirection direction)
@@ -72,9 +73,9 @@ Vector2 Wire::GetEndPos() const
     return outTransistor->pos;
 }
 
-void Wire::SearchConnectableTransistors(Vector2 startPos, Vector2 endPos, std::vector<Transistor*>* transistorArr)
+void Wire::SearchConnectableTransistors(Vector2 startPos, Vector2 endPos)
 {
-    for (Transistor* searchStart : *transistorArr)
+    for (Transistor* searchStart : Transistor::allTransistors)
     {
         if (Vector2Equal(searchStart->pos, startPos))
         {
@@ -83,7 +84,7 @@ void Wire::SearchConnectableTransistors(Vector2 startPos, Vector2 endPos, std::v
             break;
         }
     }
-    for (Transistor* searchEnd : *transistorArr)
+    for (Transistor* searchEnd : Transistor::allTransistors)
     {
         if (Vector2Equal(searchEnd->pos, endPos))
         {
@@ -115,26 +116,26 @@ bool Wire::IsPointOnLine(Vector2 point) const
     return (((pointDist[0] + pointDist[1]) <= segmentLen[0]) || ((pointDist[1] + pointDist[2]) <= segmentLen[1]));
 }
 
-Wire::Wire(Vector2 _startPos, Vector2 _endPos, WireDirection _direction, std::vector<Transistor*>* transistorArr)
+Wire::Wire(Vector2 _startPos, Vector2 _endPos, WireDirection _direction)
 {
     direction = _direction;
 
     inTransistor = nullptr;
     outTransistor = nullptr;
 
-    SearchConnectableTransistors(_startPos, _endPos, transistorArr);
+    SearchConnectableTransistors(_startPos, _endPos);
 
     if (!inTransistor)
     {
         inTransistor = new Transistor(_startPos);
         inTransistor->outputs.push_back(this);
-        transistorArr->push_back(inTransistor);
+        Transistor::allTransistors.push_back(inTransistor);
     }
     if (!outTransistor)
     {
         outTransistor = new Transistor(_endPos);
         outTransistor->inputs.push_back(this);
-        transistorArr->push_back(outTransistor);
+        Transistor::allTransistors.push_back(outTransistor);
     }
 
     active = false;
@@ -142,15 +143,9 @@ Wire::Wire(Vector2 _startPos, Vector2 _endPos, WireDirection _direction, std::ve
 
 Wire::~Wire()
 {
-    for (int i = 0; i < inTransistor->outputs.size(); ++i)
-    {
-        if (inTransistor->outputs[i] == this) inTransistor->outputs.erase(inTransistor->outputs.begin() + i);
-    }
-    
-    for (int i = 0; i < outTransistor->inputs.size(); ++i)
-    {
-        if (outTransistor->inputs[i] == this) outTransistor->inputs.erase(outTransistor->inputs.begin() + i);
-    }
+    if (inTransistor) Erase(inTransistor->outputs, this);
+    if (outTransistor) Erase(outTransistor->inputs, this);
+    Erase(Wire::allWires, this);
 }
 
 void Wire::Draw() const
@@ -175,3 +170,6 @@ void Wire::Highlight(Color color, int width) const
 {
     DrawSnappedLine(inTransistor->pos, outTransistor->pos, color, direction, width);
 }
+
+std::vector<Wire*> Wire::allWires;
+

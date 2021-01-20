@@ -1,6 +1,7 @@
 #include "Abstraction.h"
-#include "Wire.h"
 #include <fstream>
+#include "Globals.h"
+#include "Wire.h"
 
 AbstractComponent::AbstractComponent(std::vector<Transistor*> const* base)
 {
@@ -17,7 +18,7 @@ void AbstractComponent::Spawn(Vector2 position)
     newComponent.internalCount = this->internals.size();
 
     newComponent.internals = new ComponentTransistor[newComponent.internalCount];
-    for (int i = 0; i < newComponent.internalCount; ++i)
+    for (size_t i = 0; i < newComponent.internalCount; ++i)
     {
         newComponent.internals[i] = this->internals[i];
     }
@@ -38,14 +39,14 @@ void Component::Draw()
     DrawRectangleRec(casing, DARKGRAY);
 }
 
-void MakeAbstract(std::vector<Transistor*>& selection, Vector2 position, float gridSize)
+void MakeAbstract(std::vector<Transistor*>& selection, Vector2 position, float g_gridSize)
 {
     size_t input = 0;
     size_t output = 0;
     for (Transistor* elem : selection)
     {
-        if (elem->OutputOnly()) elem->pos = { position.x - gridSize, position.y + (gridSize * (float)(input++))};
-        else if (elem->InputOnly()) elem->pos = { position.x + gridSize, position.y + (gridSize * (float)(output++))};
+        if (elem->OutputOnly()) elem->pos = { position.x - g_gridSize, position.y + (g_gridSize * (float)(input++))};
+        else if (elem->InputOnly()) elem->pos = { position.x + g_gridSize, position.y + (g_gridSize * (float)(output++))};
         else elem->pos = position;
     }
 }

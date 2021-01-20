@@ -6,6 +6,7 @@
     <ClCompile Include="Transistor.cpp" />
     <ClCompile Include="Abstraction.cpp" />
     <ClCompile Include="Serialization.cpp" />
+    <ClCompile Include="Globals.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Wire.h" />
@@ -13,6 +14,7 @@
     <ClInclude Include="Abstraction.h" />
     <ClInclude Include="Serialization.h" />
     <ClInclude Include="Circuit.h" />
+    <ClInclude Include="Globals.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="pretty.frag" />

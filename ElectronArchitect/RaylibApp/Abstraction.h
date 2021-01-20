@@ -56,7 +56,7 @@ struct AbstractComponent // Blueprint for component
 	void Spawn(Vector2 position);
 };
 
-void MakeAbstract(std::vector<Transistor*>& selection, Vector2 position, float gridSize);
+void MakeAbstract(std::vector<Transistor*>& selection, Vector2 position, float g_gridSize);
 
 struct ComponentPort
 {
@@ -76,9 +76,9 @@ public:
 		delete[] outputs;
 	}
 
-	int inputCount;
-	int outputCount;
-	int internalCount;
+	size_t inputCount;
+	size_t outputCount;
+	size_t internalCount;
 	Vector2 pos;
 	Rectangle casing;
 	ComponentPort* inputs;

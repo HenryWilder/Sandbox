@@ -1,6 +1,7 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <vector>
+#include "Globals.h"
 #include "Transistor.h"
 #include "Wire.h"
 #include "Abstraction.h"
@@ -9,11 +10,11 @@
 struct Transistor;
 struct Wire;
 
-Vector2 Vector2Snap(const Vector2& vector, float gridSize)
+Vector2 Vector2Snap(const Vector2& vector, float g_gridSize)
 {
     return Vector2{
-        ((float)((int)((vector.x / gridSize) + 0.5f)) * gridSize),
-        ((float)((int)((vector.y / gridSize) + 0.5f)) * gridSize)
+        ((float)((int)((vector.x / g_gridSize) + 0.5f)) * g_gridSize),
+        ((float)((int)((vector.y / g_gridSize) + 0.5f)) * g_gridSize)
     };
 }
 
@@ -24,7 +25,6 @@ struct InputMode
         None = 0,
         Wire,
         Gate,
-        Move,
     };
     Mode mode;
 
@@ -35,15 +35,11 @@ struct InputMode
             WireDirection wireDirection;
         };
         WireData wire;
-        struct MoveData {
-            Transistor* dragingTransistor;
-        };
-        MoveData move;
     };
     Data data;
 };
 
-struct Undo
+struct Undo // TODO: Make more versatile
 {
     Undo() : start{ }, end{ }, direction{ }, valid{ false } { };
     Undo(Vector2 _start, Vector2 _end, WireDirection _direction) : start{ _start }, end{ _end }, direction{ _direction }, valid{ true } { };
@@ -109,71 +105,72 @@ Wire* FormTtTConnection(Transistor* a, Transistor* b, WireDirection shape = Wire
     return connector;
 }
 
-int main(void)
+void DeleteWire(Wire* wire)
 {
-    const int WindowWidth = 1280;
-    const int WindowHeight = 720;
-    const float gridSize = 8.0f;
-
-    std::vector<Wire*> wires;
-    std::vector<Transistor*> transistors;
-    std::vector<Transistor*> selection;
-
-    auto deleteWire = [&transistors, &wires](Wire* wire)
+    if (!wire->inTransistor->ConnectsExternally())
     {
-        if (!wire->inTransistor->ConnectsExternally())
+        for (size_t i = 0; i < Transistor::allTransistors.size(); ++i)
         {
-            for (size_t i = 0; i < transistors.size(); ++i)
+            if (Transistor::allTransistors[i] == wire->inTransistor)
             {
-                if (transistors[i] == wire->inTransistor)
-                {
-                    transistors.erase(transistors.begin() + i);
-                    break;
-                }
-            }
-            delete wire->inTransistor;
-        }
-        if (!wire->outTransistor->ConnectsExternally())
-        {
-            for (size_t i = 0; i < transistors.size(); ++i)
-            {
-                if (transistors[i] == wire->outTransistor)
-                {
-                    transistors.erase(transistors.begin() + i);
-                    break;
-                }
-            }
-            delete wire->outTransistor;
-        }
-        for (size_t i = 0; i < wires.size(); ++i)
-        {
-            if (wires[i] == wire)
-            {
-                wires.erase(wires.begin() + i);
+                Transistor::allTransistors.erase(Transistor::allTransistors.begin() + i);
                 break;
             }
         }
-        delete wire;
-    };
+        delete wire->inTransistor;
+    }
+    if (!wire->outTransistor->ConnectsExternally())
+    {
+        for (size_t i = 0; i < Transistor::allTransistors.size(); ++i)
+        {
+            if (Transistor::allTransistors[i] == wire->outTransistor)
+            {
+                Transistor::allTransistors.erase(Transistor::allTransistors.begin() + i);
+                break;
+            }
+        }
+        delete wire->outTransistor;
+    }
+    for (size_t i = 0; i < Wire::allWires.size(); ++i)
+    {
+        if (Wire::allWires[i] == wire)
+        {
+            Wire::allWires.erase(Wire::allWires.begin() + i);
+            break;
+        }
+    }
+    delete wire;
+}
 
+int main(void)
+{
     Undo undoneAction = Undo();
 
-    auto Vector2InvertY = [&WindowHeight](Vector2 vector) {
-        return Vector2{ vector.x, WindowHeight - vector.y };
+    auto Vector2InvertY = [](Vector2 vector) {
+        return Vector2{ vector.x, g_windowHeight - vector.y };
     };
 
-    InitWindow(WindowWidth, WindowHeight, "Electron Architect");
+    InitWindow(g_windowWidth, g_windowHeight, "Electron Architect");
 
-    Vector2 cursorPos = { -100.0f, -100.0f };
+    cursorPos = { -100.0f, -100.0f };
     Vector2 cursorPosDelta = { };
     Vector2 wireStart = { -100.0f, -100.0f };
     Vector2 selectionStart = {};
-    Vector2 selectionEnd = {};
-
     InputMode mode = {};
 
+    bool b_moveActive = false;
+    bool b_selectionIsExplicit = false; // Whether the current selection was created explicitly by the user (with a selection box) vs just an on-the-spot hover promotion to implied selection.
+    std::vector<Transistor*> selection;
+
+    auto ClearSelection = [&selection, &b_selectionIsExplicit]() {
+        selection.clear();
+        b_selectionIsExplicit = false;
+    };
+
     //Shader circuitPostProc = LoadShader(0, "pretty.frag");
-    //RenderTexture2D wireTexture = LoadRenderTexture(WindowWidth, WindowHeight);
+    //RenderTexture2D wireTexture = LoadRenderTexture(g_windowWidth, g_windowHeight);
+
+    // TODO: Set up camera
 
     SetTargetFPS(60);
 
@@ -184,19 +181,19 @@ int main(void)
         {
             Vector2 cursorPosLast = cursorPos;
             cursorPos = GetMousePosition();
-            cursorPos = Vector2Snap(cursorPos, gridSize);
+            cursorPos = Vector2Snap(cursorPos, g_gridSize);
             cursorPosDelta = cursorPos - cursorPosLast;
         }
 
         Transistor* transistorHovering = nullptr;
-        for (Transistor* transistor : transistors) {
+        for (Transistor* transistor : Transistor::allTransistors) {
             if (Vector2Equal(cursorPos, transistor->pos)) {
                 transistorHovering = transistor;
                 break;
             }
         }
         Wire* wireHovering = nullptr;
-        for (Wire* wire : wires) {
+        for (Wire* wire : Wire::allWires) {
             if (wire->IsPointOnLine(cursorPos)) {
                 wireHovering = wire;
                 break;
@@ -219,21 +216,15 @@ int main(void)
                     Transistor* splitTransistor = new Transistor();
                     splitTransistor->type = TransistorType::Simple;
                     splitTransistor->pos = cursorPos;
-                    transistors.push_back(splitTransistor);
+                    Transistor::allTransistors.push_back(splitTransistor);
                     SolderTransistorInput(splitTransistor, wireHovering);
-                    wires.push_back(FormTtTConnection(splitTransistor, endTransistor, wireHovering->direction));
+                    Wire::allWires.push_back(FormTtTConnection(splitTransistor, endTransistor, wireHovering->direction));
                 }
             }
             // M2
             if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) // Enter Gate mode
             {
                 mode.mode = InputMode::Mode::Gate;
-            }
-
-            if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON)) // Move transistor being hovered
-            {
-                mode.mode = InputMode::Mode::Move;
-                mode.data.move.dragingTransistor = transistorHovering;
             }
         break;
 
@@ -250,8 +241,8 @@ int main(void)
             // M1
             if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) // Finish drawing wire
             {
-                Wire* newWire = new Wire(wireStart, cursorPos, mode.data.wire.wireDirection, &transistors);
-                wires.push_back(newWire);
+                Wire* newWire = new Wire(wireStart, cursorPos, mode.data.wire.wireDirection);
+                Wire::allWires.push_back(newWire);
 
                 mode.mode = InputMode::Mode::None;
             }
@@ -260,10 +251,52 @@ int main(void)
 
         case InputMode::Mode::Gate:
         {
+            if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON) && selection.empty() && transistorHovering)
+            {
+                selection.push_back(transistorHovering);
+                b_moveActive = true;
+            }
+            if ((IsKeyPressed(KEY_DELETE) || IsKeyPressed(KEY_BACKSPACE)) && !selection.empty()) // Delete selection
+            {
+                for (Transistor* item : selection) // For each transistor in the selection
+                {
+                    // Clean up extra-selectional transistors
+                    for (Wire* wire : item->inputs) // For every wire on the input side of the transistor
+                    {
+                        if (wire->inTransistor->OutputOnly() && wire->inTransistor->outputs.size() == 1) // If this wire were deleted, the transistor on the input side of the wire would have no connections.
+                        {
+                            Erase(Transistor::allTransistors, wire->inTransistor); // Remove the transistor from the vector of all transistors
+                            delete wire->inTransistor; // Free the memory
+                            wire->inTransistor = nullptr; // Prevent the destructor in Wire from trying to access the freed memory while removing all references to itself
+                        }
+                        delete wire; // Free the memory
+                    }
+                    item->inputs.clear();
+
+                    for (Wire* wire : item->outputs)
+                    {
+                        if (wire->outTransistor->InputOnly() && wire->outTransistor->inputs.size() == 1)
+                        {
+                            Erase(Transistor::allTransistors, wire->outTransistor);
+                            delete wire->outTransistor;
+                            wire->outTransistor = nullptr;
+                        }
+                        delete wire;
+                    }
+                    item->outputs.clear();
+
+                    // Delete selected transistor
+                    Erase(Transistor::allTransistors, item);
+                    delete item;
+                }
+                ClearSelection();
+            }
+
             // Pressed
             // M1
             if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
             {
+                ClearSelection();
                 if (transistorHovering)
                 {
                     DrawCircleV(cursorPos, 8.0f, YELLOW);
@@ -272,7 +305,7 @@ int main(void)
                 }
                 else if (wireHovering)
                 {
-                    deleteWire(wireHovering);
+                    DeleteWire(wireHovering);
                     wireHovering = nullptr;
                 }
                 selectionStart = cursorPos;
@@ -280,9 +313,9 @@ int main(void)
             // TODO: component Abstraction
             else if (IsMouseButtonDown(MOUSE_LEFT_BUTTON))
             {
-                selectionEnd = cursorPos;
+                Vector2 selectionEnd = cursorPos;
                 Rectangle selectionSpace = RecVec2(selectionStart, selectionEnd);
-                for (Transistor* check : transistors)
+                for (Transistor* check : Transistor::allTransistors)
                 {
                     if (CheckCollisionPointRec(check->pos, selectionSpace))
                     {
@@ -297,59 +330,22 @@ int main(void)
             }
             else if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
             {
-                Rectangle selectionSpace = RecVec2(selectionStart, selectionEnd);
-                selection.clear();
-                if (!Vector2Equal(selectionStart, selectionEnd))
+                Rectangle selectionSpace = RecVec2(selectionStart, cursorPos);
+                ClearSelection();
+                if (!Vector2Equal(selectionStart, cursorPos)) // The selection is a box and not a point
                 {
-                    for (Transistor* check : transistors)
+                    for (Transistor* check : Transistor::allTransistors)
                     {
-                        if (CheckCollisionPointRec(check->pos, selectionSpace)) selection.push_back(check);
+                        if (CheckCollisionPointRec(check->pos, selectionSpace)) selection.push_back(check); // Add all transistors whose positions are within the collision
                     }
                 }
+                b_selectionIsExplicit = true;
             }
             // M2
             if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
             {
-                MakeAbstract(selection, cursorPos, gridSize);
-                selection.clear();
+                ClearSelection();
                 mode.mode = InputMode::Mode::None;
-            }
-
-            if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON))
-            {
-                mode.data.move.dragingTransistor = nullptr;
-                if (IsKeyDown(KEY_LEFT_ALT))
-                {
-                    std::vector<Transistor*> selectionCopy;
-                    for (size_t i = 0; i < selection.size(); ++i)
-                    {
-                        Transistor* copy = new Transistor();
-                        copy->pos = selection[i]->pos;
-                        copy->type = selection[i]->type;
-                        selectionCopy.push_back(copy);
-                        transistors.push_back(copy);
-                    }
-                    for (size_t i = 0; i < selection.size(); ++i)
-                    {
-                        // Make inputs relative
-                        for (Wire* inputWire : selection[i]->inputs)
-                        {
-                            for (size_t index = 0; index < selection.size(); ++index)
-                            {
-                                if (selection[index] == inputWire->inTransistor)
-                                {
-                                    wires.push_back(FormTtTConnection(selectionCopy[index], selectionCopy[i], inputWire->direction));
-                                    break;
-                                }
-                            }
-                        }
-                    }
-                    for (size_t i = 0; i < selection.size(); ++i)
-                    {
-                        selection[i] = selectionCopy[i];
-                    }
-                }
-                mode.mode = InputMode::Mode::Move;
             }
 
             for (Transistor* select : selection)
@@ -370,49 +366,80 @@ int main(void)
             else if (wireHovering) wireHovering->Highlight(YELLOW, 4);
         }
         break;
+        }
 
-        case InputMode::Mode::Move:
-            if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON))
-            {
-                if (mode.data.move.dragingTransistor) mode.data.move.dragingTransistor->pos = cursorPos;
-                else for (Transistor* select : selection) { select->pos = select->pos + cursorPosDelta; }
-            }
-
+        if (b_moveActive) // Dragging
+        {
             if (IsMouseButtonReleased(MOUSE_MIDDLE_BUTTON))
             {
-                if (mode.data.move.dragingTransistor)
+                if (!b_selectionIsExplicit) ClearSelection();
+                b_moveActive = false;
+            }
+            else if (((abs(cursorPosDelta.x) >= g_gridSize)  || (abs(cursorPosDelta.y) >= g_gridSize)) && IsMouseButtonDown(MOUSE_MIDDLE_BUTTON))
+            {
+                for (Transistor* item : selection)
                 {
-                    size_t index = 0;
-                    for (Transistor* transistor : transistors)
+                    item->pos = item->pos + cursorPosDelta;
+                }
+            }
+        }
+        else // Not dragging
+        {
+            if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON))
+            {
+                if (IsKeyDown(KEY_LEFT_ALT))
+                {
+                    std::vector<Transistor*> selectionCopy;
+                    for (size_t i = 0; i < selection.size(); ++i)
                     {
-                        if (Vector2Equal(transistor->pos, mode.data.move.dragingTransistor->pos))
+                        Transistor* copy = new Transistor();
+                        copy->pos = selection[i]->pos;
+                        copy->type = selection[i]->type;
+                        selectionCopy.push_back(copy);
+                        Transistor::allTransistors.push_back(copy);
+                    }
+                    for (size_t i = 0; i < selection.size(); ++i)
+                    {
+                        // Make inputs relative
+                        for (Wire* inputWire : selection[i]->inputs)
                         {
-                            if (transistor != mode.data.move.dragingTransistor)
+                            for (size_t index = 0; index < selection.size(); ++index)
                             {
-                                // TODO: What happens when a transistor is dropped onto the same position as another?
-                                break;
+                                if (selection[index] == inputWire->inTransistor)
+                                {
+                                    Wire::allWires.push_back(FormTtTConnection(selectionCopy[index], selectionCopy[i], inputWire->direction));
+                                    break;
+                                }
                             }
                         }
                     }
+                    for (size_t i = 0; i < selection.size(); ++i)
+                    {
+                        selection[i] = selectionCopy[i];
+                    }
                 }
-                mode.mode = InputMode::Mode::None;
-                mode.data.move.dragingTransistor = nullptr;
+                b_moveActive = true;
             }
-            break;
+        }
+
+        if (IsKeyPressed(KEY_SPACE) && selection.size())
+        {
+            MakeAbstract(selection, cursorPos, g_gridSize);
+            selection.clear();
         }
 
         // Key comboes
-        if (wires.size() && IsKeyDown(KEY_LEFT_CONTROL))
+        if (Wire::allWires.size() && IsKeyDown(KEY_LEFT_CONTROL))
         {
             // Save
             if (IsKeyPressed(KEY_S))
             {
-                Save(&transistors);
+                Save(&Transistor::allTransistors);
             }
             // Load
             if (IsKeyPressed(KEY_L))
             {
-                Load(&transistors, &wires);
+                Load(&Transistor::allTransistors, &Wire::allWires);
             }
 
             // Undo/redo
@@ -422,41 +449,27 @@ int main(void)
                 {
                     if (undoneAction.valid)
                     {
-                        Wire* newWire = new Wire(undoneAction.start, undoneAction.end, undoneAction.direction, &transistors);
-                        wires.push_back(newWire);
+                        Wire* newWire = new Wire(undoneAction.start, undoneAction.end, undoneAction.direction);
+                        Wire::allWires.push_back(newWire);
                         undoneAction = Undo();
                     }
                 }
                 else if (!IsKeyDown(KEY_LEFT_SHIFT)) // Undo
                 {
-                    Wire* wireToUndo = wires[wires.size() - 1];
+                    Wire* wireToUndo = Wire::allWires[Wire::allWires.size() - 1];
                     undoneAction = Undo(wireToUndo);
                     if (!wireToUndo->inTransistor->ConnectsExternally())
                     {
-                        for (int i = 0; i < transistors.size(); ++i)
-                        {
-                            if (transistors[i] == wireToUndo->inTransistor)
-                            {
-                                transistors.erase(transistors.begin() + i);
-                                break;
-                            }
-                        }
+                        Erase(Transistor::allTransistors, wireToUndo->inTransistor);
                         delete wireToUndo->inTransistor;
                     }
                     if (!wireToUndo->outTransistor->ConnectsExternally())
                     {
-                        for (int i = 0; i < transistors.size(); ++i)
-                        {
-                            if (transistors[i] == wireToUndo->outTransistor)
-                            {
-                                transistors.erase(transistors.begin() + i);
-                                break;
-                            }
-                        }
+                        Erase(Transistor::allTransistors, wireToUndo->outTransistor);
                         delete wireToUndo->outTransistor;
                     }
                     delete wireToUndo;
-                    wires.pop_back();
+                    Wire::allWires.pop_back();
                 }
             }
         }
@@ -464,7 +477,7 @@ int main(void)
         // Evaluation
         {
             std::vector<Transistor*> evaluationList;
-            for (Transistor* transistor : transistors)
+            for (Transistor* transistor : Transistor::allTransistors)
             {
                 if (transistor->OutputOnly()) evaluationList.push_back(transistor); // Start of a branch
             }
@@ -482,30 +495,30 @@ int main(void)
         ClearBackground(BLACK);
 
         // Columns
-        for(float x = 0.0f; x < WindowWidth; x += gridSize)
+        for(float x = 0.0f; x < g_windowWidth; x += g_gridSize)
         {
             if (x == cursorPos.x)
             {
                 unsigned char alpha = 32;
                 if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) alpha = 64;
-                DrawLine((int)(x - 1.0f), 0, (int)(x - 1.0f), WindowHeight, { 255,255,255, (alpha / (unsigned)'\2') });
-                DrawLine((int)x, 0, (int)x, WindowHeight, { 255,255,255, alpha });
-                DrawLine((int)(x + 1.0f), 0, (int)(x + 1.0f), WindowHeight, { 255,255,255, (alpha / (unsigned)'\2') });
+                DrawLine((int)(x - 1.0f), 0, (int)(x - 1.0f), g_windowHeight, { 255,255,255, (alpha / (unsigned)'\2') });
+                DrawLine((int)x, 0, (int)x, g_windowHeight, { 255,255,255, alpha });
+                DrawLine((int)(x + 1.0f), 0, (int)(x + 1.0f), g_windowHeight, { 255,255,255, (alpha / (unsigned)'\2') });
             }
-            else DrawLine((int)x, 0, (int)x, WindowHeight, { 255,255,255,16 });
+            else DrawLine((int)x, 0, (int)x, g_windowHeight, { 255,255,255,16 });
         }
         // Rows
-        for (float y = 0.0f; y < WindowHeight; y += gridSize)
+        for (float y = 0.0f; y < g_windowHeight; y += g_gridSize)
         {
             if (y == cursorPos.y)
             {
                 unsigned char alpha = 32;
                 if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) alpha = 64;
-                DrawLine(0, (int)(y - 1.0f), WindowWidth, (int)(y - 1.0f), { 255,255,255, (alpha / (unsigned)'\2') });
-                DrawLine(0, (int)y, WindowWidth, (int)y, { 255,255,255, alpha });
-                DrawLine(0, (int)(y + 1.0f), WindowWidth, (int)(y + 1.0f), { 255,255,255, (alpha / (unsigned)'\2') });
+                DrawLine(0, (int)(y - 1.0f), g_windowWidth, (int)(y - 1.0f), { 255,255,255, (alpha / (unsigned)'\2') });
+                DrawLine(0, (int)y, g_windowWidth, (int)y, { 255,255,255, alpha });
+                DrawLine(0, (int)(y + 1.0f), g_windowWidth, (int)(y + 1.0f), { 255,255,255, (alpha / (unsigned)'\2') });
             }
-            else DrawLine(0, (int)y, WindowWidth, (int)y, { 255,255,255,16 });
+            else DrawLine(0, (int)y, g_windowWidth, (int)y, { 255,255,255,16 });
         }
 
         // Draw cursor
@@ -533,7 +546,7 @@ int main(void)
 
         { // We want to draw the active wires on top of the inactive ones
             std::vector<Wire*> activeWires;
-            for (Wire* wire : wires)
+            for (Wire* wire : Wire::allWires)
             {
                 if (wire->active) activeWires.push_back(wire);
                 else wire->Draw();
@@ -551,13 +564,13 @@ int main(void)
         //EndShaderMode();
 
         // Transistors
-        for (Transistor* transistor : transistors) { transistor->Draw(); }
+        for (Transistor* transistor : Transistor::allTransistors) { transistor->Draw(); }
 
         DrawText("Apple", 0, 0, 8, WHITE);
 
         EndDrawing();
 
-        for (Transistor* transistor : transistors) { transistor->FrameReset(); }
+        for (Transistor* transistor : Transistor::allTransistors) { transistor->FrameReset(); }
     }
 
     // Return memory to heap
@@ -565,17 +578,13 @@ int main(void)
     //UnloadShader(circuitPostProc);
     //UnloadRenderTexture(wireTexture);
 
-    for (Transistor* transistor : transistors)
-    {
-        delete transistor;
-    }
-    transistors.clear();
+    selection.clear();
 
-    for (Wire* wire : wires)
-    {
-        delete wire;
-    }
-    wires.clear();
+    for (Transistor* transistor : Transistor::allTransistors) { delete transistor; }
+    Transistor::allTransistors.clear();
+
+    for (Wire* wire : Wire::allWires) { delete wire; }
+    Wire::allWires.clear();
 
     return 0;
 }

@@ -1,4 +1,5 @@
 #include "Transistor.h"
+#include "Globals.h"
 #include "Wire.h"
 
 Vector2 operator*(Vector2 a, Vector2 b) { return { a.x * b.x, a.y * b.y }; }
@@ -32,9 +33,10 @@ TransistorType SymbolToGate(char symbol)
     {
         if (gateSymbol[i] == symbol) return TransistorType(i);
     }
+    return TransistorType::Simple;
 }
 
-void DrawTransistorIcon(TransistorType type, Vector2 pos, Color color, int size)
+void DrawTransistorIcon(TransistorType type, Vector2 pos, Color color, float size)
 {
     switch (type)
     {
@@ -43,27 +45,27 @@ void DrawTransistorIcon(TransistorType type, Vector2 pos, Color color, int size)
         break;
 
     case TransistorType::Invert:
-        DrawCircleV(pos, ((float)size / 2.0f), color);
+        DrawCircleV(pos, (size / 2.0f), color);
         break;
 
     case TransistorType::Combine:
-        DrawRectangleV({ pos.x - ((float)size / 2.0f), pos.y - ((float)size / 2.0f) }, { ((float)size / 2.0f), (float)size }, color);
-        DrawCircleV(pos, ((float)size / 2.0f), color);
+        DrawRectangleV({ pos.x - (size / 2.0f), pos.y - (size / 2.0f) }, { (size / 2.0f), size }, color);
+        DrawCircleV(pos, (size / 2.0f), color);
         break;
 
     case TransistorType::Choose:
         DrawDirectionTriangle({ 0,0 }, { 1,0 }, pos, color, size);
-        DrawLine(pos.x - size, pos.y + size, pos.x - size, pos.y - size, color);
+        DrawLineV({ pos.x - size, pos.y + size }, { pos.x - size, pos.y - size }, color);
         break;
 
     case TransistorType::Diode:
         DrawDirectionTriangle({ 0,0 }, { 1,0 }, pos, color, size);
-        DrawLine(pos.x + size, pos.y + size, pos.x + size, pos.y - size, color);
+        DrawLineV({ pos.x + size, pos.y + size }, { pos.x + size, pos.y - size }, color);
         break;
     }
 }
 
-void Transistor::Icon(Color color, int size) const
+void Transistor::Icon(Color color, float size) const
 {
     DrawTransistorIcon(type, pos, color, size);
 }
@@ -86,13 +88,13 @@ void Transistor::Draw()
         // Diode glow
         if (type == TransistorType::Diode && evaluation) DrawCircleV(pos, 8.0f, ColorAlpha(WHITE, 0.5));
         
-        Icon(color, 4);
+        Icon(color, ((pos.x == cursorPos.x || pos.y == cursorPos.y) ? g_gridSize * 0.75f : g_gridSize * 0.5f));
         
         b_drawnThisFrame = true;
     }
 }
 
-void Transistor::Highlight(Color color, int size) const
+void Transistor::Highlight(Color color, float size) const
 {
     Icon(BLACK, size + 2);
     Icon(color, size);
@@ -194,3 +196,5 @@ void Transistor::FrameReset()
     b_drawnThisFrame = false;
     b_evaluatedThisFrame = false;
 }
+
+std::vector<Transistor*> Transistor::allTransistors;

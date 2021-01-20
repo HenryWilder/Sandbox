@@ -35,6 +35,7 @@ struct Transistor
     Transistor(Vector2 _pos) : type{ TransistorType::Simple }, pos{ _pos }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }{ };
     Transistor(TransistorType _type, Vector2 _pos) : type{ _type }, pos{ _pos }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }{ };
 
+    static std::vector<Transistor*> allTransistors;
     std::vector<Wire*> inputs;
     std::vector<Wire*> outputs;
     Vector2 pos;
@@ -47,9 +48,11 @@ struct Transistor
 
     void Evaluate();
 
-    void Icon(Color color, int size) const;
+    void Icon(Color color, float size) const;
     void Draw();
-    void Highlight(Color color, int size) const;
+    void Highlight(Color color, float size) const;
 
     void FrameReset();
 };
+
+extern std::vector<Transistor*> allTransistors;

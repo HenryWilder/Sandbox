@@ -1,7 +1,8 @@
+#include <fstream>
 #include "Serialization.h"
+#include "Globals.h"
 #include "Transistor.h"
 #include "Wire.h"
-#include <fstream>
 
 std::ostream& operator<<(std::ostream& file, const Vector2& vector)
 {
@@ -113,9 +114,7 @@ void Save(const std::vector<Transistor*>* fromArr)
 		saveFile << transistor->outputs.size() << " ";
 		for (Wire* const& outputWire : transistor->outputs)
 		{
-			auto found = std::find(fromArr->begin(), fromArr->end(), outputWire->outTransistor); // Find the input's relative position in the list
-			size_t foundIndex = std::distance(fromArr->begin(), found); // Get the index from the pointer
-
+			size_t foundIndex = FindIndex(*fromArr, (outputWire->outTransistor));
 			saveFile << "[ " << foundIndex << " "  << outputWire->direction << " ] "; // The wire direction will only be on the output side of the line.
 		}
 
