@@ -29,8 +29,6 @@ struct Wire
     Wire(Transistor* _inTransistor, Transistor* _outTransistor, WireDirection _direction) : inTransistor{ _inTransistor }, outTransistor{ _outTransistor }, direction{ _direction }, active{ false } {};
     Wire(Vector2 _startPos, Vector2 _endPos, WireDirection _direction);
 
-    ~Wire();
-
     static std::vector<Wire*> allWires;
     Transistor* inTransistor;
     Transistor* outTransistor;
@@ -45,9 +43,10 @@ struct Wire
     bool IsPointOnLine(Vector2 point) const;
 
     void Draw() const;
-    void Highlight(Color color, int width) const;
+    void Highlight(Color color, float width) const;
 
     void SearchConnectableTransistors(Vector2 startPos, Vector2 endPos);
+    void ClearReferences();
 };
 
 extern std::vector<Wire*> allWires;

@@ -12,9 +12,12 @@ struct Wire;
 
 Vector2 Vector2Snap(const Vector2& vector, float g_gridSize)
 {
+    Vector2 roundOffs = { 0.5f, 0.5f };
+    if (vector.x < 0.0f) roundOffs.x *= -1.0f;
+    if (vector.y < 0.0f) roundOffs.y *= -1.0f;
     return Vector2{
-        ((float)((int)((vector.x / g_gridSize) + 0.5f)) * g_gridSize),
-        ((float)((int)((vector.y / g_gridSize) + 0.5f)) * g_gridSize)
+        ((float)((int)((vector.x / g_gridSize) + roundOffs.x)) * g_gridSize),
+        ((float)((int)((vector.y / g_gridSize) + roundOffs.y)) * g_gridSize)
     };
 }
 
@@ -139,6 +142,7 @@ void DeleteWire(Wire* wire)
             break;
         }
     }
+    wire->ClearReferences();
     delete wire;
 }
 
@@ -161,6 +165,7 @@ int main(void)
     bool b_moveActive = false;
     bool b_selectionIsExplicit = false; // Whether the current selection was created explicitly by the user (with a selection box) vs just an on-the-spot hover promotion to implied selection.
     std::vector<Transistor*> selection;
+    Rectangle selectionSpace = {};
 
     auto ClearSelection = [&selection, &b_selectionIsExplicit]() {
         selection.clear();
@@ -171,6 +176,12 @@ int main(void)
     //RenderTexture2D wireTexture = LoadRenderTexture(g_windowWidth, g_windowHeight);
 
     // TODO: Set up camera
+    Camera2D camera;
+    camera.offset = { (float)g_windowWidth / 2.0f, (float)g_windowHeight / 2.0f };
+    camera.rotation = 0.0f;
+    camera.target = { 0,0 };
+    camera.zoom = 1.0f;
+    Vector2 tweenCamOffset = {0,0}; // This will store the decimal camera offset, while the true camera offset will be this but snapped to the grid.
 
     SetTargetFPS(60);
 
@@ -178,9 +189,39 @@ int main(void)
     {
         // Update vars
         //---------------------------------------------
+       
+        // Zoom
+        if (GetMouseWheelMove())
+        {
+            float delta = 0.0f;
+            if (camera.zoom <= 1.0f)
+            {
+                if (GetMouseWheelMove() < 0.0f)
+                {
+                    delta = -1.0f * (camera.zoom / 2);
+                }
+                else if (camera.zoom < 1.0f)
+                {
+                    delta = camera.zoom;
+                }
+                else delta = GetMouseWheelMove();
+            }
+            else
+            {
+                delta = GetMouseWheelMove();
+            }
+            camera.zoom = camera.zoom + delta;
+            camera.offset = camera.offset + (cursorPos * (delta * -1.0f));
+        }
+
+        // Pan
+        camera.offset.x += ((float)((int)(IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) - (int)(IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D))) * (g_gridSize * camera.zoom));
+        camera.offset.y += ((float)((int)(IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) - (int)(IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S))) * (g_gridSize * camera.zoom));
+        //camera.offset = Vector2Snap(tweenCamOffset, g_gridSize);
+
         {
             Vector2 cursorPosLast = cursorPos;
-            cursorPos = GetMousePosition();
+            cursorPos = (GetMousePosition() - camera.offset) * (1.0f / camera.zoom);
             cursorPos = Vector2Snap(cursorPos, g_gridSize);
             cursorPosDelta = cursorPos - cursorPosLast;
         }
@@ -199,6 +240,7 @@ int main(void)
                 break;
             }
         }
+
 
         switch (mode.mode)
         {
@@ -269,6 +311,7 @@ int main(void)
                             delete wire->inTransistor; // Free the memory
                             wire->inTransistor = nullptr; // Prevent the destructor in Wire from trying to access the freed memory while removing all references to itself
                         }
+                        wire->ClearReferences();
                         delete wire; // Free the memory
                     }
                     item->inputs.clear();
@@ -281,6 +324,7 @@ int main(void)
                             delete wire->outTransistor;
                             wire->outTransistor = nullptr;
                         }
+                        wire->ClearReferences();;
                         delete wire;
                     }
                     item->outputs.clear();
@@ -314,23 +358,11 @@ int main(void)
             else if (IsMouseButtonDown(MOUSE_LEFT_BUTTON))
             {
                 Vector2 selectionEnd = cursorPos;
-                Rectangle selectionSpace = RecVec2(selectionStart, selectionEnd);
-                for (Transistor* check : Transistor::allTransistors)
-                {
-                    if (CheckCollisionPointRec(check->pos, selectionSpace))
-                    {
-                        check->Highlight(YELLOW, 8);
-                    }
-                }
-
-                DrawRectangleRec(selectionSpace, ColorAlpha(YELLOW, 0.2f));
-                DrawRectangleLinesEx(selectionSpace, 2, YELLOW);
-
-                // TODO
+                selectionSpace = RecVec2(selectionStart, selectionEnd);
             }
             else if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
             {
-                Rectangle selectionSpace = RecVec2(selectionStart, cursorPos);
+                selectionSpace = RecVec2(selectionStart, cursorPos);
                 ClearSelection();
                 if (!Vector2Equal(selectionStart, cursorPos)) // The selection is a box and not a point
                 {
@@ -340,6 +372,7 @@ int main(void)
                     }
                 }
                 b_selectionIsExplicit = true;
+                selectionSpace = {};
             }
             // M2
             if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
@@ -347,23 +380,6 @@ int main(void)
                 ClearSelection();
                 mode.mode = InputMode::Mode::None;
             }
-
-            for (Transistor* select : selection)
-            {
-                select->Highlight(BLACK, 12);
-                select->Highlight(YELLOW, 8);
-            }
-            // Show branches
-            if (transistorHovering)
-            {
-                transistorHovering->Highlight(BLACK, 12);
-                transistorHovering->Highlight(YELLOW, 8);
-
-                for (Wire* wire : transistorHovering->inputs) { wire->Highlight(BLUE, 4); }
-                for (Wire* wire : transistorHovering->outputs) { wire->Highlight(GREEN, 4); }
-            }
-            // Show selectable wire
-            else if (wireHovering) wireHovering->Highlight(YELLOW, 4);
         }
         break;
         }
@@ -468,6 +484,7 @@ int main(void)
                         Erase(Transistor::allTransistors, wireToUndo->outTransistor);
                         delete wireToUndo->outTransistor;
                     }
+                    wireToUndo->ClearReferences();
                     delete wireToUndo;
                     Wire::allWires.pop_back();
                 }
@@ -491,34 +508,67 @@ int main(void)
         // Draw
         //---------------------------------------------
         BeginDrawing();
+        BeginMode2D(camera);
 
         ClearBackground(BLACK);
 
-        // Columns
-        for(float x = 0.0f; x < g_windowWidth; x += g_gridSize)
+        DrawRectangleRec(selectionSpace, ColorAlpha(YELLOW, 0.2f));
         {
-            if (x == cursorPos.x)
+            const float gridSize = 50.0f;
+            const float gridEnd = (gridSize * g_gridSize);
+            const float gridStart = (gridEnd * -1.0f);
+            // Columns
+            for (float x = gridStart; x < gridEnd; x += g_gridSize)
             {
-                unsigned char alpha = 32;
-                if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) alpha = 64;
-                DrawLine((int)(x - 1.0f), 0, (int)(x - 1.0f), g_windowHeight, { 255,255,255, (alpha / (unsigned)'\2') });
-                DrawLine((int)x, 0, (int)x, g_windowHeight, { 255,255,255, alpha });
-                DrawLine((int)(x + 1.0f), 0, (int)(x + 1.0f), g_windowHeight, { 255,255,255, (alpha / (unsigned)'\2') });
+                if (x == cursorPos.x)
+                {
+                    unsigned char alpha = 32;
+                    if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON) || IsMouseButtonDown(MOUSE_LEFT_BUTTON)) alpha = 48;
+                    DrawLineEx({ x, gridStart }, { x, gridEnd }, 2, { 255,255,255, alpha });
+                }
+                else DrawLine(x, gridStart, x, gridEnd, { 255,255,255,16 });
             }
-            else DrawLine((int)x, 0, (int)x, g_windowHeight, { 255,255,255,16 });
+            // Rows
+            for (float y = gridStart; y < gridEnd; y += g_gridSize)
+            {
+                if (y == cursorPos.y)
+                {
+                    unsigned char alpha = 32;
+                    if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON) || IsMouseButtonDown(MOUSE_LEFT_BUTTON)) alpha = 48;
+                    DrawLineEx({ gridStart, y }, { gridEnd, y }, 2, { 255,255,255, alpha });
+                }
+                else DrawLine(gridStart, y, gridEnd, y, { 255,255,255,16 });
+            }
         }
-        // Rows
-        for (float y = 0.0f; y < g_windowHeight; y += g_gridSize)
+        for (Transistor* check : Transistor::allTransistors)
         {
-            if (y == cursorPos.y)
+            if (CheckCollisionPointRec(check->pos, selectionSpace))
             {
-                unsigned char alpha = 32;
-                if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) alpha = 64;
-                DrawLine(0, (int)(y - 1.0f), g_windowWidth, (int)(y - 1.0f), { 255,255,255, (alpha / (unsigned)'\2') });
-                DrawLine(0, (int)y, g_windowWidth, (int)y, { 255,255,255, alpha });
-                DrawLine(0, (int)(y + 1.0f), g_windowWidth, (int)(y + 1.0f), { 255,255,255, (alpha / (unsigned)'\2') });
+                check->Highlight(YELLOW, 8);
             }
-            else DrawLine(0, (int)y, g_windowWidth, (int)y, { 255,255,255,16 });
+        }
+        DrawRectangleLinesEx(selectionSpace, 2, YELLOW);
+
+        if (!selection.empty())
+        {
+            for (Transistor* select : selection)
+            {
+                select->Highlight(YELLOW, 8);
+                for (Wire* wire : select->inputs) { wire->Highlight(BLUE, 4); }
+                for (Wire* wire : select->outputs) { wire->Highlight(GREEN, 4); }
+            }
+        }
+        else if (mode.mode == InputMode::Mode::Gate)
+        {
+            // Show branches
+            if (transistorHovering)
+            {
+                transistorHovering->Highlight(YELLOW, 8);
+
+                for (Wire* wire : transistorHovering->inputs) { wire->Highlight(BLUE, 4); }
+                for (Wire* wire : transistorHovering->outputs) { wire->Highlight(GREEN, 4); }
+            }
+            else if (wireHovering) wireHovering->Highlight(YELLOW, 4); // Show selectable wire
         }
 
         // Draw cursor
@@ -566,7 +616,9 @@ int main(void)
         // Transistors
         for (Transistor* transistor : Transistor::allTransistors) { transistor->Draw(); }
 
-        DrawText("Apple", 0, 0, 8, WHITE);
+        EndMode2D();
+
+        DrawText(TextFormat("Transistors: %i\nWires: %i\n\nZoom: %f", Transistor::allTransistors.size(), Wire::allWires.size(), camera.zoom), 0, 0, 8, WHITE);
 
         EndDrawing();
 

@@ -55,12 +55,12 @@ void DrawTransistorIcon(TransistorType type, Vector2 pos, Color color, float siz
 
     case TransistorType::Choose:
         DrawDirectionTriangle({ 0,0 }, { 1,0 }, pos, color, size);
-        DrawLineV({ pos.x - size, pos.y + size }, { pos.x - size, pos.y - size }, color);
+        DrawLineEx({ pos.x - size, pos.y + size }, { pos.x - size, pos.y - size }, 2, color);
         break;
 
     case TransistorType::Diode:
         DrawDirectionTriangle({ 0,0 }, { 1,0 }, pos, color, size);
-        DrawLineV({ pos.x + size, pos.y + size }, { pos.x + size, pos.y - size }, color);
+        DrawLineEx({ pos.x + size, pos.y + size }, { pos.x + size, pos.y - size }, 2, color);
         break;
     }
 }
@@ -77,8 +77,8 @@ void Transistor::Draw()
         bool b_startNode = (inputs.size() == 0);
         bool b_endNode = (outputs.size() == 0);
 
-        Color color = GREEN;
-        if (b_startNode) color = YELLOW;
+        Color color = BLUE;
+        if (b_startNode) color = GREEN;
         if (b_endNode) color = RED;
 
         //color = ColorAlpha(color, 0.5);
@@ -88,7 +88,7 @@ void Transistor::Draw()
         // Diode glow
         if (type == TransistorType::Diode && evaluation) DrawCircleV(pos, 8.0f, ColorAlpha(WHITE, 0.5));
         
-        Icon(color, ((pos.x == cursorPos.x || pos.y == cursorPos.y) ? g_gridSize * 0.75f : g_gridSize * 0.5f));
+        Icon(color, (((pos.x == cursorPos.x || pos.y == cursorPos.y) && (IsMouseButtonDown(MOUSE_LEFT_BUTTON) || IsMouseButtonDown(MOUSE_MIDDLE_BUTTON))) ? (g_gridSize * 0.6f) : (g_gridSize * 0.5f)));
         
         b_drawnThisFrame = true;
     }
@@ -96,18 +96,17 @@ void Transistor::Draw()
 
 void Transistor::Highlight(Color color, float size) const
 {
-    Icon(BLACK, size + 2);
     Icon(color, size);
 }
 
 bool Transistor::OutputOnly() const
 {
-    return (inputs.size() == 0);
+    return (inputs.empty());
 }
 
 bool Transistor::InputOnly() const
 {
-    return (outputs.size() == 0);
+    return (outputs.empty());
 }
 
 bool Transistor::ConnectsExternally() const

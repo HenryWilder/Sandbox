@@ -44,16 +44,14 @@ void DrawSnappedLine(Vector2 start, Vector2 end, Color color, WireDirection dire
     DrawLineV(start, jointPos, color);
     DrawLineV(jointPos, end, color);
 }
-
-void DrawSnappedLine(Vector2 start, Vector2 end, Color color, WireDirection direction, int width)
+void DrawSnappedLineEx(Vector2 start, Vector2 end, float thickness, Color color, WireDirection direction)
 {
-    for (int x = ((-1 * width) / 2); x < (width / 2); ++x)
-    {
-        for (int y = ((-1 * width) / 2); y < (width / 2); ++y)
-        {
-            DrawSnappedLine({ start.x + (float)x, start.y + (float)y }, { end.x + (float)x, end.y + (float)y }, color, direction);
-        }
-    }
+    Vector2 jointPos;
+
+    jointPos = JointPos(start, end, direction);
+
+    DrawLineEx(start, jointPos, thickness, color);
+    DrawLineEx(jointPos, end, thickness, color);
 }
 
 bool Vector2Equal(const Vector2& a, const Vector2& b)
@@ -100,6 +98,13 @@ float Wire::GetLength() const
     return abs(Vector2Length(GetJointPos() - GetStartPos())) + abs(Vector2Length(GetEndPos() + GetJointPos()));
 }
 
+void Wire::ClearReferences()
+{
+    if (inTransistor) Erase(inTransistor->outputs, this);
+    if (outTransistor) Erase(outTransistor->inputs, this);
+    Erase(Wire::allWires, this);
+}
+
 bool Wire::IsPointOnLine(Vector2 point) const
 {
     Vector2 joint = GetJointPos();
@@ -141,13 +146,6 @@ Wire::Wire(Vector2 _startPos, Vector2 _endPos, WireDirection _direction)
     active = false;
 }
 
-Wire::~Wire()
-{
-    if (inTransistor) Erase(inTransistor->outputs, this);
-    if (outTransistor) Erase(outTransistor->inputs, this);
-    Erase(Wire::allWires, this);
-}
-
 void Wire::Draw() const
 {
     Color color;
@@ -166,9 +164,9 @@ void Wire::Draw() const
     //}
 }
 
-void Wire::Highlight(Color color, int width) const
+void Wire::Highlight(Color color, float width) const
 {
-    DrawSnappedLine(inTransistor->pos, outTransistor->pos, color, direction, width);
+    DrawSnappedLineEx(inTransistor->pos, outTransistor->pos, width, color, direction);
 }
 
 std::vector<Wire*> Wire::allWires;

@@ -26,7 +26,7 @@ enum class TransistorType : char
 char GateToSymbol(TransistorType type);
 TransistorType SymbolToGate(char symbol);
 
-void DrawTransistorIcon(TransistorType type, Vector2 pos, Color color, int size);
+void DrawTransistorIcon(TransistorType type, Vector2 pos, Color color, float size);
 
 struct Transistor
 {
