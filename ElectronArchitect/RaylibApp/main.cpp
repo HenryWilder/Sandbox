@@ -310,6 +310,7 @@ int main(void)
             // M2
             if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
             {
+                MakeAbstract(selection, cursorPos, gridSize);
                 selection.clear();
                 mode.mode = InputMode::Mode::None;
             }
@@ -481,30 +482,30 @@ int main(void)
         ClearBackground(BLACK);
 
         // Columns
-        for(int x = 0; x < WindowWidth; x += gridSize)
+        for(float x = 0.0f; x < WindowWidth; x += gridSize)
         {
             if (x == cursorPos.x)
             {
                 unsigned char alpha = 32;
                 if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) alpha = 64;
-                DrawLine(x - 1, 0, x - 1, WindowHeight, { 255,255,255, (alpha / (unsigned)'\2') });
-                DrawLine(x, 0, x, WindowHeight, { 255,255,255, alpha });
-                DrawLine(x + 1, 0, x + 1, WindowHeight, { 255,255,255, (alpha / (unsigned)'\2') });
+                DrawLine((int)(x - 1.0f), 0, (int)(x - 1.0f), WindowHeight, { 255,255,255, (alpha / (unsigned)'\2') });
+                DrawLine((int)x, 0, (int)x, WindowHeight, { 255,255,255, alpha });
+                DrawLine((int)(x + 1.0f), 0, (int)(x + 1.0f), WindowHeight, { 255,255,255, (alpha / (unsigned)'\2') });
             }
-            else DrawLine(x, 0, x, WindowHeight, { 255,255,255,16 });
+            else DrawLine((int)x, 0, (int)x, WindowHeight, { 255,255,255,16 });
         }
         // Rows
-        for (int y = 0; y < WindowHeight; y += gridSize)
+        for (float y = 0.0f; y < WindowHeight; y += gridSize)
         {
             if (y == cursorPos.y)
             {
                 unsigned char alpha = 32;
                 if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON)) alpha = 64;
-                DrawLine(0, y - 1, WindowWidth, y - 1, { 255,255,255, (alpha / (unsigned)'\2') });
-                DrawLine(0, y, WindowWidth, y, { 255,255,255, alpha });
-                DrawLine(0, y + 1, WindowWidth, y + 1, { 255,255,255, (alpha / (unsigned)'\2') });
+                DrawLine(0, (int)(y - 1.0f), WindowWidth, (int)(y - 1.0f), { 255,255,255, (alpha / (unsigned)'\2') });
+                DrawLine(0, (int)y, WindowWidth, (int)y, { 255,255,255, alpha });
+                DrawLine(0, (int)(y + 1.0f), WindowWidth, (int)(y + 1.0f), { 255,255,255, (alpha / (unsigned)'\2') });
             }
-            else DrawLine(0, y, WindowWidth, y, { 255,255,255,16 });
+            else DrawLine(0, (int)y, WindowWidth, (int)y, { 255,255,255,16 });
         }
 
         // Draw cursor

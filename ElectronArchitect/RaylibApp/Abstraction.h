@@ -38,8 +38,8 @@ struct ComponentTransistor
 		b_evaluated = false;
 	}
 
-	int inputCount; // 4
-	int outputCount; // 4
+	size_t inputCount; // 8
+	size_t outputCount; // 8
 	ComponentTransistor* inputs; // 8
 	ComponentTransistor* outputs; // 8
 	TransistorType type; // 1
@@ -56,7 +56,7 @@ struct AbstractComponent // Blueprint for component
 	void Spawn(Vector2 position);
 };
 
-void MakeAbstract(std::vector<Transistor*> const* selection);
+void MakeAbstract(std::vector<Transistor*>& selection, Vector2 position, float gridSize);
 
 struct ComponentPort
 {

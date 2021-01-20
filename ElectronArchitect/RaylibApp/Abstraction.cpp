@@ -38,16 +38,14 @@ void Component::Draw()
     DrawRectangleRec(casing, DARKGRAY);
 }
 
-void MakeAbstract(std::vector<Transistor*>& selection)
+void MakeAbstract(std::vector<Transistor*>& selection, Vector2 position, float gridSize)
 {
-    Vector2 center = { 0,0 };
+    size_t input = 0;
+    size_t output = 0;
     for (Transistor* elem : selection)
     {
-        center = center + elem->pos;
-    }
-    if (selection.size() > 0) center = { center.x / (float)selection.size(), center.y / (float)selection.size() };
-    for (Transistor* elem : selection)
-    {
-        elem->pos = center;
+        if (elem->OutputOnly()) elem->pos = { position.x - gridSize, position.y + (gridSize * (float)(input++))};
+        else if (elem->InputOnly()) elem->pos = { position.x + gridSize, position.y + (gridSize * (float)(output++))};
+        else elem->pos = position;
     }
 }
