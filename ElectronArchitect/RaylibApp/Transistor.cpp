@@ -281,6 +281,31 @@ bool Transistor::ConnectsExternally() const
     return (input[0].connector || input[1].connector || output[0].connector || output[1].connector);
 }
 
+Transistor::~Transistor()
+{
+    // Replace references to myself with nullptrs
+    if (input[0].connector)
+    {
+        int myIndex = input[0].connector->GetOutputIndex(this);
+        if (myIndex != -1) input[0].connector->output[myIndex] = nullptr;
+    }
+    if (input[1].connector)
+    {
+        int myIndex = input[1].connector->GetOutputIndex(this);
+        if (myIndex != -1) input[1].connector->output[myIndex] = nullptr;
+    }
+    if (output[0].connector)
+    {
+        int myIndex = output[0].connector->GetOutputIndex(this);
+        if (myIndex != -1) output[0].connector->input[myIndex] = nullptr;
+    }
+    if (output[1].connector)
+    {
+        int myIndex = output[1].connector->GetOutputIndex(this);
+        if (myIndex != -1) output[1].connector->input[myIndex] = nullptr;
+    }
+}
+
 void Transistor::Evaluate()
 {
     if (b_beingEvaluated) b_evaluatedThisFrame = true; // Probably a loop. Just pass the existing evaluation.
@@ -358,7 +383,7 @@ void Transistor::FrameReset()
     b_evaluatedThisFrame = false;
 }
 
-std::vector<Transistor*> Transistor::allTransistors;
+std::vector<Transistor*> Transistor::s_allTransistors;
 
 void Transistor::Connection::IncrementShape()
 {

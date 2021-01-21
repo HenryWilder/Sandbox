@@ -22,6 +22,7 @@ struct InputMode
     union Data
     {
         struct WireData {
+            Transistor* start;
             Transistor::Connection* draggingWire;
             Transistor::Connection::Shape shape;
         };
@@ -122,14 +123,14 @@ int main(void)
         }
 
         Component* componentHovering = nullptr;
-        for (Component* component : Component::allComponents) {
-            if (CheckCollisionPointRec(cursorPos, component->casing)) {
+        for (Component* component : Component::s_allComponents) {
+            if (CheckCollisionPointRec(cursorPos, component->GetCaseRect())) {
                 componentHovering = component;
                 break;
             }
         }
         Transistor* transistorHovering = nullptr;
-        for (Transistor* transistor : Transistor::allTransistors) {
+        for (Transistor* transistor : Transistor::s_allTransistors) {
             if (!transistor->IsHidden() && Vector2Equal(cursorPos, transistor->GetPos())) {
                 transistorHovering = transistor;
                 break;
@@ -145,6 +146,16 @@ int main(void)
             if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) // Start a wire
             {
                 wireStart = cursorPos;
+                mode.data.wire.start = nullptr;
+                for (Transistor* check : Transistor::s_allTransistors)
+                {
+                    if (Vector2Equal(check->GetPos(), cursorPos))
+                    {
+                        mode.data.wire.start = check;
+                        break;
+                    }
+                }
+                if (!mode.data.wire.start) mode.data.wire.start = new Transistor(cursorPos);
                 mode.mode = InputMode::Mode::Wire;
             }
             // M2
@@ -167,11 +178,7 @@ int main(void)
             // M1
             if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) // Finish drawing wire
             {
-                Transistor* startTransistor = new Transistor(Transistor::Gate::Simple, wireStart);
-                Transistor* endTransistor = new Transistor(Transistor::Gate::Simple, cursorPos);
-                startTransistor->SolderOutput(endTransistor, mode.data.wire.shape);
-                Transistor::allTransistors.push_back(startTransistor);
-                Transistor::allTransistors.push_back(endTransistor);
+                Transistor* endTransistor = new Transistor(mode.data.wire.start, cursorPos, mode.data.wire.shape);
                 mode.mode = InputMode::Mode::None;
             }
         }
@@ -187,9 +194,11 @@ int main(void)
                 }
                 else if (componentHovering) // Drag component
                 {
-                    for (size_t i = 0; i < componentHovering->internalCount; ++i) { selection.push_back(componentHovering->internals[i]); }
-                    for (size_t i = 0; i < componentHovering->inputCount; ++i) { selection.push_back(componentHovering->inputs[i]); }
-                    for (size_t i = 0; i < componentHovering->outputCount; ++i) { selection.push_back(componentHovering->outputs[i]); }
+                    selection.reserve(selection.size() + componentHovering->GetTotalCount());
+                    for (Transistor** compTrans = (componentHovering->Begin()); compTrans != componentHovering->End(); ++compTrans)
+                    {
+                        selection.push_back(*compTrans);
+                    }
                 }
                 b_moveActive = true;
             }
@@ -214,7 +223,7 @@ int main(void)
                 }
                 else if (componentHovering) // Delete component
                 {
-                    Erase(Component::allComponents, componentHovering);
+                    Erase(Component::s_allComponents, componentHovering);
                     delete componentHovering;
                     componentHovering = nullptr;
                 }
@@ -232,7 +241,7 @@ int main(void)
                 ClearSelection();
                 if (!Vector2Equal(selectionStart, cursorPos)) // The selection is a box and not a point
                 {
-                    for (Transistor* check : Transistor::allTransistors)
+                    for (Transistor* check : Transistor::s_allTransistors)
                     {
                         if (CheckCollisionPointRec(check->GetPos(), selectionSpace)) selection.push_back(check); // Add all transistors whose positions are within the collision
                     }
@@ -282,7 +291,7 @@ int main(void)
                         copy->SetPos(selection[i]->GetPos());
                         copy->SetGateType(selection[i]->GetGateType());
                         selectionCopy.push_back(copy);
-                        Transistor::allTransistors.push_back(copy);
+                        Transistor::s_allTransistors.push_back(copy);
                     }
                     for (size_t i = 0; i < selection.size(); ++i)
                     {
@@ -295,14 +304,14 @@ int main(void)
 
         if (IsKeyPressed(KEY_SPACE) && selection.size())
         {
-            MakeAbstract(selection, cursorPos, g_gridSize);
+            new Component(selection, cursorPos);
             selection.clear();
         }
 
         // Evaluation
         {
             std::vector<Transistor*> evaluationList;
-            for (Transistor* transistor : Transistor::allTransistors)
+            for (Transistor* transistor : Transistor::s_allTransistors)
             {
                 if (transistor->InputOnly()) evaluationList.push_back(transistor); // Start of a branch
             }
@@ -349,7 +358,7 @@ int main(void)
                 else DrawLineV({ gridStart.x, y }, { gridEnd.x, y }, { 255,255,255,16 });
             }
         }
-        for (Transistor* check : Transistor::allTransistors)
+        for (Transistor* check : Transistor::s_allTransistors)
         {
             if (CheckCollisionPointRec(check->GetPos(), selectionSpace))
             {
@@ -389,7 +398,7 @@ int main(void)
             Transistor::DrawSnappedLine(wireStart, cursorPos, GRAY, mode.data.wire.shape); // Temporary wire
         }
 
-        for (Component* component : Component::allComponents) // Draw component casings
+        for (Component* component : Component::s_allComponents) // Draw component casings
         {
             component->Draw();
         }
@@ -398,15 +407,15 @@ int main(void)
         else if (transistorHovering) transistorHovering->Highlight(YELLOW, 8.0f);
 
         // Transistors
-        for (Transistor* transistor : Transistor::allTransistors) { transistor->Draw(); }
+        for (Transistor* transistor : Transistor::s_allTransistors) { transistor->Draw(); }
 
         EndMode2D();
 
-        DrawText(TextFormat("Transistors: %i\nZoom: %f", Transistor::allTransistors.size(), camera.zoom), 0, 0, 8, WHITE);
+        DrawText(TextFormat("Transistors: %i\nZoom: %f", Transistor::s_allTransistors.size(), camera.zoom), 0, 0, 8, WHITE);
 
         EndDrawing();
 
-        for (Transistor* transistor : Transistor::allTransistors) { transistor->FrameReset(); }
+        for (Transistor* transistor : Transistor::s_allTransistors) { transistor->FrameReset(); }
     }
 
     // Return memory to heap
@@ -414,11 +423,11 @@ int main(void)
 
     selection.clear();
 
-    for (Component* component : Component::allComponents) { delete component; } // Must come before transistors
-    Component::allComponents.clear();
+    for (Component* component : Component::s_allComponents) { delete component; } // Must come before transistors
+    Component::s_allComponents.clear();
 
-    for (Transistor* transistor : Transistor::allTransistors) { delete transistor; }
-    Transistor::allTransistors.clear();
+    for (Transistor* transistor : Transistor::s_allTransistors) { delete transistor; }
+    Transistor::s_allTransistors.clear();
 
     return 0;
 }

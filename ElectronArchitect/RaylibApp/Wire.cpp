@@ -73,7 +73,7 @@ Vector2 Wire::GetEndPos() const
 
 void Wire::SearchConnectableTransistors(Vector2 startPos, Vector2 endPos)
 {
-    for (Transistor* searchStart : Transistor::allTransistors)
+    for (Transistor* searchStart : Transistor::s_allTransistors)
     {
         if (Vector2Equal(searchStart->pos, startPos) && (!searchStart->b_hidden))
         {
@@ -82,7 +82,7 @@ void Wire::SearchConnectableTransistors(Vector2 startPos, Vector2 endPos)
             break;
         }
     }
-    for (Transistor* searchEnd : Transistor::allTransistors)
+    for (Transistor* searchEnd : Transistor::s_allTransistors)
     {
         if (Vector2Equal(searchEnd->pos, endPos) && (!searchEnd->b_hidden))
         {
@@ -134,13 +134,13 @@ Wire::Wire(Vector2 _startPos, Vector2 _endPos, WireDirection _direction)
     {
         inTransistor = new Transistor(_startPos);
         inTransistor->outputs.push_back(this);
-        Transistor::allTransistors.push_back(inTransistor);
+        Transistor::s_allTransistors.push_back(inTransistor);
     }
     if (!outTransistor)
     {
         outTransistor = new Transistor(_endPos);
         outTransistor->inputs.push_back(this);
-        Transistor::allTransistors.push_back(outTransistor);
+        Transistor::s_allTransistors.push_back(outTransistor);
     }
 
     active = false;

@@ -28,7 +28,7 @@ public:
         Size // Used for %
     };
 
-    struct Connection
+    struct Connection // Connections will never have "new" or "delete" called, so there will never be a dangling reference.
     {
         enum class Shape : char
         {
@@ -50,36 +50,17 @@ public:
         static Shape NextShape(Shape);
     };
 
-    Transistor() : type{ Gate::Simple }, input{{},{}}, output{{},{}}, pos{ }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ };
-    Transistor(Gate _type) : input{ {},{} }, output{ {},{} }, type{ _type }, pos{ }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ };
-    Transistor(Vector2 _pos) : input{ {},{} }, output{ {},{} }, type{ Gate::Simple }, pos{ _pos }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ };
-    Transistor(Gate _type, Vector2 _pos) : type{ _type }, input{ {},{} }, output{ {},{} }, pos{ _pos }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ };
-    
-    ~Transistor()
-    {
-        if (input[0].connector)
-        {
-            int myIndex = input[0].connector->GetOutputIndex(this);
-            if (myIndex != -1) input[0].connector->output[myIndex] = nullptr;
-        }
-        if (input[1].connector)
-        {
-            int myIndex = input[1].connector->GetOutputIndex(this);
-            if (myIndex != -1) input[1].connector->output[myIndex] = nullptr;
-        }
-        if (output[0].connector)
-        {
-            int myIndex = output[0].connector->GetOutputIndex(this);
-            if (myIndex != -1) output[0].connector->input[myIndex] = nullptr;
-        }
-        if (output[1].connector)
-        {
-            int myIndex = output[1].connector->GetOutputIndex(this);
-            if (myIndex != -1) output[1].connector->input[myIndex] = nullptr;
-        }
-    }
+    Transistor() : type{ Gate::Simple }, input{ {},{} }, output{ {},{} }, pos{ }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); };
+    Transistor(Gate _type) : input{ {},{} }, output{ {},{} }, type{ _type }, pos{ }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); };
+    Transistor(Vector2 _pos) : input{ {},{} }, output{ {},{} }, type{ Gate::Simple }, pos{ _pos }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); };
+    Transistor(Gate _type, Vector2 _pos) : type{ _type }, input{ {},{} }, output{ {},{} }, pos{ _pos }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); };
+    Transistor(Transistor* _input) : type{  }, input{ { _input },{} }, output{ {},{} }, pos{  }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); SolderInput(_input, Connection::Shape::XFirst); };
+    Transistor(Transistor* _input, Vector2 _pos) : type{  }, input{ {},{} }, output{ {},{} }, pos{ _pos }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); SolderInput(_input, Connection::Shape::XFirst); };
+    Transistor(Transistor* _input, Vector2 _pos, Connection::Shape _shape) : type{  }, input{ {},{} }, output{ {},{} }, pos{ _pos }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); SolderInput(_input, _shape); };
 
-    static std::vector<Transistor*> allTransistors;
+    ~Transistor();
+
+    static std::vector<Transistor*> s_allTransistors;
 
 private:
 
@@ -147,7 +128,7 @@ public:
     friend Component* MakeAbstract(std::vector<Transistor*>& selection, Vector2 position, float g_gridSize);
 };
 
-extern std::vector<Transistor*> allTransistors;
+extern std::vector<Transistor*> s_allTransistors;
 
 char GateToSymbol(Transistor::Gate type);
 Transistor::Gate SymbolToGate(char symbol);

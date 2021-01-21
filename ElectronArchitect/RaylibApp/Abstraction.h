@@ -26,19 +26,40 @@ class Transistor;
 class Component
 {
 public:
-	size_t inputCount;
-	size_t outputCount;
-	size_t internalCount;
-	Vector2 pos;
-	Rectangle casing;
-	Transistor** inputs;
-	Transistor** outputs;
-	Transistor** internals; // Fixed size once created
-
+	Component() : m_caseShape{}, m_componentTransistors{ nullptr }, m_inputCount{}, m_internalCount{}, m_outputCount{}, m_componentTransistorCount{} {};
+	Component(std::vector<Transistor*>& selection, Vector2 position);
 	~Component();
 
-	static std::vector<Component*> allComponents;
+	static std::vector<Component*> s_allComponents;
 
+private:
+	Rectangle m_caseShape;
+
+	// Fixed size once created
+	Transistor** m_componentTransistors;
+	size_t m_inputCount;
+	size_t m_internalCount;
+	size_t m_outputCount;
+	size_t m_componentTransistorCount;
+	
+public:
+	size_t GetInputCount() const;
+	size_t GetOutputCount() const;
+	size_t GetInternalCount() const;
+	size_t GetTotalCount() const;
+
+	Transistor** InputsBegin();
+	Transistor** InputsEnd();
+	Transistor** InternalsBegin();
+	Transistor** InternalsEnd();
+	Transistor** OutputsBegin();
+	Transistor** OutputsEnd();
+
+	Transistor** Begin();
+	Transistor** End();
+
+	Vector2 GetPos() const;
+	Rectangle GetCaseRect() const;
 	void Move(Vector2 deltaPos);
 	void MoveAbsolute(Vector2 newPos);
 
@@ -49,9 +70,5 @@ public:
 	void Highlight(Color color);
 
 	void ClearReferences();
-
-	friend Component* MakeAbstract(std::vector<Transistor*>& selection, Vector2 position, float g_gridSize);
 };
-extern std::vector<Component*> allComponents;
-
-Component* MakeAbstract(std::vector<Transistor*>& selection, Vector2 position, float g_gridSize);
+extern std::vector<Component*> s_allComponents;

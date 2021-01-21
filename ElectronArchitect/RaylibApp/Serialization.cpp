@@ -132,7 +132,7 @@ void Load(std::vector<Transistor*>& toArr)
 		Transistor* transistor = new Transistor(); // These transistors will be used outside this function, so we want to allocate memory for them.
 		transistors.push_back(transistor);
 		toArr.push_back(transistor); // Push the transistor to the output array; we've already got it allocated now, anyway.
-		Transistor::allTransistors.push_back(transistor);
+		Transistor::s_allTransistors.push_back(transistor);
 	}
 
 	for (Transistor* thisLineTransistor : transistors) // The transistor on the line being read
