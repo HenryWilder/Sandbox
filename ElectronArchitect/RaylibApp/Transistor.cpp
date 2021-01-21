@@ -320,15 +320,15 @@ void Transistor::Evaluate()
 
 Transistor::Connection* Transistor::AvailIn()
 {
-    if (input[0].connector) return &(input[0]);
-    else if (input[1].connector) return &(input[1]);
+    if (!input[0].connector) return &(input[0]);
+    else if (!input[1].connector) return &(input[1]);
     else return nullptr;
 }
 
 Transistor::Connection* Transistor::AvailOut()
 {
-    if (output[0].connector) return &(output[0]);
-    else if (output[1].connector) return &(output[1]);
+    if (!output[0].connector) return &(output[0]);
+    else if (!output[1].connector) return &(output[1]);
     else return nullptr;
 }
 
