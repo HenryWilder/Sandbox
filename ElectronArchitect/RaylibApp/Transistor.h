@@ -58,14 +58,12 @@ public:
     Transistor(Transistor* _input, Vector2 _pos) : type{  }, input{ {},{} }, output{ {},{} }, pos{ _pos }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); SolderInput(_input, Connection::Shape::XFirst); };
     Transistor(Transistor* _input, Vector2 _pos, Connection::Shape _shape) : type{  }, input{ {},{} }, output{ {},{} }, pos{ _pos }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); SolderInput(_input, _shape); };
 
-    ~Transistor();
-
     static std::vector<Transistor*> s_allTransistors;
-
-private:
 
     Connection input[2];
     Connection output[2];
+
+private:
     Vector2 pos;
     Gate type;
     bool b_drawnThisFrame, b_evaluatedThisFrame, b_beingEvaluated, evaluation, b_hidden;
@@ -84,6 +82,7 @@ public:
     void SetGateType(Gate _type);
     void IncrementGate();
     Component* GetComponent() const;
+    void SetComponent(Component* component);
 
     bool IsHidden() const;
     void Hide();
@@ -121,11 +120,10 @@ public:
 
     void FrameReset();
 
+    void ClearReferences();
+
     friend void Save(const std::vector<Transistor*>&);
     friend void Load(std::vector<Transistor*>&);
-
-    friend class Component;
-    friend Component* MakeAbstract(std::vector<Transistor*>& selection, Vector2 position, float g_gridSize);
 };
 
 extern std::vector<Transistor*> s_allTransistors;

@@ -178,7 +178,21 @@ int main(void)
             // M1
             if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) // Finish drawing wire
             {
-                Transistor* endTransistor = new Transistor(mode.data.wire.start, cursorPos, mode.data.wire.shape);
+                Transistor* endTransistor = nullptr;
+                for (Transistor* check : Transistor::s_allTransistors)
+                {
+                    if (Vector2Equal(check->GetPos(), cursorPos))
+                    {
+                        endTransistor = check;
+                        check->SolderInput(mode.data.wire.start, mode.data.wire.shape);
+                        break;
+                    }
+                }
+                if (!endTransistor) endTransistor = new Transistor(mode.data.wire.start, cursorPos, mode.data.wire.shape);
+                if (endTransistor == mode.data.wire.start)
+                {
+                    delete mode.data.wire.start; // Make sure this is correct
+                }
                 mode.mode = InputMode::Mode::None;
             }
         }
@@ -195,9 +209,9 @@ int main(void)
                 else if (componentHovering) // Drag component
                 {
                     selection.reserve(selection.size() + componentHovering->GetTotalCount());
-                    for (Transistor** compTrans = (componentHovering->Begin()); compTrans != componentHovering->End(); ++compTrans)
+                    for (size_t i = 0; i < componentHovering->GetTotalCount(); ++i)
                     {
-                        selection.push_back(*compTrans);
+                        selection.push_back(componentHovering->Begin()[i]);
                     }
                 }
                 b_moveActive = true;
@@ -206,7 +220,9 @@ int main(void)
             {
                 while (!selection.empty())
                 {
-                    delete selection[selection.size() - 1];
+                    size_t index = selection.size() - 1;
+                    selection[index]->ClearReferences();
+                    delete selection[index];
                     selection.pop_back();
                 }
                 b_selectionIsExplicit = false;
@@ -223,7 +239,7 @@ int main(void)
                 }
                 else if (componentHovering) // Delete component
                 {
-                    Erase(Component::s_allComponents, componentHovering);
+                    componentHovering->ClearReferences();
                     delete componentHovering;
                     componentHovering = nullptr;
                 }
@@ -263,6 +279,7 @@ int main(void)
         {
             for (Transistor* elem : selection)
             {
+                if (elem == nullptr) continue;
                 if (elem->GetComponent()) elem->GetComponent()->UpdateCasing();
             }
             if (IsMouseButtonReleased(MOUSE_MIDDLE_BUTTON))

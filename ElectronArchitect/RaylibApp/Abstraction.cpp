@@ -43,7 +43,7 @@ Component::Component(std::vector<Transistor*>& selection, Vector2 position)
             elemInPos.x = -1.0f * g_gridSize;
             elemInPos.y = (g_gridSize * (float)(m_inputCount++));
             if (elemInPos.y > maxCorner.y) maxCorner.y = elemInPos.y;
-            elem->pos = position + elemInPos;
+            elem->SetPos(position + elemInPos);
 
             // The output transistor will be created here
             Vector2 elemOutPos;
@@ -94,13 +94,13 @@ Component::Component(std::vector<Transistor*>& selection, Vector2 position)
                 output->output[1].connector->input[port] = output;
             }
         }
-        if (externalInput && !externalOutput) // Has only input(s) outside the selection
+        else if (externalInput && !externalOutput) // Has only input(s) outside the selection
         {
             Vector2 elemPos;
             elemPos.x = -1.0f * g_gridSize;
             elemPos.y = (g_gridSize * (float)(m_inputCount++));
             if (elemPos.y > maxCorner.y) maxCorner.y = elemPos.y;
-            elem->pos = position + elemPos;
+            elem->SetPos(position + elemPos); // Change this to SetPos()
         }
         else if (!externalInput && externalOutput) // Has only output(s) outside the selection
         {
@@ -108,14 +108,14 @@ Component::Component(std::vector<Transistor*>& selection, Vector2 position)
             elemPos.x = g_gridSize;
             elemPos.y = (g_gridSize * (float)(m_outputCount++));
             if (elemPos.y > maxCorner.y) maxCorner.y = elemPos.y;
-            elem->pos = position + elemPos;
+            elem->SetPos(position + elemPos);
         }
         else // Entirely contained within the selection
         {
-            elem->pos = position;
+            elem->SetPos(position);
             m_internalCount++;
         }
-        elem->containingComponent = this;
+        elem->SetComponent(this);
     }
     selection.reserve(selection.size() + toBePushed.size());
     for (Transistor* push : toBePushed)
@@ -130,19 +130,34 @@ Component::Component(std::vector<Transistor*>& selection, Vector2 position)
     printf("Position: { %#1.1f, %#1.1f }", position.x, position.y);
     printf("Rectangle: {\n    x = %#1.1f,\n    y = %#1.1f,\n    width = %#1.1f,\n    height = %#1.1f\n}\n", m_caseShape.x, m_caseShape.y, m_caseShape.width, m_caseShape.height);
 
-    m_componentTransistors = new Transistor*[m_componentTransistorCount];
+    m_componentTransistors = new Transistor*[m_componentTransistorCount]();
 
-    size_t currentIndex[3] = { 0, m_inputCount, m_inputCount + m_internalCount }; // { inputs, internals, outputs }
-    for (size_t index = 0; index < selection.size(); ++index)
+    size_t currentIndex[3] = { 0, m_inputCount, m_componentTransistorCount - m_outputCount }; // { inputs, internals, outputs }
+    for (Transistor* elem : selection)
     {
-        Transistor* elem = selection[index];
-        char externalIO = 0b00;
-        if (std::find(selection.begin(), selection.end(), elem->input[0].connector) == selection.end()) externalIO |= 0b01;
-        else if (std::find(selection.begin(), selection.end(), elem->input[1].connector) == selection.end()) externalIO |= 0b01;
-        if (std::find(selection.begin(), selection.end(), elem->output[0].connector) == selection.end()) externalIO |= 0b10;
-        else if (std::find(selection.begin(), selection.end(), elem->output[1].connector) == selection.end()) externalIO |= 0b10;
+        char externalIO = 1;
 
-        if (externalIO != 3) m_componentTransistors[(currentIndex[externalIO]++) + index] = elem;
+        if ((elem->input[0].connector) && (std::find(selection.begin(), selection.end(), elem->input[0].connector) == selection.end()) ||
+            (elem->input[1].connector) && (std::find(selection.begin(), selection.end(), elem->input[1].connector) == selection.end()))
+        {
+            externalIO = 0;
+        }
+        else if ((elem->output[0].connector) && (std::find(selection.begin(), selection.end(), elem->output[0].connector) == selection.end()) ||
+            (elem->output[1].connector) && (std::find(selection.begin(), selection.end(), elem->output[1].connector) == selection.end()))
+        {
+            externalIO = 2;
+        }
+
+        printf("%p belongs in sector %i\n", elem, externalIO);
+
+        m_componentTransistors[(currentIndex[externalIO])] = elem;
+
+        printf("Transistor [%i] of the component is now: %p\n", int(currentIndex[externalIO]), m_componentTransistors[(currentIndex[externalIO])]);
+        currentIndex[externalIO]++;
+    }
+    for (size_t i = 0; i < m_componentTransistorCount; ++i)
+    {
+        printf("Transistor [%i] confirmed to be %p.\n", i, m_componentTransistors[i]);
     }
 }
 
@@ -239,10 +254,15 @@ void Component::UpdateCasing()
     Vector2 minCorner = { maxCorner.x + m_caseShape.width - (g_gridSize * 2.0f), maxCorner.y + m_caseShape.height - (g_gridSize * 2.0f)};
     
     auto updateCorners = [&minCorner, &maxCorner](Transistor* elem) {
-        if (elem->pos.x > maxCorner.x) maxCorner.x = elem->pos.x;
-        else if (elem->pos.x < minCorner.x) minCorner.x = elem->pos.x;
-        if (elem->pos.y > maxCorner.y) maxCorner.y = elem->pos.y;
-        else if (elem->pos.y < minCorner.y) minCorner.y = elem->pos.y;
+        if (elem)
+        {
+            Vector2 checkPos = elem->GetPos();
+            if (checkPos.x > maxCorner.x) maxCorner.x = checkPos.x;
+            else if (checkPos.x < minCorner.x) minCorner.x = checkPos.x;
+            if (checkPos.y > maxCorner.y) maxCorner.y = checkPos.y;
+            else if (checkPos.y < minCorner.y) minCorner.y = checkPos.y;
+        }
+        else printf("Encountered null");
     };
 
     for (Transistor** input = InputsBegin(); input != InputsEnd(); input++)
@@ -280,7 +300,11 @@ void Component::Highlight(Color color)
 
 void Component::ClearReferences()
 {
-    // TODO
+    for (size_t i = 0; i < m_componentTransistorCount; ++i)
+    {
+        m_componentTransistors[i]->SetComponent(nullptr);
+    }
+    Erase(s_allComponents, this);
 }
 
 std::vector<Component*> Component::s_allComponents;
