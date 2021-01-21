@@ -2,14 +2,12 @@
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
     <ClCompile Include="main.cpp" />
-    <ClCompile Include="Wire.cpp" />
     <ClCompile Include="Transistor.cpp" />
     <ClCompile Include="Abstraction.cpp" />
     <ClCompile Include="Serialization.cpp" />
     <ClCompile Include="Globals.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Wire.h" />
     <ClInclude Include="Transistor.h" />
     <ClInclude Include="Abstraction.h" />
     <ClInclude Include="Serialization.h" />

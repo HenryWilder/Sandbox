@@ -1,7 +1,30 @@
 #include "Abstraction.h"
 #include <fstream>
 #include "Globals.h"
-#include "Wire.h"
+#include "Transistor.h"
+
+Component::~Component()
+{
+    for (size_t i = 0; i < internalCount; ++i)
+    {
+        delete internals[i];
+    }
+    delete[] internals;
+
+    for (size_t i = 0; i < inputCount; ++i)
+    {
+        Erase(Transistor::allTransistors, inputs[i]);
+        delete inputs[i];
+    }
+    delete[] inputs;
+
+    for (size_t i = 0; i < outputCount; ++i)
+    {
+        Erase(Transistor::allTransistors, outputs[i]);
+        delete outputs[i];
+    }
+    delete[] outputs;
+}
 
 void Component::Move(Vector2 deltaPos)
 {
@@ -58,20 +81,6 @@ void Component::Draw()
     {
         internals[i]->b_drawnThisFrame = true; // Skip drawing later
     }
-    for (size_t i = 0; i < inputCount; ++i)
-    {
-        for (Wire* input : inputs[i]->inputs)
-        {
-            input->Draw();
-        }
-    }
-    for (size_t i = 0; i < outputCount; ++i)
-    {
-        for (Wire* output : outputs[i]->outputs)
-        {
-            output->Draw();
-        }
-    }
 }
 
 void Component::Highlight(Color color)
@@ -102,10 +111,6 @@ Component* MakeAbstract(std::vector<Transistor*>& selection, Vector2 position, f
             elemPos.y = (g_gridSize * (float)(component->inputCount++));
             if (elemPos.y > maxCorner.y) maxCorner.y = elemPos.y;
             elem->pos = position + elemPos;
-            for (Wire* wire : elem->outputs)
-            {
-                wire->hidden = true;
-            }
         }
         else if (elem->InputOnly())
         {
@@ -114,23 +119,11 @@ Component* MakeAbstract(std::vector<Transistor*>& selection, Vector2 position, f
             elemPos.y = (g_gridSize * (float)(component->outputCount++));
             if (elemPos.y > maxCorner.y) maxCorner.y = elemPos.y;
             elem->pos = position + elemPos;
-            for (Wire* wire : elem->inputs)
-            {
-                wire->hidden = true;
-            }
         }
         else
         {
             elem->pos = position;
             component->internalCount++;
-            for (Wire* wire : elem->inputs)
-            {
-                wire->hidden = true;
-            }
-            for (Wire* wire : elem->outputs)
-            {
-                wire->hidden = true;
-            }
         }
         elem->containingComponent = component;
     }

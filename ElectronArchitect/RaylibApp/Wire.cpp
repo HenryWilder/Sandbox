@@ -168,3 +168,8 @@ void Wire::Highlight(Color color, float width) const
 
 std::vector<Wire*> Wire::allWires;
 
+//Wire::~Wire()
+//{
+//    if (inTransistor) Erase(inTransistor->outputs, this);
+//    if (outTransistor) Erase(outTransistor->inputs, this);
+//}

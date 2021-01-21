@@ -3,9 +3,8 @@
 #include <raymath.h>
 #include <vector>
 
-struct Wire;
-struct Transistor;
+class Transistor;
 
-void Save(const std::vector<Transistor*>*);
+void Save(const std::vector<Transistor*>&);
 
-void Load(std::vector<Transistor*>*, std::vector<Wire*>*);
+void Load(std::vector<Transistor*>&);

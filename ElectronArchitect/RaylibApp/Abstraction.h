@@ -2,7 +2,6 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <vector>
-#include "Transistor.h"
 
 /*******************
 *
@@ -22,30 +21,11 @@
 *
 *******************/
 
-struct Component
+class Transistor;
+
+class Component
 {
-	~Component()
-	{
-		Erase(allComponents, this);
-		for (size_t i = 0; i < internalCount; ++i)
-		{
-			delete internals[i];
-		}
-		for (size_t i = 0; i < inputCount; ++i)
-		{
-			delete inputs[i];
-		}
-		for (size_t i = 0; i < outputCount; ++i)
-		{
-			delete outputs[i];
-		}
-		delete[] internals;
-		delete[] inputs;
-		delete[] outputs;
-	}
-
-	static std::vector<Component*> allComponents;
-
+public:
 	size_t inputCount;
 	size_t outputCount;
 	size_t internalCount;
@@ -54,6 +34,10 @@ struct Component
 	Transistor** inputs;
 	Transistor** outputs;
 	Transistor** internals; // Fixed size once created
+
+	~Component();
+
+	static std::vector<Component*> allComponents;
 
 	void Move(Vector2 deltaPos);
 	void MoveAbsolute(Vector2 newPos);
@@ -65,6 +49,8 @@ struct Component
 	void Highlight(Color color);
 
 	void ClearReferences();
+
+	friend Component* MakeAbstract(std::vector<Transistor*>& selection, Vector2 position, float g_gridSize);
 };
 extern std::vector<Component*> allComponents;
 

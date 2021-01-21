@@ -28,6 +28,7 @@ struct Wire
     Wire() : inTransistor{ nullptr }, outTransistor{ nullptr }, direction{ WireDirection::XFirst }, active{ false }, hidden{ false }{};
     Wire(Transistor* _inTransistor, Transistor* _outTransistor, WireDirection _direction) : inTransistor{ _inTransistor }, outTransistor{ _outTransistor }, direction{ _direction }, active{ false }, hidden{ false }{};
     Wire(Vector2 _startPos, Vector2 _endPos, WireDirection _direction);
+    //~Wire();
 
     static std::vector<Wire*> allWires;
     Transistor* inTransistor;

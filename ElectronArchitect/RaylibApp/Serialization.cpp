@@ -2,7 +2,6 @@
 #include "Serialization.h"
 #include "Globals.h"
 #include "Transistor.h"
-#include "Wire.h"
 
 std::ostream& operator<<(std::ostream& file, const Vector2& vector)
 {
@@ -15,12 +14,12 @@ std::istream& operator>>(std::istream& file, Vector2& vector)
 	return file;
 }
 
-std::ostream& operator<<(std::ostream& file, const TransistorType& type)
+std::ostream& operator<<(std::ostream& file, const Transistor::Gate& type)
 {
 	file << GateToSymbol(type);
 	return file;
 }
-std::istream& operator>>(std::istream& file, TransistorType& transistorType)
+std::istream& operator>>(std::istream& file, Transistor::Gate& transistorType)
 {
 	char transistorTypeSymbol;
 	file >> transistorTypeSymbol;
@@ -28,109 +27,97 @@ std::istream& operator>>(std::istream& file, TransistorType& transistorType)
 	return file;
 }
 
-std::ostream& operator<<(std::ostream& file, const WireDirection& direction)
+std::ostream& operator<<(std::ostream& file, const Transistor::Connection::Shape& direction)
 {
 	switch (direction)
 	{
-	default: case WireDirection::XFirst:
+	default: case Transistor::Connection::Shape::XFirst:
 		file << 'x';
 		break;
 
-	case WireDirection::YFirst:
+	case Transistor::Connection::Shape::YFirst:
 		file << 'y';
 		break;
 
-	case WireDirection::DiagStart:
+	case Transistor::Connection::Shape::DiagStart:
 		file << 's';
 		break;
-	case WireDirection::DiagEnd:
+	case Transistor::Connection::Shape::DiagEnd:
 		file << 'e';
 		break;
 	}
 	return file;
 }
-std::istream& operator>>(std::istream& file, WireDirection& direction)
+std::istream& operator>>(std::istream& file, Transistor::Connection::Shape& direction)
 {
 	char wireDirectionSymbol;
 	file >> wireDirectionSymbol;
 	switch (wireDirectionSymbol)
 	{
 	default: case 'x':
-		direction = WireDirection::XFirst;
+		direction = Transistor::Connection::Shape::XFirst;
 		break;
 	case 'y':
-		direction = WireDirection::YFirst;
+		direction = Transistor::Connection::Shape::YFirst;
 		break;
 	case 's':
-		direction = WireDirection::DiagStart;
+		direction = Transistor::Connection::Shape::DiagStart;
 		break;
 	case 'e':
-		direction = WireDirection::DiagEnd;
+		direction = Transistor::Connection::Shape::DiagEnd;
 		break;
 	}
 	return file;
 }
 
-void Save(const std::vector<Transistor*>* fromArr)
+/*********************************
+*
+*	Connections are output only.
+*
+*	a--->b--->c
+*	-a(b)
+*	-b(c)
+*	-c
+*
+*	a--.
+*		\
+*		 :-->c
+*		/
+*	b--'
+*	-a(c)
+*	-b(c)
+*	-c
+*
+*		 .-->b
+*		/
+*	a--:
+*		\
+*		 '-->c
+*	-a(b,c)
+*	-b
+*	-c
+*
+*********************************/
+
+void Save(const std::vector<Transistor*>& fromArr)
 {
+	const int versionNumber = 1;
 	std::ofstream saveFile("saved_diagram.txt", std::ofstream::out | std::ofstream::trunc);
-	saveFile << "version 0\n";
-
-	saveFile << "c " << fromArr->size() << "\n";
-
-	for (Transistor* const& transistor : *fromArr)
+	saveFile << "version 1\nc " << fromArr.size() << "\n";
+	for (Transistor* const& transistor : fromArr)
 	{
-		saveFile << "t " << transistor->pos << " " << transistor->type << " ";
-
-		/*********************************
-		* 
-		*	Connections are output only.
-		* 
-		*	a--->b--->c
-		*	-a(b)
-		*	-b(c)
-		*	-c
-		*	
-		*	a--.
-		*		\
-		*		 :-->c
-		*		/
-		*	b--'
-		*	-a(c)
-		*	-b(c)
-		*	-c
-		* 
-		*		 .-->b
-		*		/
-		*	a--:
-		*		\
-		*		 '-->c
-		*	-a(b,c)
-		*	-b
-		*	-c
-		* 
-		*********************************/
-
-		saveFile << transistor->outputs.size() << " ";
-		for (Wire* const& outputWire : transistor->outputs)
-		{
-			size_t foundIndex = FindIndex(*fromArr, (outputWire->outTransistor));
-			saveFile << "[ " << foundIndex << " "  << outputWire->direction << " ] "; // The wire direction will only be on the output side of the line.
-		}
-
-		saveFile << '\n'; // Newline for next transistor
+		saveFile << "t " << transistor->pos << " " << transistor->type << " " <<
+			"[ "<< FindIndex(fromArr, transistor->output[0].connector) << " " << transistor->output[0].shape << " ] " <<
+			"[ "<< FindIndex(fromArr, transistor->output[1].connector) << " " << transistor->output[1].shape << " ]\n";
 	}
 
 	saveFile.close();
 }
 
-void Load(std::vector<Transistor*>* toArr, std::vector<Wire*>* wireArr)
+void Load(std::vector<Transistor*>& toArr)
 {
 	std::ifstream loadFile("saved_diagram.txt", std::ifstream::in);
-	// These vectors are local so that indexes can be relative. We don't know how many wires/transistors may already be in the parameter vectors.
-	// Then again, I could probably just store an offset. Idk. I don't wanna risk it.
-	std::vector<Transistor*> transistors;
-	std::vector<Wire*> wires;
+	std::vector<Transistor*> transistors; // Local copy for relative pointers
 
 	// Get the number of transistors
 	loadFile.ignore(256, 'c');
@@ -144,7 +131,8 @@ void Load(std::vector<Transistor*>* toArr, std::vector<Wire*>* wireArr)
 	{
 		Transistor* transistor = new Transistor(); // These transistors will be used outside this function, so we want to allocate memory for them.
 		transistors.push_back(transistor);
-		toArr->push_back(transistor); // Push the transistor to the output array; we've already got it allocated now, anyway.
+		toArr.push_back(transistor); // Push the transistor to the output array; we've already got it allocated now, anyway.
+		Transistor::allTransistors.push_back(transistor);
 	}
 
 	for (Transistor* thisLineTransistor : transistors) // The transistor on the line being read
@@ -153,22 +141,16 @@ void Load(std::vector<Transistor*>* toArr, std::vector<Wire*>* wireArr)
 		loadFile.ignore(256, 't') >> thisLineTransistor->pos  >> thisLineTransistor->type >> outputCount;
 
 		// Connections
-		for (size_t i = 0; i < outputCount; ++i) // For each output
+		for (int i = 0; i <= 1; ++i)
 		{
 			size_t outputTransistorIndex;
 			loadFile.ignore(256, '[') >> outputTransistorIndex;
-			Transistor* connectedTransistor = transistors[outputTransistorIndex]; // Being used pretty much as just an alias. Saves the extra step/confusion of having the "[...]" in two places.
-
-			// Each connection will have a 1:1 wire to connection ratio. If a connection is listed, then it's our first encounter with it.
-			Wire* newWire = new Wire();
-			wireArr->push_back(newWire); // Now that its been allocated and given a pointer, it can be pushed to the output array without any issue.
-
-			newWire->inTransistor = thisLineTransistor;
-			thisLineTransistor->outputs.push_back(newWire);
-			newWire->outTransistor = connectedTransistor;
-			connectedTransistor->inputs.push_back(newWire);
-
-			loadFile >> newWire->direction;
+			if (outputTransistorIndex != transistorCount)
+			{
+				Transistor* connectedTransistor = transistors[outputTransistorIndex]; // Being used pretty much as just an alias. Saves the extra step/confusion of having the "[...]" in two places.
+				thisLineTransistor->SolderOutput(transistors[outputTransistorIndex], Transistor::Connection::Shape::XFirst); // TODO: We can make this better
+				loadFile >> thisLineTransistor->output[i].shape;
+			}
 		}
 	}
 
