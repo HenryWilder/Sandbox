@@ -183,7 +183,7 @@ void Transistor::Icon(Color color, float size) const
 
 void Transistor::Draw()
 {
-    if (!b_drawnThisFrame)
+    if (!b_hidden && !b_drawnThisFrame)
     {
         bool b_startNode = (OutputOnly());
         bool b_endNode = (InputOnly());
@@ -347,13 +347,13 @@ void Transistor::DrawWires()
 {
     Color color = WHITE;
     float thickness = 0.5f;
-    if (evaluation)
+    if (GetEvaluation())
     {
         color = RED;
         thickness = 1;
     }
-    if (output[0].connector) DrawSnappedLine(GetPos(), output[0].connector->GetPos(), color, output[0].shape);
-    if (output[1].connector) DrawSnappedLine(GetPos(), output[1].connector->GetPos(), color, output[1].shape);
+    if (output[0].connector && !output[0].connector->b_hidden) DrawSnappedLine(GetPos(), output[0].connector->GetPos(), color, output[0].shape);
+    if (output[1].connector && !output[1].connector->b_hidden) DrawSnappedLine(GetPos(), output[1].connector->GetPos(), color, output[1].shape);
 }
 
 // Called at the end of every frame

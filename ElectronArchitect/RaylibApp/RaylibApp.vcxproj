@@ -16,6 +16,7 @@
     <ProjectGuid>{121c392a-ddad-4484-ad81-059a7ffb8518}</ProjectGuid>
     <RootNamespace>RaylibApp</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <ProjectName>ElectronArchitect</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
@@ -99,6 +100,7 @@
   <ItemGroup>
     <ClInclude Include="Abstraction.h" />
     <ClInclude Include="Circuit.h" />
+    <ClInclude Include="CustomTypes.h" />
     <ClInclude Include="Globals.h" />
     <ClInclude Include="Serialization.h" />
     <ClInclude Include="Transistor.h" />

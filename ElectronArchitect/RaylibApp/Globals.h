@@ -5,7 +5,7 @@
 extern const int g_windowWidth;
 extern const int g_windowHeight;
 
-Vector2 Vector2InvertY(Vector2 vector);;
+Vector2 Vector2InvertY(Vector2 vector);
 
 extern const float g_gridSize;
 extern Vector2 cursorPos;

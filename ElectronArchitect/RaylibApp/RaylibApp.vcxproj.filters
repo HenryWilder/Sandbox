@@ -13,6 +13,7 @@
     <ClInclude Include="Serialization.h" />
     <ClInclude Include="Circuit.h" />
     <ClInclude Include="Globals.h" />
+    <ClInclude Include="CustomTypes.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="pretty.frag" />

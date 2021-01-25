@@ -50,13 +50,13 @@ public:
         static Shape NextShape(Shape);
     };
 
-    Transistor() : type{ Gate::Simple }, input{ {},{} }, output{ {},{} }, pos{ }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); };
+    Transistor() : input{ {},{} }, output{ {},{} }, pos{ }, type{ Gate::Simple }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); };
     Transistor(Gate _type) : input{ {},{} }, output{ {},{} }, type{ _type }, pos{ }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); };
     Transistor(Vector2 _pos) : input{ {},{} }, output{ {},{} }, type{ Gate::Simple }, pos{ _pos }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); };
-    Transistor(Gate _type, Vector2 _pos) : type{ _type }, input{ {},{} }, output{ {},{} }, pos{ _pos }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); };
-    Transistor(Transistor* _input) : type{  }, input{ { _input },{} }, output{ {},{} }, pos{  }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); SolderInput(_input, Connection::Shape::XFirst); };
-    Transistor(Transistor* _input, Vector2 _pos) : type{  }, input{ {},{} }, output{ {},{} }, pos{ _pos }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); SolderInput(_input, Connection::Shape::XFirst); };
-    Transistor(Transistor* _input, Vector2 _pos, Connection::Shape _shape) : type{  }, input{ {},{} }, output{ {},{} }, pos{ _pos }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); SolderInput(_input, _shape); };
+    Transistor(Gate _type, Vector2 _pos) : input{ {},{} }, output{ {},{} }, pos{ _pos }, type{ _type }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); };
+    Transistor(Transistor* _input) : input{ { _input },{} }, output{ {},{} }, pos{  }, type{  }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); SolderInput(_input, Connection::Shape::XFirst); };
+    Transistor(Transistor* _input, Vector2 _pos) : input{ {},{} }, output{ {},{} }, pos{ _pos }, type{  }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); SolderInput(_input, Connection::Shape::XFirst); };
+    Transistor(Transistor* _input, Vector2 _pos, Connection::Shape _shape) : input{ {},{} }, output{ {},{} }, pos{ _pos }, type{  }, b_drawnThisFrame{ false }, b_evaluatedThisFrame{ false }, b_beingEvaluated{ false }, evaluation{ false }, b_hidden{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); SolderInput(_input, _shape); };
 
     static std::vector<Transistor*> s_allTransistors;
 
@@ -66,7 +66,11 @@ public:
 private:
     Vector2 pos;
     Gate type;
-    bool b_drawnThisFrame, b_evaluatedThisFrame, b_beingEvaluated, evaluation, b_hidden;
+    bool b_drawnThisFrame;
+    bool b_evaluatedThisFrame;
+    bool b_beingEvaluated;
+    bool evaluation;
+    bool b_hidden;
 
     Component* containingComponent;
 
@@ -115,7 +119,7 @@ public:
     void DrawWires(); // Draws the output wire(s)
 
     void Icon(Color color, float size) const;
-    void Draw(); // Not const because it modifies b_drawnThisFrame
+    void Draw();
     void Highlight(Color color, float size) const;
 
     void FrameReset();

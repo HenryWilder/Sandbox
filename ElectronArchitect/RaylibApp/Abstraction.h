@@ -36,7 +36,7 @@ private:
 	Rectangle m_caseShape;
 
 	// Fixed size once created
-	Transistor** m_componentTransistors;
+	Transistor* m_componentTransistors; // We copy the Transistors directly into this array instead of storing an array of their pointers
 	size_t m_inputCount;
 	size_t m_internalCount;
 	size_t m_outputCount;
@@ -57,6 +57,13 @@ public:
 
 	Transistor** Begin();
 	Transistor** End();
+
+	std::vector<Transistor*> GetInputs();
+	std::vector<Transistor*> GetInternals();
+	std::vector<Transistor*> GetOutputs();
+	std::vector<Transistor*> GetTransistors();
+
+	void SelectTransistors(std::vector<Transistor*>& selection);
 
 	Vector2 GetPos() const;
 	Rectangle GetCaseRect() const;

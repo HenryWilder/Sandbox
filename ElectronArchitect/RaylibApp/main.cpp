@@ -191,7 +191,7 @@ int main(void)
                 if (!endTransistor) endTransistor = new Transistor(mode.data.wire.start, cursorPos, mode.data.wire.shape);
                 if (endTransistor == mode.data.wire.start)
                 {
-                    delete mode.data.wire.start; // Make sure this is correct
+                    delete mode.data.wire.start; // TODO: Make sure this is correct
                 }
                 mode.mode = InputMode::Mode::None;
             }
@@ -208,11 +208,7 @@ int main(void)
                 }
                 else if (componentHovering) // Drag component
                 {
-                    selection.reserve(selection.size() + componentHovering->GetTotalCount());
-                    for (size_t i = 0; i < componentHovering->GetTotalCount(); ++i)
-                    {
-                        selection.push_back(componentHovering->Begin()[i]);
-                    }
+                    componentHovering->SelectTransistors(selection);
                 }
                 b_moveActive = true;
             }
@@ -239,6 +235,18 @@ int main(void)
                 }
                 else if (componentHovering) // Delete component
                 {
+                    selection.clear();
+                    componentHovering->SelectTransistors(selection);
+
+                    while (!selection.empty())
+                    {
+                        size_t index = selection.size() - 1;
+                        selection[index]->ClearReferences();
+                        delete selection[index];
+                        selection.pop_back();
+                    }
+                    b_selectionIsExplicit = false;
+
                     componentHovering->ClearReferences();
                     delete componentHovering;
                     componentHovering = nullptr;
@@ -277,11 +285,6 @@ int main(void)
 
         if (b_moveActive) // Dragging
         {
-            for (Transistor* elem : selection)
-            {
-                if (elem == nullptr) continue;
-                if (elem->GetComponent()) elem->GetComponent()->UpdateCasing();
-            }
             if (IsMouseButtonReleased(MOUSE_MIDDLE_BUTTON))
             {
                 if (!b_selectionIsExplicit) ClearSelection();
@@ -289,10 +292,16 @@ int main(void)
             }
             else if (((abs(cursorPosDelta.x) >= g_gridSize)  || (abs(cursorPosDelta.y) >= g_gridSize)) && IsMouseButtonDown(MOUSE_MIDDLE_BUTTON))
             {
-                for (Transistor* item : selection)
+                for (Transistor* elem : selection)
                 {
-                    item->ChangePos(cursorPosDelta);
+                    elem->ChangePos(cursorPosDelta);
                 }
+            }
+
+            for (Transistor* elem : selection) // Update all component casings
+            {
+                if (elem == nullptr) continue;
+                if (elem->GetComponent()) elem->GetComponent()->UpdateCasing();
             }
         }
         else // Not dragging
@@ -441,12 +450,9 @@ int main(void)
     selection.clear();
 
     for (Component* component : Component::s_allComponents) { delete component; } // Must come before transistors
-    Component::s_allComponents.clear();
 
     for (Transistor* transistor : Transistor::s_allTransistors) { delete transistor; }
-    Transistor::s_allTransistors.clear();
 
     return 0;
 }
-
 
