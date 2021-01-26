@@ -35,6 +35,13 @@ struct Vec3
 	Coord Trunc() const { return { x, y }; }
 };
 
+
+template<int size>
+struct Matrix
+{
+	Matrix
+};
+
 double Dist(const Coord p1, const Coord p2) { return (p2 - p1).Length(); }
 bool InCircle(const Coord pos, const Coord origin, double radius) { return radius >= Dist(pos, origin); }
 bool InCircle(const Vec3 pos, const Vec3 origin, double radius) { return InCircle(Coord{ pos.x, pos.y }, Coord{ origin.x, origin.y }, radius); }

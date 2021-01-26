@@ -40,11 +40,8 @@ namespace Class
 	{
 		void CloakAndRecon()
 		{
-			while (true)
-			{
-				UpdateMovement({ 0,1 });
-				Turn({ -50,0 });
-			}
+			UpdateMovement({ 0,1 });
+			Turn({ -50,0 });
 		}
 	}
 }
