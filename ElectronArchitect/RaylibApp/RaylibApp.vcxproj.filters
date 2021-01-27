@@ -17,6 +17,7 @@
     <ClInclude Include="Globals.h" />
     <ClInclude Include="CustomTypes.h" />
     <ClInclude Include="BasicMath.h" />
+    <ClInclude Include="CustomSmrtPtr.h" />
   </ItemGroup>
   <ItemGroup>
     <None Include="pretty.frag" />

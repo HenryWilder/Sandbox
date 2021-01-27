@@ -103,6 +103,7 @@
     <ClInclude Include="Abstraction.h" />
     <ClInclude Include="BasicMath.h" />
     <ClInclude Include="Circuit.h" />
+    <ClInclude Include="CustomSmrtPtr.h" />
     <ClInclude Include="CustomTypes.h" />
     <ClInclude Include="Globals.h" />
     <ClInclude Include="Serialization.h" />
