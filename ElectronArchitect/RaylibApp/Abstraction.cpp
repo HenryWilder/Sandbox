@@ -193,7 +193,12 @@ Component::Component(const Component& src)
 
 Component::~Component()
 {
+    for (size_t i = 0; i < m_componentTransistorCount; ++i)
+    {
+        m_componentTransistors[i].ClearReferences();
+    }
     delete[] m_componentTransistors;
+    printf("Component containing %zu transistors deleted!\n", m_componentTransistorCount);
 }
 
 size_t Component::GetInputCount() const

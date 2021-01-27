@@ -117,7 +117,7 @@ int main(void)
 
         {
             Int2 cursorPosLast = cursorPos;
-            cursorPos = Int2(IntSpace(Vector2Snap(Vector2Divide(Vector2Subtract(GetMousePosition(), camera.offset), Vector2{ camera.zoom, camera.zoom }))));
+            cursorPos = Int2(Vector2Snap(Vector2Divide(Vector2Subtract(GetMousePosition(), camera.offset), Vector2{ camera.zoom, camera.zoom })));
             cursorPosDelta = cursorPos - cursorPosLast;
         }
 
@@ -233,25 +233,12 @@ int main(void)
                 }
                 else if (componentHovering) // Delete component
                 {
-                    selection.clear();
-                    componentHovering->SelectTransistors(selection);
-
-                    while (!selection.empty())
-                    {
-                        size_t index = selection.size() - 1;
-                        selection[index]->ClearReferences();
-                        delete selection[index];
-                        selection.pop_back();
-                    }
-                    b_selectionIsExplicit = false;
-
                     componentHovering->ClearReferences();
                     delete componentHovering;
                     componentHovering = nullptr;
                 }
                 selectionStart = cursorPos;
             }
-            // TODO: component Abstraction
             else if (IsMouseButtonDown(MOUSE_LEFT_BUTTON))
             {
                 Int2 selectionEnd = cursorPos;
@@ -361,31 +348,62 @@ int main(void)
 
         DrawRectangleRec((Rectangle)selectionSpace, ColorAlpha(YELLOW, 0.2f));
         {
-            IntRect gridSpace = IntRect(Int2(0), Int2(g_windowWidth, g_windowHeight) * camera.zoom);
-            for (Int2 pt = gridSpace.m_cornerMin; pt <= gridSpace.m_cornerMax; pt += Int2(1))
+            Vector2 screenMin = GetScreenToWorld2D(Vector2{ 0.0f,0.0f }, camera);
+            Vector2 screenMax = GetScreenToWorld2D(Vector2{ (float)g_windowWidth, (float)g_windowHeight }, camera);
+
+            for (Int2 pt = Int2(screenMin); !(pt.x > screenMax.x && pt.y > screenMax.y); pt += Int2(1))
             {
-                DrawLine(pt.x, gridSpace.m_cornerMin.y, pt.x, gridSpace.m_cornerMax.y, { 255,255,255,16 });
-                DrawLine(gridSpace.m_cornerMin.x, pt.y, gridSpace.m_cornerMax.x, pt.y, { 255,255,255,16 });
+                DrawLine(pt.x, screenMin.y, pt.x, screenMax.y, { 255,255,255,16 });
+                DrawLine(screenMin.x, pt.y, screenMax.x, pt.y, { 255,255,255,16 });
             }
             unsigned char alpha = 32;
             if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON) || IsMouseButtonDown(MOUSE_LEFT_BUTTON)) alpha = 48;
-            DrawLineEx((Vector2)Int2(cursorPos.x, gridSpace.m_cornerMin.y), (Vector2)Int2(cursorPos.x, gridSpace.m_cornerMax.y), 2, { 255,255,255, alpha });
-            DrawLineEx((Vector2)Int2(gridSpace.m_cornerMin.x, cursorPos.y), (Vector2)Int2(gridSpace.m_cornerMax.x, cursorPos.y), 2, { 255,255,255, alpha });
+
+            float width = (3.0f) / camera.zoom;
+            float halfWidth = (width / 2.0f);
+
+            // Mouse cross
+            // x-axis
+            DrawLineEx(
+                (Vector2{ screenMin.x, (float)cursorPos.y + 1.0f - halfWidth }),
+                (Vector2{ screenMax.x, (float)cursorPos.y + 1.0f - halfWidth }),
+                width, { 255,255,255, alpha }
+            );
+            // y-axis
+            DrawLineEx(
+                (Vector2{ (float)cursorPos.x - 1.0f + halfWidth, screenMin.y }),
+                (Vector2{ (float)cursorPos.x - 1.0f + halfWidth, screenMax.y }),
+                width, { 255,255,255, alpha }
+            );
+
+            // (0,0) cross
+            // x-axis
+            DrawLineEx(
+                (Vector2{ screenMin.x, -halfWidth }),
+                (Vector2{ screenMax.x, -halfWidth }),
+                width, { 255,255,255, 48 }
+            );
+            // y-axis
+            DrawLineEx(
+                (Vector2{ halfWidth, screenMin.y }),
+                (Vector2{ halfWidth, screenMax.y }),
+                width, { 255,255,255, 48 }
+            );
         }
         for (Transistor* check : Transistor::s_allTransistors)
         {
             if (selectionSpace.Contains(check->GetPos()))
             {
-                check->Highlight(YELLOW, 8);
+                check->Highlight(YELLOW, 2.0f);
             }
         }
-        DrawRectangleLinesEx((Rectangle)selectionSpace, 2, YELLOW);
+        DrawRectangleLinesEx((Rectangle)selectionSpace, 2.0f, YELLOW);
 
-        if (!selection.empty())
+        if (!selection.empty()) // Highlight selection
         {
             for (Transistor* select : selection)
             {
-                select->Highlight(YELLOW, 8);
+                select->Highlight(YELLOW, 2.0f);
             }
         }
         else if (mode.mode == InputMode::Mode::Gate)
@@ -393,7 +411,7 @@ int main(void)
             // Show branches
             if (transistorHovering)
             {
-                transistorHovering->Highlight(YELLOW, 8);
+                transistorHovering->Highlight(YELLOW, 2.0f);
                 // TODO: Highlight wires
             }
         }
@@ -404,7 +422,7 @@ int main(void)
             if (mode.mode == InputMode::Mode::Wire) cursorColor = RED;
             else if (mode.mode == InputMode::Mode::Gate) cursorColor = YELLOW;
 
-            DrawRectangleV((Vector2)(cursorPos - Int2(2)), (Vector2)Int2(4), cursorColor);
+            DrawRectangleV(Vector2Subtract((Vector2)cursorPos, Vector2{ 0.5f,0.5f }), (Vector2)Int2(1), cursorColor);
         }
 
         if (mode.mode == InputMode::Mode::Wire)
@@ -418,7 +436,7 @@ int main(void)
         }
 
         if (componentHovering && !(transistorHovering || b_moveActive)) componentHovering->Highlight({32,32,0,255});
-        else if (transistorHovering) transistorHovering->Highlight(YELLOW, 8.0f);
+        else if (transistorHovering) transistorHovering->Highlight(YELLOW, 2.0f);
 
         // Transistors
         for (Transistor* transistor : Transistor::s_allTransistors) { transistor->Draw(); }

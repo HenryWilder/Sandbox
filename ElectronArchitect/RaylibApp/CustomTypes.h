@@ -140,10 +140,6 @@ Int2 operator-(const Int2 i2);
 template<> Int2 Min<Int2>(Int2 a, Int2 b);
 template<> Int2 Max<Int2>(Int2 a, Int2 b);
 
-Int2 VecSpace(Int2 i2);
-
-Vector2 IntSpace(Vector2 vec);
-
 struct Rectangle;
 
 struct IntRect

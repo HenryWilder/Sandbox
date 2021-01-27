@@ -55,6 +55,7 @@ public:
     Transistor(Transistor* _input) : input{ { _input },{} }, output{ {},{} }, pos{  }, type{  }, flags{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); SolderInput(_input, Connection::Shape::XFirst); };
     Transistor(Transistor* _input, Int2 _pos) : input{ {},{} }, output{ {},{} }, pos{ _pos }, type{  }, flags{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); SolderInput(_input, Connection::Shape::XFirst); };
     Transistor(Transistor* _input, Int2 _pos, Connection::Shape _shape) : input{ {},{} }, output{ {},{} }, pos{ _pos }, type{  }, flags{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); SolderInput(_input, _shape); };
+    ~Transistor() { printf("Transistor deleted! %zu transistors remain.\n", s_allTransistors.size()); }
 
     static std::vector<Transistor*> s_allTransistors;
 

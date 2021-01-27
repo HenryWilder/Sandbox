@@ -129,7 +129,7 @@ void Load(std::vector<Transistor*>& toArr)
 
 	transistors.reserve(transistorCount);
 	toArr.reserve(toArr.size() + transistorCount);
-	//Transistor::s_allTransistors.reserve(s_allTransistors.size() + transistorCount);
+	//Transistor::s_allTransistors.reserve(s_allTransistors.size() + transistorCount); // TODO: Figure out why tf this causes errors
 
 	// Populate the transistor vector
 	// This will allow us to accurately obtain pointers from indexes
