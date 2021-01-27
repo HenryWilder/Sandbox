@@ -1,15 +1,18 @@
 #include <fstream>
 #include <iostream>
-#include "Abstraction.h"
+#include <raylib.h>
+#include <raymath.h>
+#include "CustomTypes.h"
 #include "Globals.h"
 #include "Transistor.h"
+#include "Abstraction.h"
 
-Component::Component(std::vector<Transistor*>& selection, Vector2 position)
+Component::Component(std::vector<Transistor*>& selection, Int2 position)
 {
     m_componentTransistorCount = selection.size();
     s_allComponents.push_back(this);
-    Vector2 minCorner = { -1.0f * g_gridSize, -1.0f * g_gridSize };
-    Vector2 maxCorner = { g_gridSize, -1.0f * g_gridSize };
+
+    IntRect rectangle(Int2(-g_gridSize), Int2(g_gridSize, -g_gridSize));
 
     m_inputCount = 0;
     m_internalCount = 0;
@@ -35,7 +38,7 @@ Component::Component(std::vector<Transistor*>& selection, Vector2 position)
         }
         if (externalIO & 0b10000) printf("Some real bullshit happened"); // How the fuck does this happen
 
-        Vector2 elemPos = { 0,0 };
+        Int2 elemPos(0);
         switch ((((externalIO & 0b0011) > 0) * 0b01) | (((externalIO & 0b1100) > 0) * 0b10)) // Convert the 4 bits of data into just 2
         {
         default:
@@ -44,14 +47,14 @@ Component::Component(std::vector<Transistor*>& selection, Vector2 position)
             break;
 
         case 0b01: // Has only input(s) outside the selection
-            elemPos.x = -1.0f * g_gridSize;
-            elemPos.y = (g_gridSize * (float)(m_inputCount));
+            elemPos.x = -g_gridSize;
+            elemPos.y = (int)((size_t)g_gridSize * m_inputCount);
             m_inputCount++;
             break;
 
         case 0b10: // Has only output(s) outside the selection
             elemPos.x = g_gridSize;
-            elemPos.y = (g_gridSize * (float)(m_outputCount));
+            elemPos.y = (int)((size_t)g_gridSize * m_outputCount);
             m_outputCount++;
             break;
 
@@ -59,9 +62,9 @@ Component::Component(std::vector<Transistor*>& selection, Vector2 position)
             
             // The output transistor will be created here
             elemPos.x = g_gridSize;
-            elemPos.y = (g_gridSize * (float)(m_outputCount));
+            elemPos.y = (int)((size_t)g_gridSize * m_outputCount);
             m_outputCount++;
-            maxCorner.y = __max(elemPos.y, maxCorner.y);
+            rectangle.m_cornerMax.y = Max(elemPos.y, rectangle.m_cornerMax.y);
 
             {
                 Transistor* output = new Transistor(position + elemPos);
@@ -111,11 +114,11 @@ Component::Component(std::vector<Transistor*>& selection, Vector2 position)
             }
 
             // elem will always be the input
-            elemPos.x = -1.0f * g_gridSize;
-            elemPos.y = (g_gridSize * (float)(m_inputCount++));
+            elemPos.x = -g_gridSize;
+            elemPos.y = (int)((size_t)g_gridSize * m_inputCount++);
             break;
         }
-        maxCorner.y = __max(elemPos.y, maxCorner.y);
+        rectangle.m_cornerMax.y = Max(elemPos.y, rectangle.m_cornerMax.y);
         elem->SetPos(position + elemPos);
         elem->SetComponent(this);
     }
@@ -125,12 +128,12 @@ Component::Component(std::vector<Transistor*>& selection, Vector2 position)
         selection.push_back(push);
     }
 
-    m_caseShape.x = position.x + minCorner.x - g_gridSize;
-    m_caseShape.y = position.y + minCorner.y;
-    m_caseShape.width = (g_gridSize * 4.0f);
-    m_caseShape.height = (abs(maxCorner.y - minCorner.y) + (g_gridSize));
-    printf("Position: { %#1.1f, %#1.1f }", position.x, position.y);
-    printf("Rectangle: {\n    x = %#1.1f,\n    y = %#1.1f,\n    width = %#1.1f,\n    height = %#1.1f\n}\n", m_caseShape.x, m_caseShape.y, m_caseShape.width, m_caseShape.height);
+    m_caseShape = rectangle;
+    m_caseShape.Move(position);
+    m_caseShape.GrowBorder(1);
+
+    printf("Position: { %i, %i }", position.x, position.y);
+    printf("Rectangle: {\n    x = %i,\n    y = %i,\n    width = %i,\n    height = %i\n}\n", m_caseShape.m_cornerMin.x, m_caseShape.m_cornerMin.y, m_caseShape.Range().x, m_caseShape.Range().y);
 
     m_componentTransistors = new Transistor[m_componentTransistorCount]();
 
@@ -154,21 +157,38 @@ Component::Component(std::vector<Transistor*>& selection, Vector2 position)
 
         printf("%p belongs in sector %i\n", elem, externalIO);
 
-        if (externalIO == 1) elem->Hide();
+        if ((currentIndex[externalIO]) < m_componentTransistorCount)
+        {
+            if (externalIO == 1) elem->Hide();
 
-        m_componentTransistors[(currentIndex[externalIO])] = *elem;
-        m_componentTransistors[(currentIndex[externalIO])].Hide();
+            memcpy(m_componentTransistors + (currentIndex[externalIO]), elem, sizeof(Transistor));
+            m_componentTransistors[(currentIndex[externalIO])].Hide();
 
-        printf("Transistor [%i] of the component is now: %p\n", int(currentIndex[externalIO]), m_componentTransistors[(currentIndex[externalIO])]);
-        elem->ClearReferences();
-        delete elem;
-        elem = nullptr;
-        currentIndex[externalIO]++;
+            printf("Transistor [%i] of the component is now: %p\n", int(currentIndex[externalIO]), m_componentTransistors + (currentIndex[externalIO]));
+            elem->ClearReferences();
+            delete elem;
+            elem = nullptr;
+            currentIndex[externalIO]++;
+        }
     }
     for (size_t i = 0; i < m_componentTransistorCount; ++i)
     {
-        printf("Transistor [%i] confirmed to be %p.\n", i, m_componentTransistors[i]);
+        printf("Transistor [%zu] confirmed to be %p.\n", i, m_componentTransistors + i);
     }
+}
+
+Component::Component(const Component& src)
+{
+    s_allComponents.push_back(this);
+
+    m_caseShape = src.m_caseShape;
+    m_inputCount = src.m_inputCount;
+    m_internalCount = src.m_internalCount;
+    m_outputCount = src.m_outputCount;
+    m_componentTransistorCount = src.m_componentTransistorCount;
+
+    m_componentTransistors = new Transistor[m_componentTransistorCount];
+    if (m_componentTransistors) memcpy(m_componentTransistors, src.m_componentTransistors, (sizeof(Transistor) * m_componentTransistorCount));
 }
 
 Component::~Component()
@@ -196,46 +216,6 @@ size_t Component::GetTotalCount() const
     return m_componentTransistorCount;
 }
 
-Transistor** Component::InputsBegin()
-{
-    return m_componentTransistors;
-}
-
-Transistor** Component::InputsEnd()
-{
-    return InputsBegin() + m_inputCount;
-}
-
-Transistor** Component::InternalsBegin()
-{
-    return InputsEnd();
-}
-
-Transistor** Component::InternalsEnd()
-{
-    return InternalsBegin() + m_internalCount;
-}
-
-Transistor** Component::OutputsBegin()
-{
-    return InternalsEnd();
-}
-
-Transistor** Component::OutputsEnd()
-{
-    return (m_componentTransistors + m_componentTransistorCount);
-}
-
-Transistor** Component::Begin()
-{
-    return m_componentTransistors;
-}
-
-Transistor** Component::End()
-{
-    return m_componentTransistors + m_componentTransistorCount;
-}
-
 std::vector<Transistor*> Component::GetInputs()
 {
     std::vector<Transistor*> arr;
@@ -243,10 +223,14 @@ std::vector<Transistor*> Component::GetInputs()
 
     for (size_t i = 0; i < m_inputCount; ++i)
     {
-        arr.push_back(m_componentTransistors[i]);
+        arr.push_back(m_componentTransistors + i);
     }
 
     return arr;
+}
+
+void Component::ForEachInput(void(*func)(Transistor& elem, size_t index))
+{
 }
 
 std::vector<Transistor*> Component::GetInternals()
@@ -256,10 +240,14 @@ std::vector<Transistor*> Component::GetInternals()
 
     for (size_t i = m_inputCount; i < (m_inputCount + m_internalCount); ++i)
     {
-        arr.push_back(m_componentTransistors[i]);
+        arr.push_back(m_componentTransistors + i);
     }
 
     return arr;
+}
+
+void Component::ForEachInternal(void(*func)(Transistor& elem, size_t index))
+{
 }
 
 std::vector<Transistor*> Component::GetOutputs()
@@ -269,10 +257,14 @@ std::vector<Transistor*> Component::GetOutputs()
 
     for (size_t i = (m_componentTransistorCount - m_outputCount); i < m_componentTransistorCount; ++i)
     {
-        arr.push_back(m_componentTransistors[i]);
+        arr.push_back(m_componentTransistors + i);
     }
 
     return arr;
+}
+
+void Component::ForEachOutput(void(*func)(Transistor& elem, size_t index))
+{
 }
 
 std::vector<Transistor*> Component::GetTransistors()
@@ -282,10 +274,14 @@ std::vector<Transistor*> Component::GetTransistors()
 
     for (size_t i = 0; i < m_componentTransistorCount; ++i)
     {
-        arr.push_back(m_componentTransistors[i]);
+        arr.push_back(m_componentTransistors + i);
     }
 
     return arr;
+}
+
+void Component::ForEachTransistor(void(*func)(Transistor& elem, size_t index))
+{
 }
 
 void Component::SelectTransistors(std::vector<Transistor*>& selection)
@@ -294,72 +290,60 @@ void Component::SelectTransistors(std::vector<Transistor*>& selection)
 
     for (size_t i = 0; i < m_componentTransistorCount; ++i)
     {
-        selection.push_back(m_componentTransistors[i]);
+        selection.push_back(m_componentTransistors + i);
     }
 }
 
-Vector2 Component::GetPos() const
+Int2 Component::GetPos() const
 {
-    return Vector2{ m_caseShape.x, m_caseShape.y };
+    return m_caseShape.m_cornerMin;
 }
 
-Rectangle Component::GetCaseRect() const
+IntRect Component::GetCaseRect() const
 {
     return m_caseShape;
 }
 
-void Component::Move(Vector2 deltaPos)
+void Component::Move(const Int2 deltaPos)
 {
-    m_caseShape.x = m_caseShape.x + deltaPos.x;
-    m_caseShape.y = m_caseShape.y + deltaPos.y;
+    m_caseShape.Move(deltaPos);
 }
 
-void Component::MoveAbsolute(Vector2 newPos)
+void Component::MoveAbsolute(const Int2 newPos)
 {
-    m_caseShape.x = newPos.x;
-    m_caseShape.y = newPos.y;
+    m_caseShape.Move(newPos - m_caseShape.m_cornerMin);
 }
 
 void Component::UpdateCasing()
 {
-    int maxX = INT_MIN;
-    int maxY = INT_MIN;
-
-    int minX = INT_MAX;
-    int minY = INT_MAX;
+    Int2 min = Int2(INT_MAX);
+    Int2 max = Int2(INT_MIN);
     
     auto updateCorners = [&](Transistor* elem) {
-        Vector2 checkPos = elem->GetPos();
-        int checkPosX = (int)checkPos.x;
-        int checkPosY = (int)checkPos.y;
-
-        maxX = __max(maxX, checkPosX);
-        minX = __min(minX, checkPosX);
-        maxY = __max(maxY, checkPosY);
-        minY = __min(minY, checkPosY);
+        Int2 checkPos = elem->GetPos();
+        min.x = Min(min.x, checkPos.x);
+        min.y = Min(min.y, checkPos.y);
+        max.x = Max(max.x, checkPos.x);
+        max.y = Max(max.y, checkPos.y);
     };
 
-    for (size_t i = 0; i < m_inputCount; ++i)
-    {
-        updateCorners(m_componentTransistors[i]);
-    }
-    for (size_t i = (m_componentTransistorCount - m_outputCount); i < m_componentTransistorCount; ++i)
-    {
-        updateCorners(m_componentTransistors[i]);
+    for (size_t i = 0; i < m_componentTransistorCount; ++i) {
+        if (i == m_inputCount) {
+            i += m_internalCount - 1; // Skip internals
+            continue;
+        }
+        updateCorners(m_componentTransistors + i);
     }
 
-    m_caseShape.x = ((float)minX - g_gridSize);
-    m_caseShape.y = ((float)minY - g_gridSize);
-    Vector2 extents = Vector2{ (float)maxX + g_gridSize, (float)maxY + g_gridSize } - Vector2{ m_caseShape.x, m_caseShape.y };
-    m_caseShape.width = (extents.x);
-    m_caseShape.height = (extents.y);
+    m_caseShape.m_cornerMin = min;
+    m_caseShape.m_cornerMax = max;
 }
 
 void Component::Icon(Color color)
 {
     Vector3 edgeColor = ColorToHSV(color);
-    DrawRectangleRec(m_caseShape, color);
-    DrawRectangleLinesEx(m_caseShape, 2, ColorFromHSV(edgeColor.x, edgeColor.y, edgeColor.z + 12.0f));
+    DrawRectangleRec((Rectangle)m_caseShape, color);
+    DrawRectangleLinesEx((Rectangle)m_caseShape, 2, ColorFromHSV(edgeColor.x, edgeColor.y, edgeColor.z + 12.0f));
 }
 
 void Component::Draw()

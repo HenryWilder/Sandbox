@@ -1,14 +1,17 @@
 #include <fstream>
-#include "Serialization.h"
+#include <raylib.h>
+#include <raymath.h>
+#include "CustomTypes.h"
 #include "Globals.h"
 #include "Transistor.h"
+#include "Serialization.h"
 
-std::ostream& operator<<(std::ostream& file, const Vector2& vector)
+std::ostream& operator<<(std::ostream& file, const Int2& vector)
 {
 	file << vector.x << " " << vector.y;
 	return file;
 }
-std::istream& operator>>(std::istream& file, Vector2& vector)
+std::istream& operator>>(std::istream& file, Int2& vector)
 {
 	file >> vector.x >> vector.y;
 	return file;
@@ -106,7 +109,7 @@ void Save(const std::vector<Transistor*>& fromArr)
 	saveFile << "version 1\nc " << fromArr.size() << "\n";
 	for (Transistor* const& transistor : fromArr)
 	{
-		saveFile << "t " << transistor->pos << " " << transistor->type << " " <<
+		saveFile << "t " << transistor->GetPos() << " " << transistor->GetGateType() << " " <<
 			"[ "<< FindIndex(fromArr, transistor->output[0].connector) << " " << transistor->output[0].shape << " ] " <<
 			"[ "<< FindIndex(fromArr, transistor->output[1].connector) << " " << transistor->output[1].shape << " ]\n";
 	}
@@ -124,6 +127,10 @@ void Load(std::vector<Transistor*>& toArr)
 	size_t transistorCount;
 	loadFile >> transistorCount;
 
+	transistors.reserve(transistorCount);
+	toArr.reserve(toArr.size() + transistorCount);
+	//Transistor::s_allTransistors.reserve(s_allTransistors.size() + transistorCount);
+
 	// Populate the transistor vector
 	// This will allow us to accurately obtain pointers from indexes
 	// This NEEDS to happen BEFORE the next loop so that the connections can be linked correctly! Stop trying to optimize it out, dumbass!!
@@ -132,7 +139,6 @@ void Load(std::vector<Transistor*>& toArr)
 		Transistor* transistor = new Transistor(); // These transistors will be used outside this function, so we want to allocate memory for them.
 		transistors.push_back(transistor);
 		toArr.push_back(transistor); // Push the transistor to the output array; we've already got it allocated now, anyway.
-		Transistor::s_allTransistors.push_back(transistor);
 	}
 
 	for (Transistor* thisLineTransistor : transistors) // The transistor on the line being read
@@ -148,7 +154,7 @@ void Load(std::vector<Transistor*>& toArr)
 			if (outputTransistorIndex != transistorCount)
 			{
 				Transistor* connectedTransistor = transistors[outputTransistorIndex]; // Being used pretty much as just an alias. Saves the extra step/confusion of having the "[...]" in two places.
-				thisLineTransistor->SolderOutput(transistors[outputTransistorIndex], Transistor::Connection::Shape::XFirst); // TODO: We can make this better
+				thisLineTransistor->SolderOutput(connectedTransistor); // TODO: We can make this better
 				loadFile >> thisLineTransistor->output[i].shape;
 			}
 		}

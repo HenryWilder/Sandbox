@@ -1,9 +1,8 @@
 #pragma once
-#include <raylib.h>
-#include <raymath.h>
 #include <vector>
 
 class Transistor;
+extern std::vector<Transistor*> s_allTransistors;
 
 void Save(const std::vector<Transistor*>&);
 

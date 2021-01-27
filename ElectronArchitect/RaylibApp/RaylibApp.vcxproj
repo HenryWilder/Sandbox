@@ -92,6 +92,8 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Abstraction.cpp" />
+    <ClCompile Include="BasicMath.cpp" />
+    <ClCompile Include="CustomTypes.cpp" />
     <ClCompile Include="Globals.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Serialization.cpp" />
@@ -99,6 +101,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Abstraction.h" />
+    <ClInclude Include="BasicMath.h" />
     <ClInclude Include="Circuit.h" />
     <ClInclude Include="CustomTypes.h" />
     <ClInclude Include="Globals.h" />
