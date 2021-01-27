@@ -19,7 +19,7 @@ struct Int2
 		y = i2.y;
 		return *this;
 	}
-	
+
 	Int2 operator+(const Int2 b) const {
 		return { x + b.x, y + b.y };
 	}
@@ -120,7 +120,7 @@ struct Int2
 		return (x != b.x || y != b.y);
 	}
 	bool operator<(const Int2 b) const {
-		return (x < b.x && y < b.y);
+		return (x < b.x&& y < b.y);
 	}
 	bool operator<=(const Int2 b) const {
 		return (x <= b.x && y <= b.y);

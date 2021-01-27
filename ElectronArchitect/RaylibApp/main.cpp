@@ -50,9 +50,9 @@ Rectangle RecVec2(Vector2 start, Vector2 end)
 
 int main(void)
 {
-    
-
     InitWindow(g_windowWidth, g_windowHeight, "Electron Architect");
+
+    Font font = LoadFont("resources/fonts/alpha_beta.png");
 
     cursorPos;
     Int2 cursorPosDelta(0);
@@ -73,12 +73,18 @@ int main(void)
     //Shader circuitPostProc = LoadShader(0, "pretty.frag");
     //RenderTexture2D wireTexture = LoadRenderTexture(g_windowWidth, g_windowHeight);
 
-    // TODO: Set up camera
+    //Shader gridShader = LoadShader(0, "grid.frag");
+    //int cameraOffsetSHD = GetShaderLocation(gridShader, "cameraPosition");
+    //int cameraZoomSHD = GetShaderLocation(gridShader, "cameraZoom");
+
     Camera2D camera;
     camera.offset = { (float)g_windowWidth / 2.0f, (float)g_windowHeight / 2.0f };
     camera.rotation = 0.0f;
     camera.target = { 0,0 };
     camera.zoom = 1.0f;
+
+    //float cameraOffset[2] = { 0.0f,0.0f };
+    //float cameraZoom = 0.0f;
 
     SetTargetFPS(60);
 
@@ -86,38 +92,40 @@ int main(void)
     {
         // Update vars
         //---------------------------------------------
-       
+
         // Zoom
         if (GetMouseWheelMove())
         {
             float delta = 0.0f;
-            if (camera.zoom <= 1.0f)
+            if (GetMouseWheelMove() < 0.0f) // Zoom out
             {
-                if (GetMouseWheelMove() < 0.0f)
-                {
-                    delta = -(camera.zoom / 2);
-                }
-                else if (camera.zoom < 1.0f)
-                {
-                    delta = camera.zoom;
-                }
-                else delta = GetMouseWheelMove();
+                delta = -(camera.zoom / 2);
             }
-            else
+            else // Zoom in
             {
-                delta = GetMouseWheelMove();
+                delta = camera.zoom;
             }
             camera.zoom = camera.zoom + delta;
-            camera.offset = Vector2Add(camera.offset, Vector2Multiply((Vector2)cursorPos, (Vector2)(Int2(-Round(delta)))));
+            camera.offset = Vector2Add(camera.offset, Vector2Multiply((Vector2)cursorPos, Vector2{ -delta, -delta }));
         }
 
         // Pan
         camera.offset.x += ((float)((int)(IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) - (int)(IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D))) * (g_gridSize * camera.zoom));
         camera.offset.y += ((float)((int)(IsKeyDown(KEY_UP) || IsKeyDown(KEY_W)) - (int)(IsKeyDown(KEY_DOWN) || IsKeyDown(KEY_S))) * (g_gridSize * camera.zoom));
 
+        Vector2 wsScreenPix = Vector2Subtract(GetScreenToWorld2D((Vector2)(Int2(1)), camera), GetScreenToWorld2D((Vector2)(Int2(0)), camera)); // The size of a screenspace pixel in worldspace
+
+        //cameraOffset[0] = camera.offset.x;
+        //cameraOffset[1] = camera.offset.y;
+        //cameraZoom = camera.zoom;
+
+        //SetShaderValue(gridShader, cameraOffsetSHD, cameraOffset, UNIFORM_VEC2);
+        //SetShaderValue(gridShader, cameraZoomSHD, &cameraZoom, UNIFORM_FLOAT);
+    
+        // Mouse position
         {
-            Int2 cursorPosLast = cursorPos;
-            cursorPos = Int2(Vector2Snap(Vector2Divide(Vector2Subtract(GetMousePosition(), camera.offset), Vector2{ camera.zoom, camera.zoom })));
+            Int2 cursorPosLast = cursorPos; // Where the cursor was last frame
+            cursorPos = Int2(GetScreenToWorld2D(GetMousePosition(), camera));
             cursorPosDelta = cursorPos - cursorPosLast;
         }
 
@@ -346,16 +354,60 @@ int main(void)
 
         ClearBackground({ 8,8,8, 255 });
 
-        DrawRectangleRec((Rectangle)selectionSpace, ColorAlpha(YELLOW, 0.2f));
+        //BeginShaderMode(gridShader);
+        //{
+        //    Vector2 start = GetScreenToWorld2D(Vector2{ 0.0f,0.0f }, camera);
+        //    DrawRectangleV(
+        //        start,
+        //        Vector2Subtract(GetScreenToWorld2D(Vector2{ (float)g_windowWidth, -(float)g_windowHeight }, camera), start),
+        //        WHITE
+        //    );
+        //}
+        //EndShaderMode();
+
+        // Draw grid
         {
             Vector2 screenMin = GetScreenToWorld2D(Vector2{ 0.0f,0.0f }, camera);
             Vector2 screenMax = GetScreenToWorld2D(Vector2{ (float)g_windowWidth, (float)g_windowHeight }, camera);
 
-            for (Int2 pt = Int2(screenMin); !(pt.x > screenMax.x && pt.y > screenMax.y); pt += Int2(1))
+            if (camera.zoom >= 1) // 1x gridlines
             {
-                DrawLine(pt.x, screenMin.y, pt.x, screenMax.y, { 255,255,255,16 });
-                DrawLine(screenMin.x, pt.y, screenMax.x, pt.y, { 255,255,255,16 });
+                // Gridlines
+                for (int x = screenMin.x; x <= screenMax.x; ++x) { DrawLine(x, (int)screenMin.y, x, (int)screenMax.y, { 63,255,63,32 }); }
+                for (int y = screenMin.y; y <= screenMax.y; ++y) { DrawLine((int)screenMin.x, y, (int)screenMax.x, y, { 63,255,63,32 }); }
+                // Coords
+                if (camera.zoom >= 32) {
+                    for (int x = screenMin.x; x <= screenMax.x; ++x) { DrawTextEx(font, TextFormat("%i", x), Vector2{ (float)x + 0.5f, 0.05f }, ((float)font.baseSize / camera.zoom), 1.0f / camera.zoom, WHITE); }
+                    for (int y = screenMin.y; y <= screenMax.y; ++y) { DrawTextEx(font, TextFormat("%i", y), Vector2{ 0.05f, (float)y + 0.5f }, (float)font.baseSize / camera.zoom, 1.0f / camera.zoom, WHITE); }
+                }
             }
+            else // Average
+            {
+                constexpr Color meld{ 63 / 4, 255 / 4, 63 / 4, 255 };
+                ClearBackground(meld);
+            }
+            if (camera.zoom >= 0.5) // 8x gridlines
+            {
+                for (int x = screenMin.x; x <= screenMax.x; x += 8) { DrawLine(x, (int)screenMin.y, x, (int)screenMax.y, { 63,255,255,24 }); }
+                for (int y = screenMin.y; y <= screenMax.y; y += 8) { DrawLine((int)screenMin.x, y, (int)screenMax.x, y, { 63,255,255,24 }); }
+            }
+            else // Average
+            {
+                constexpr Color meld{ (63 / 16) * 3, (255 / 16) * 3, (255 / 16) * 3, 255 };
+                ClearBackground(meld);
+            }
+            if (camera.zoom >= 0.015625) // 64x gridlines
+            {
+                for (int x = screenMin.x; x <= screenMax.x; x += 64) DrawLine(x, (int)screenMin.y, x, (int)screenMax.y, { 63,63,255,24 });
+                for (int y = screenMin.y; y <= screenMax.y; y += 64) DrawLine((int)screenMin.x, y, (int)screenMax.x, y, { 63,63,255,24 });
+            }
+            else
+            {
+                constexpr Color meld{ (63 / 16) * 3, (63 / 16) * 3, (255 / 16) * 3, 255 };
+                ClearBackground(meld);
+            }
+
+
             unsigned char alpha = 32;
             if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON) || IsMouseButtonDown(MOUSE_LEFT_BUTTON)) alpha = 48;
 
@@ -379,17 +431,20 @@ int main(void)
             // (0,0) cross
             // x-axis
             DrawLineEx(
-                (Vector2{ screenMin.x, -halfWidth }),
-                (Vector2{ screenMax.x, -halfWidth }),
+                (Vector2{ screenMin.x, -halfWidth + 1.0f }),
+                (Vector2{ screenMax.x, -halfWidth + 1.0f }),
                 width, { 255,255,255, 48 }
             );
             // y-axis
             DrawLineEx(
-                (Vector2{ halfWidth, screenMin.y }),
-                (Vector2{ halfWidth, screenMax.y }),
+                (Vector2{ halfWidth - 1.0f, screenMin.y }),
+                (Vector2{ halfWidth - 1.0f, screenMax.y }),
                 width, { 255,255,255, 48 }
             );
         }
+
+        DrawRectangleRec((Rectangle)selectionSpace, ColorAlpha(YELLOW, 0.2f));
+
         for (Transistor* check : Transistor::s_allTransistors)
         {
             if (selectionSpace.Contains(check->GetPos()))
@@ -397,7 +452,6 @@ int main(void)
                 check->Highlight(YELLOW, 2.0f);
             }
         }
-        DrawRectangleLinesEx((Rectangle)selectionSpace, 2.0f, YELLOW);
 
         if (!selection.empty()) // Highlight selection
         {
@@ -416,15 +470,6 @@ int main(void)
             }
         }
 
-        // Draw cursor
-        {
-            Color cursorColor = WHITE;
-            if (mode.mode == InputMode::Mode::Wire) cursorColor = RED;
-            else if (mode.mode == InputMode::Mode::Gate) cursorColor = YELLOW;
-
-            DrawRectangleV(Vector2Subtract((Vector2)cursorPos, Vector2{ 0.5f,0.5f }), (Vector2)Int2(1), cursorColor);
-        }
-
         if (mode.mode == InputMode::Mode::Wire)
         {
             Transistor::DrawSnappedLine((Vector2)wireStart, (Vector2)cursorPos, GRAY, mode.data.wire.shape); // Temporary wire
@@ -441,9 +486,18 @@ int main(void)
         // Transistors
         for (Transistor* transistor : Transistor::s_allTransistors) { transistor->Draw(); }
 
+        // Draw cursor
+        {
+            Color cursorColor = WHITE;
+            if (mode.mode == InputMode::Mode::Wire) cursorColor = RED;
+            else if (mode.mode == InputMode::Mode::Gate) cursorColor = YELLOW;
+            Vector2 width = Vector2Scale(wsScreenPix, 4.0f);
+            DrawRectangleV(Vector2Subtract((Vector2)cursorPos, Vector2Scale(width, 0.5f)), width, cursorColor);
+        }
+
         EndMode2D();
 
-        DrawText(TextFormat("Transistors: %i\nZoom: %f", Transistor::s_allTransistors.size(), camera.zoom), 0, 0, 8, WHITE);
+        DrawText(TextFormat("Transistors: %i\nZoom: %f\nCursor position: (%i, %i)", Transistor::s_allTransistors.size(), camera.zoom, cursorPos.x, cursorPos.y), 0, 0, 8, WHITE);
 
         EndDrawing();
 
@@ -452,6 +506,8 @@ int main(void)
 
     // Return memory to heap
     //--------------------------
+
+    //UnloadShader(gridShader);
 
     selection.clear();
 

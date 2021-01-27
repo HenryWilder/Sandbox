@@ -1,5 +1,6 @@
 #pragma once
 #include <vector>
+#include "IDSystem.h"
 
 struct Color;
 struct Vector2;
@@ -37,31 +38,38 @@ public:
 
             Size // Total directions (for %)
         };
-        Connection() : shape{ Shape::XFirst }, connector{ nullptr } {};
-        Connection(Transistor* _connector) : shape{ Shape::XFirst }, connector{ _connector } {};
-        Connection(Transistor* _connector, Shape _shape) : shape{ (_shape == Shape::Size ? Shape::XFirst : _shape) }, connector{ _connector } {};
+        Connection() : shape{ Shape::XFirst }, connector{ (ID_t)IDFlags::NULLID } {};
+        Connection(ID_t _connector) : shape{ Shape::XFirst }, connector{ _connector } {};
+        Connection(ID_t _connector, Shape _shape) : shape{ (_shape == Shape::Size ? Shape::XFirst : _shape) }, connector{ _connector } {};
 
         Shape shape;
-        Transistor* connector;
+        ID_t connector;
 
         void IncrementShape();
         static Shape NextShape(Shape);
     };
 
-    Transistor() : input{ {},{} }, output{ {},{} }, pos{ }, type{ Gate::Simple }, flags{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); };
-    Transistor(Gate _type) : input{ {},{} }, output{ {},{} }, type{ _type }, pos{ }, flags{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); };
-    Transistor(Int2 _pos) : input{ {},{} }, output{ {},{} }, type{ Gate::Simple }, pos{ _pos }, flags{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); };
-    Transistor(Gate _type, Int2 _pos) : input{ {},{} }, output{ {},{} }, pos{ _pos }, type{ _type }, flags{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); };
-    Transistor(Transistor* _input) : input{ { _input },{} }, output{ {},{} }, pos{  }, type{  }, flags{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); SolderInput(_input, Connection::Shape::XFirst); };
-    Transistor(Transistor* _input, Int2 _pos) : input{ {},{} }, output{ {},{} }, pos{ _pos }, type{  }, flags{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); SolderInput(_input, Connection::Shape::XFirst); };
-    Transistor(Transistor* _input, Int2 _pos, Connection::Shape _shape) : input{ {},{} }, output{ {},{} }, pos{ _pos }, type{  }, flags{ false }, containingComponent{ nullptr }{ s_allTransistors.push_back(this); SolderInput(_input, _shape); };
-    ~Transistor() { printf("Transistor deleted! %zu transistors remain.\n", s_allTransistors.size()); }
+    Transistor() : input{ }, output{ }, pos( ), type( Gate::Simple ), flags(0), containingComponent(nullptr) {};
+    Transistor(Gate _type) : input{ }, output{ }, pos( ), type( _type ), flags(0), containingComponent(nullptr) {};
+    Transistor(Int2 _pos) : input{ }, output{ }, pos(_pos), type( Gate::Simple ), flags(0), containingComponent(nullptr) {};
+    Transistor(Gate _type, Int2 _pos) : input{ }, output{ }, pos( _pos ), type( _type ), flags(0), containingComponent(nullptr) {};
+    Transistor(ID_t _input) : input{ (_input) }, output{ }, pos( ), type( ), flags(0), containingComponent(nullptr) { SolderInput(_input); };
+    Transistor(ID_t _input, Int2 _pos) : input{ }, output{ }, pos( _pos ), type(), flags(0), containingComponent(nullptr) { SolderInput(_input); };
+    Transistor(ID_t _input, Int2 _pos, Connection::Shape _shape) : input{ }, output{ }, pos( _pos ), type(  ), flags(0), containingComponent(nullptr) { SolderInput(_input, _shape); };
 
-    static std::vector<Transistor*> s_allTransistors;
+    ~Transistor() { printf("Transistor deleted!\n"); }
+
+    static std::unordered_map<ID_t, Validator<Transistor>> s_transistorMap; // Map of all transistors (as validators). This is used in place of pointers to transistors themselves.
+    static Validator<Transistor>* Get(ID_t id);
+    static ID_t Create(const Transistor& transistor);
+    static ID_t Create();
+    static void Destroy(const ID_t id);
+
+    static ID_t s_validTransistorCount;
 
     Connection input[2];
     Connection output[2];
-
+    
 private:
     Int2 pos;
     Gate type;
@@ -107,16 +115,20 @@ public:
     void Hide();
     void UnHide();
 
-    int GetInputIndex(Transistor* connector) const;
-    int GetOutputIndex(Transistor* connector) const;
-    bool IsConnected(Transistor* connector) const;
+    int WhichInputSocketAmI(ID_t connector) const;
+    int WhichOutputSocketAmI(ID_t connector) const;
+    bool IsConnected(ID_t connector) const;
 
     Int2 GetPos() const;
     void SetPos(Int2 newPos);
     void ChangePos(Int2 amount);
 
-    bool SolderInput(Transistor* connection, Connection::Shape direction = Connection::Shape::XFirst);
-    bool SolderOutput(Transistor* connection, Connection::Shape direction = Connection::Shape::XFirst);
+    bool SolderInput(ID_t connection, Connection::Shape direction = Connection::Shape::XFirst);
+    bool SolderOutput(ID_t connection, Connection::Shape direction = Connection::Shape::XFirst);
+    bool DesolderInput(int which);
+    bool DesolderInput(ID_t what);
+    bool DesolderOutput(int which);
+    bool DesolderOutput(ID_t what);
 
     bool OutputOnly() const;    // Is the start of a tree
     bool InputOnly() const;     //Is the end of a tree
@@ -140,11 +152,11 @@ public:
 
     void ClearReferences();
 
-    friend void Save(const std::vector<Transistor*>&);
-    friend void Load(std::vector<Transistor*>&);
+    friend void Save(const std::vector<ID_t>&);
+    friend void Load(std::vector<ID_t>&);
 };
 
-extern std::vector<Transistor*> s_allTransistors;
+extern std::unordered_map<ID_t, Validator<Transistor>> s_transistorMap;
 
 char GateToSymbol(Transistor::Gate type);
 Transistor::Gate SymbolToGate(char symbol);

@@ -95,6 +95,7 @@
     <ClCompile Include="BasicMath.cpp" />
     <ClCompile Include="CustomTypes.cpp" />
     <ClCompile Include="Globals.cpp" />
+    <ClCompile Include="IDSystem.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="Serialization.cpp" />
     <ClCompile Include="Transistor.cpp" />
@@ -103,13 +104,14 @@
     <ClInclude Include="Abstraction.h" />
     <ClInclude Include="BasicMath.h" />
     <ClInclude Include="Circuit.h" />
-    <ClInclude Include="CustomSmrtPtr.h" />
     <ClInclude Include="CustomTypes.h" />
     <ClInclude Include="Globals.h" />
+    <ClInclude Include="IDSystem.h" />
     <ClInclude Include="Serialization.h" />
     <ClInclude Include="Transistor.h" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="grid.frag" />
     <None Include="pretty.frag" />
   </ItemGroup>
   <ItemGroup>

@@ -53,6 +53,47 @@ Int2 Transistor::JointPos(Int2 start, Int2 end, Connection::Shape direction)
     }
 }
 
+Validator<Transistor>* Transistor::Get(ID_t id)
+{
+    if (IsIDValid(id))
+    {
+        auto it = s_transistorMap.find(id);
+        if (it != s_transistorMap.end() && it->second.IsValid()) return &it->second;
+    }
+    return nullptr;
+}
+
+ID_t Transistor::Create(const Transistor& transistor)
+{
+    auto it = s_transistorMap.find(s_validTransistorCount);
+    if (it != s_transistorMap.end())
+    {
+        printf("What the fuck is going on here?...\n");
+    }
+    else
+    {
+        std::pair<ID_t, Validator<Transistor>> insertion;
+        insertion.first = s_validTransistorCount;
+        insertion.second = Validator<Transistor>(transistor);
+        s_transistorMap.insert(insertion);
+    }
+    return s_validTransistorCount++;
+}
+
+ID_t Transistor::Create()
+{
+    return Create(Transistor());
+}
+
+void Transistor::Destroy(const ID_t id)
+{
+    auto it = s_transistorMap.find(id);
+    if (it != s_transistorMap.end())
+    {
+        it->second.Invalidate();
+    }
+}
+
 Transistor::Gate Transistor::GetGateType() const
 {
     return type;
@@ -225,21 +266,21 @@ void Transistor::Highlight(Color color, float size) const
     Icon(color, size);
 }
 
-int Transistor::GetInputIndex(Transistor* connector) const
+int Transistor::WhichInputSocketAmI(ID_t connector) const
 {
     if (connector == input[0].connector) return 0;
     else if (connector == input[1].connector) return 1;
     else return -1;
 }
 
-int Transistor::GetOutputIndex(Transistor* connector) const
+int Transistor::WhichOutputSocketAmI(ID_t connector) const
 {
     if (connector == output[0].connector) return 0;
     else if (connector == output[1].connector) return 1;
     else return -1;
 }
 
-bool Transistor::IsConnected(Transistor* connector) const
+bool Transistor::IsConnected(ID_t connector) const
 {
     if ((connector == input[0].connector) || (connector == output[0].connector) ||
         (connector == input[1].connector) || (connector == output[1].connector)) return true;
@@ -261,21 +302,20 @@ void Transistor::ChangePos(Int2 amount)
     pos = (pos + amount);
 }
 
-bool Transistor::SolderInput(Transistor* connection, Connection::Shape direction)
+bool Transistor::SolderInput(ID_t connection, Connection::Shape direction)
 {
     Connection* mine = AvailIn();
-    Connection* theirs = connection->AvailOut();
+    Connection* theirs = Get(connection)->GetPayload_Copy().AvailOut();
     if (mine && theirs)
     {
         mine->connector = connection;
-        theirs->connector = this;
+        theirs->connector = MyID();
         theirs->shape = direction;
         return true;
     }
     else return false;
 }
-
-bool Transistor::SolderOutput(Transistor* connection, Connection::Shape direction)
+bool Transistor::SolderOutput(ID_t connection, Connection::Shape direction)
 {
     Connection* mine = AvailOut();
     Connection* theirs = connection->AvailIn();
@@ -287,6 +327,22 @@ bool Transistor::SolderOutput(Transistor* connection, Connection::Shape directio
         return true;
     }
     else return false;
+}
+bool Transistor::DesolderInput(int which)
+{
+
+}
+bool Transistor::DesolderInput(ID_t what)
+{
+
+}
+bool Transistor::DesolderOutput(int which)
+{
+
+}
+bool Transistor::DesolderOutput(ID_t what)
+{
+
 }
 
 bool Transistor::OutputOnly() const
@@ -357,7 +413,7 @@ void Transistor::Evaluate()
     }
     else // 1 input
     {
-        Transistor* evalInput = (input[0].connector ? input[0].connector : input[1].connector);
+        ID_t evalInput = (input[0].connector ? input[0].connector : input[1].connector);
         SetCurrentEvaluation(evalInput->GetEvaluation());
     }
     if (type == Gate::Invert) SetCurrentEvaluation(!CurrentEvaluation());
@@ -442,4 +498,6 @@ Transistor::Connection::Shape Transistor::Connection::NextShape(Shape input)
     return Shape((int)input + 1);
 }
 
-std::vector<Transistor*> Transistor::s_allTransistors;
+std::unordered_map<ID_t, Validator<Transistor>> g_TMap;
+
+std::unordered_map<ID_t, Validator<Transistor>> s_transistorMap;
