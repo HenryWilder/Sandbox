@@ -7,6 +7,11 @@
 #include "Abstraction.h"
 #include "Serialization.h"
 
+__interface IInterface
+{
+
+};
+
 class Transistor;
 class Component;
 
