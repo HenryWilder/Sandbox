@@ -35,14 +35,9 @@ void CheckForWin(int* board,int playerValue)
 }
 int main()
 {
+	printf(C_RED"This is red\n");
+	printf(C_BLUE"This is blue\n");
+	printf(C_DEFAULT"This is default\n");
 
-
-	int main()
-	{
-		printf(C_RED"This is red\n");
-		printf(C_BLUE"This is blue\n");
-		printf(C_DEFAULT"This is default\n");
-
-		return 0;
-	}
+	return 0;
 }
