@@ -111,6 +111,16 @@ int Combo(int budget)
 
 int main()
 {
+	printf("Menu:\n");
+
+	for (auto pricerange : g_menu) {
+		for (auto name : pricerange.second.names)
+		{
+			printf("$%i - %s\n", pricerange.first, name.NameForCount(1).c_str());
+		}
+	}
+	printf("\n");
+
 	int budget;
 	std::cout << "Budget: $";
 	std::cin >> budget;
