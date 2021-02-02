@@ -1,0 +1,87 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{ad6b09bf-2767-4a5d-b743-a585067effb4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{780a8aa2-b704-44c2-8eb0-d53644c3a34c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource Files">
+      <UniqueIdentifier>{63a3a7ba-c416-4f4c-8af8-9c0e81b2cfeb}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource Files\Sprites">
+      <UniqueIdentifier>{dfa10e61-cb50-4135-9b19-edf803906cec}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource Files\Shaders">
+      <UniqueIdentifier>{2761a48a-b1df-40f9-be8c-240fdab72444}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="bishop.PNG">
+      <Filter>Resource Files\Sprites</Filter>
+    </Image>
+    <Image Include="king.PNG">
+      <Filter>Resource Files\Sprites</Filter>
+    </Image>
+    <Image Include="knight.PNG">
+      <Filter>Resource Files\Sprites</Filter>
+    </Image>
+    <Image Include="missing.png">
+      <Filter>Resource Files\Sprites</Filter>
+    </Image>
+    <Image Include="pawn.PNG">
+      <Filter>Resource Files\Sprites</Filter>
+    </Image>
+    <Image Include="queen.PNG">
+      <Filter>Resource Files\Sprites</Filter>
+    </Image>
+    <Image Include="rook.PNG">
+      <Filter>Resource Files\Sprites</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Board.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Unit.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Rendering.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Global.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CustomTypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="CustomMath.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Game.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="CustomTypes.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Global.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Unit.cpp" />
+    <ClCompile Include="Board.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="board.frag">
+      <Filter>Resource Files\Shaders</Filter>
+    </None>
+    <None Include="unit_black.frag">
+      <Filter>Resource Files\Shaders</Filter>
+    </None>
+    <None Include="unit_white.frag">
+      <Filter>Resource Files\Shaders</Filter>
+    </None>
+  </ItemGroup>
+</Project>

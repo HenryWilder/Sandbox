@@ -1,0 +1,49 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.30907.101
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ConwayLife", "RaylibApp\RaylibApp.vcxproj", "{121C392A-DDAD-4484-AD81-059A7FFB8518}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TestGameEngine", "TestGameEngine\TestGameEngine.vcxproj", "{207C71F1-5E4E-44AF-90DC-2B29BCF5228C}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Chess3", "Chess3\Chess3.vcxproj", "{D8BE66B2-C21E-4DA5-9426-E659F136F0E5}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{121C392A-DDAD-4484-AD81-059A7FFB8518}.Debug|x64.ActiveCfg = Debug|x64
+		{121C392A-DDAD-4484-AD81-059A7FFB8518}.Debug|x64.Build.0 = Debug|x64
+		{121C392A-DDAD-4484-AD81-059A7FFB8518}.Debug|x86.ActiveCfg = Debug|x64
+		{121C392A-DDAD-4484-AD81-059A7FFB8518}.Release|x64.ActiveCfg = Release|x64
+		{121C392A-DDAD-4484-AD81-059A7FFB8518}.Release|x64.Build.0 = Release|x64
+		{121C392A-DDAD-4484-AD81-059A7FFB8518}.Release|x86.ActiveCfg = Release|x64
+		{207C71F1-5E4E-44AF-90DC-2B29BCF5228C}.Debug|x64.ActiveCfg = Debug|x64
+		{207C71F1-5E4E-44AF-90DC-2B29BCF5228C}.Debug|x64.Build.0 = Debug|x64
+		{207C71F1-5E4E-44AF-90DC-2B29BCF5228C}.Debug|x86.ActiveCfg = Debug|Win32
+		{207C71F1-5E4E-44AF-90DC-2B29BCF5228C}.Debug|x86.Build.0 = Debug|Win32
+		{207C71F1-5E4E-44AF-90DC-2B29BCF5228C}.Release|x64.ActiveCfg = Release|x64
+		{207C71F1-5E4E-44AF-90DC-2B29BCF5228C}.Release|x64.Build.0 = Release|x64
+		{207C71F1-5E4E-44AF-90DC-2B29BCF5228C}.Release|x86.ActiveCfg = Release|Win32
+		{207C71F1-5E4E-44AF-90DC-2B29BCF5228C}.Release|x86.Build.0 = Release|Win32
+		{D8BE66B2-C21E-4DA5-9426-E659F136F0E5}.Debug|x64.ActiveCfg = Debug|x64
+		{D8BE66B2-C21E-4DA5-9426-E659F136F0E5}.Debug|x64.Build.0 = Debug|x64
+		{D8BE66B2-C21E-4DA5-9426-E659F136F0E5}.Debug|x86.ActiveCfg = Debug|Win32
+		{D8BE66B2-C21E-4DA5-9426-E659F136F0E5}.Debug|x86.Build.0 = Debug|Win32
+		{D8BE66B2-C21E-4DA5-9426-E659F136F0E5}.Release|x64.ActiveCfg = Release|x64
+		{D8BE66B2-C21E-4DA5-9426-E659F136F0E5}.Release|x64.Build.0 = Release|x64
+		{D8BE66B2-C21E-4DA5-9426-E659F136F0E5}.Release|x86.ActiveCfg = Release|Win32
+		{D8BE66B2-C21E-4DA5-9426-E659F136F0E5}.Release|x86.Build.0 = Release|Win32
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {A958D356-5273-48BC-B3C4-4A9921D12A03}
+	EndGlobalSection
+EndGlobal
