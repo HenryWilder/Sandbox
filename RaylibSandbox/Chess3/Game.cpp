@@ -1,4 +1,5 @@
 #include <raylib.h>
+#include <raymath.h>
 #include "Global.h"
 #include "Unit.h"
 #include "Board.h"
@@ -38,12 +39,12 @@ int main()
 	};
 	{
 		int i = 0;
-		sprite::pawn	= (spriteSet + i++);
-		sprite::rook	= (spriteSet + i++);
-		sprite::knight	= (spriteSet + i++);
-		sprite::bishop	= (spriteSet + i++);
-		sprite::queen	= (spriteSet + i++);
-		sprite::king	= (spriteSet + i);
+		sprite::pawn = (spriteSet + i++);
+		sprite::rook = (spriteSet + i++);
+		sprite::knight = (spriteSet + i++);
+		sprite::bishop = (spriteSet + i++);
+		sprite::queen = (spriteSet + i++);
+		sprite::king = (spriteSet + i);
 	}
 
 	Vector2 cursorPos = {};
@@ -58,26 +59,39 @@ int main()
 		cursorPos = GetMousePosition();
 		cursorPos = { cursorPos.x / spce::scrn::outp::g_otileWidth, cursorPos.y / spce::scrn::outp::g_otileWidth };
 
-		QuadTreeNode* hoveredNode = g_board.m_qTree->TraceChild(cursorPos);
-		if (hoveredNode->Weight() > 0)
+		QTNode* hoveredNode = g_board.m_qTree->TraceDeep(cursorPos);
+		if (hoveredNode->Weight())
 		{
 			DrawCircle(spce::scrn::outp::g_oboardWidth, spce::scrn::outp::g_oboardWidth, spce::scrn::outp::g_otileWidth * 0.5f, GREEN);
 			if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
 			{
-				g_board.s_selected = hoveredNode->GetElement(0);
-				g_board.m_qTree->Eliminate(g_board.s_selected);
-				g_board.m_qTree->Prune();
+				float shortestDist = FLT_MAX;
+				Unit* closest = nullptr;
+				for (Unit* unit : hoveredNode->units)
+				{
+					float dist = Vector2Distance(cursorPos, unit->GetPos());
+					if (dist < shortestDist)
+					{
+						shortestDist = dist;
+						closest = unit;
+					}
+				}
+				if (shortestDist < 1.0f)
+				{
+					g_board.s_selected = closest;
+					g_board.m_qTree->Eliminate(closest);
+				}
 			}
 		}
-		if (g_board.s_selected && IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) // Refresh
+		if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && g_board.s_selected) // Refresh
 		{
-			hoveredNode->Push(g_board.s_selected);
+			hoveredNode->units.push_back(g_board.s_selected);
 			g_board.m_qTree->Subdivide();
 			g_board.m_qTree->Prune();
 			g_board.s_selected = nullptr;
 		}
 
-		if (IsMouseButtonDown(MOUSE_LEFT_BUTTON))
+		if (IsMouseButtonDown(MOUSE_LEFT_BUTTON) && g_board.s_selected)
 		{
 			if (g_board.s_selected) g_board.s_selected->Move(cursorPos);
 		}
@@ -89,7 +103,15 @@ int main()
 			ClearBackground(BLACK);
 			g_board.Draw();
 			g_board.m_qTree->DrawDebug(g_board.m_qTree->MaxDepth() + 1);
-			g_board.m_qTree->TraceChild(cursorPos);
+			{
+				Rectangle rec = hoveredNode->coverage;
+				rec.x *= spce::scrn::outp::g_otileWidth;
+				rec.y *= spce::scrn::outp::g_otileWidth;
+				rec.width *= spce::scrn::outp::g_otileWidth;
+				rec.height *= spce::scrn::outp::g_otileWidth;
+				DrawRectangleRec(rec, ColorAlpha(GREEN, 0.5));
+			}
+			//g_board.m_qTree->TraceDeep(cursorPos);
 
 		} EndDrawing();
 

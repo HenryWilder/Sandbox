@@ -1,52 +1,57 @@
 #pragma once
+#ifdef _DEBUG
 #include <stdio.h>
 #include <stdlib.h>
+#endif
+#include <vector>
+#include <array>
+
 class Unit;
 
-struct QuadTreeNode
+struct QTNode
 {
-public:
-    QuadTreeNode() : children{ nullptr, nullptr, nullptr, nullptr, }, count(0), capacity(0), coverage(), contentsAtLevel(nullptr) {};
-    QuadTreeNode(Rectangle _coverage) : children{ nullptr, nullptr, nullptr, nullptr, }, count(0), capacity(0), coverage(_coverage), contentsAtLevel(nullptr)
-    { printf("Added a qTree node covering { %f, %f, %f, %f }\n", coverage.x, coverage.y, coverage.width, coverage.height); };
-    QuadTreeNode(Rectangle _coverage, Unit* elem) : children{ nullptr, nullptr, nullptr, nullptr, }, count(1), capacity(1), coverage(_coverage), contentsAtLevel(new Unit* [1]) { contentsAtLevel[0] = elem; };
-    ~QuadTreeNode();
+    enum class Quadrant : char
+    {
+        SmallXSmallY = 0b00,
+        SmallXLargeY = 0b01,
+        LargeXSmallY = 0b10,
+        LargeXLargeY = 0b11,
+    };
 
+    QTNode() : coverage(), quadrant(), children{ nullptr, nullptr, nullptr, nullptr }, units() {};
+    QTNode(Rectangle _coverage, Quadrant _quadrant) : coverage(_coverage), quadrant(_quadrant), children{ nullptr, nullptr, nullptr, nullptr }, units() {};
+    ~QTNode();
+
+    QTNode* GetChild(Quadrant where) const;
+    std::array<QTNode*, 4>::iterator GetChildIter(Quadrant where);
+    std::array<QTNode*, 4>::iterator GetChildIter(QTNode* child);
+    Vector2 GetMiddle() const;
+
+    int Weight() const;
     int MaxDepth() const;
     int TotalChildren() const;
 
-    int Weight() const;
-    int WeightOf(int child) const;
     bool WithinCoverage(Vector2 pt);
 
-    QuadTreeNode* GetChild(int i) const;
-    QuadTreeNode* GetQuadrant(Vector2 pos);
-    QuadTreeNode* TraceChild(Vector2 pos);
+    QTNode* TraceShallow(Vector2 pos); // Trace only this node
+    QTNode* TraceDeep(Vector2 pos); // Trace until the end of a branch is reached
 
-    Unit* GetElement(int i) const;
-    void Reserve(int _count);
-    void Push(Unit* const elem);
-    void Pop();
-    void Erase(Unit* elem);
-    void Eliminate(Unit* elem);
-    QuadTreeNode& AddChild(int child);
+    void Eliminate(Unit* elem); // Erase the element from the ENTIRE tree.
+
+    QTNode& AddChild(Quadrant where);
+    void RemoveChild(Quadrant where);
+
     void Subdivide();
     void Prune();
-    void RemoveChild(int child);
-
-    Unit** begin();
-    Unit** end();
 
 #ifdef _DEBUG
     void DrawDebug(int size = 1);
-    void PrintDebug(int depth = 0);
 #endif
 
-protected:
-    QuadTreeNode* children[4];
-    int count, capacity;
     Rectangle coverage;
-    Unit** contentsAtLevel; // Vector of T pointers
+    Quadrant quadrant;
+    std::array<QTNode*, 4> children;
+    std::vector<Unit*> units;
 };
 
 struct Shader;
@@ -68,7 +73,7 @@ public:
     static RenderTexture2D* s_unitsBuffer;
 
     static Unit* s_selected;
-    QuadTreeNode* m_qTree;
+    QTNode* m_qTree;
 };
 extern Shader* s_boardShader;
 extern Shader* s_blackUnitShdr;

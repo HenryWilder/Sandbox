@@ -4,296 +4,244 @@
 #include "Board.h"
 #include "Unit.h"
 
-QuadTreeNode::~QuadTreeNode() {
-    for (int child = 0; child < 4; ++child)
-    {
-        if (children[child]) delete children[child];
-    }
-    if (contentsAtLevel) delete[] contentsAtLevel;
-}
-
-int QuadTreeNode::MaxDepth() const
+QTNode::~QTNode()
 {
-    int max = 0;
-    bool hasChild = false;
     for (int i = 0; i < 4; ++i)
     {
         if (children[i])
         {
+            delete children[i];
+            children[i] = nullptr;
+        }
+    }
+}
+
+int QTNode::MaxDepth() const
+{
+    int max = 0;
+    bool hasChild = false;
+    for (QTNode* child : children)
+    {
+        if (child)
+        {
             hasChild = true;
-            max = cstm::Max(max, children[i]->MaxDepth());
+            max = cstm::Max(max, child->MaxDepth());
         }
     }
     return max + (hasChild ? 1 : 0);
 }
 
-int QuadTreeNode::TotalChildren() const
+int QTNode::TotalChildren() const
 {
     int total = 0;
-    for (int i = 0; i < 4; ++i)
+    for (QTNode* child : children)
     {
-        if (children[i])
+        if (child)
         {
             total++;
-            total += children[i]->TotalChildren();
+            total += child->TotalChildren();
         }
     }
     return total;
 }
 
-int QuadTreeNode::Weight() const
+int QTNode::Weight() const
 {
-    return count;
-}
-int QuadTreeNode::WeightOf(int child) const
-{
-    QuadTreeNode* childPtr = children[child];
-    if (childPtr) return childPtr->Weight();
-    else return 0;
+    return (int)units.size();
 }
 
-QuadTreeNode* QuadTreeNode::GetChild(int i) const
+QTNode* QTNode::GetChild(Quadrant where) const
 {
-    return children[i];
+    return children[(int)where];
 }
 
-QuadTreeNode* QuadTreeNode::GetQuadrant(Vector2 pos)
+std::array<QTNode*, 4>::iterator QTNode::GetChildIter(Quadrant where)
 {
-    if (pos.x < coverage.x + (coverage.width * 0.5f)) { // Left
-        if (pos.y < coverage.y + (coverage.height * 0.5f)) // Up
-            return children[0];
-        else // Right
-            return children[2];
-    }
-    else { // Right
-        if (pos.y < coverage.y + (coverage.height * 0.5f)) // Down
-            return children[1];
-        else // Right
-            return children[3];
-    }
+    std::array<QTNode*, 4>::iterator it = children.begin();
+    for (int i = 0; i < (char)where; ++i) { ++it; }
+    return it;
+}
+std::array<QTNode*, 4>::iterator QTNode::GetChildIter(QTNode* child)
+{
+    return GetChildIter(child->quadrant);
 }
 
-QuadTreeNode* QuadTreeNode::TraceChild(Vector2 pos)
+Vector2 QTNode::GetMiddle() const
+{
+    return { (coverage.x + (coverage.width * 0.5f)), (coverage.y + (coverage.height * 0.5f)) };
+}
+
+QTNode* QTNode::TraceShallow(Vector2 pos)
+{
+    char quad = 0b00;
+    Vector2 mid = GetMiddle();
+    quad = ((char)((pos.x > mid.x) << 1) | (char)(pos.y > mid.y));
+    return GetChild(Quadrant(quad));
+}
+
+QTNode* QTNode::TraceDeep(Vector2 pos)
 {
     DrawDebug(1);
-    QuadTreeNode* child = GetQuadrant(pos);
-    if (child) return child->TraceChild(pos);
+    QTNode* child = TraceShallow(pos);
+    if (child) return child->TraceDeep(pos);
     else return this; // this is the closest we're getting
 }
+void QTNode::Eliminate(Unit* elem)
+{
+    auto it = std::find(units.begin(), units.end(), elem);
+    units.erase(it, it);
+    QTNode* next = TraceShallow(elem->GetPos()); // The element won't be in more than 1 immediate child
+    if (next) next->Eliminate(elem);
+}
+QTNode& QTNode::AddChild(Quadrant where)
+{
+    std::array<QTNode*, 4>::iterator childIter = GetChildIter(where);
 
-Unit* QuadTreeNode::GetElement(int i) const
-{
-    return contentsAtLevel[i];
-}
-void QuadTreeNode::Pop()
-{
-    if (count) contentsAtLevel[--count] = nullptr;
-}
-void QuadTreeNode::Erase(Unit* elem)
-{
-    int i = 0;
-    for (; i < count - 1; ++i) { if (contentsAtLevel[i] == elem) break; }
-    for (; i < count - 1; ++i) { if (contentsAtLevel[i] == elem) contentsAtLevel[i] = contentsAtLevel[i + 1]; }
-    Pop();
-}
-void QuadTreeNode::Eliminate(Unit* elem)
-{
-    QuadTreeNode* next = GetQuadrant(elem->GetPos());
-    if (next)
+    if (!*childIter) // If the child does not already exist
     {
-        next->Erase(elem);
-        next->Eliminate(elem);
-    }
-}
-void QuadTreeNode::Push(Unit* const elem)
-{
-    if ((count + 1) >= capacity) Reserve(count + 1);
+        Rectangle subdiv = { coverage.x, coverage.y, coverage.width * 0.5f, coverage.height * 0.5f };
 
-    contentsAtLevel[count++] = elem;
-}
-QuadTreeNode& QuadTreeNode::AddChild(int child)
-{
-    if (children[child] == nullptr)
-    {
-        Vector2 subdivDim = { coverage.width * 0.5f, coverage.height * 0.5f };
-        Vector2 offset = { coverage.x, coverage.y };
-        switch (child)
-        {
-        default:
-        case 0:
-            break;
-        case 1:
-            offset.x += subdivDim.x;
-            break;
-        case 2:
-            offset.y += subdivDim.y;
-            break;
-        case 3:
-            offset.x += subdivDim.x;
-            offset.y += subdivDim.y;
-            break;
-        }
-        children[child] = new QuadTreeNode({ offset.x, offset.y, subdivDim.x, subdivDim.y });
+        if ((char)where & 0b10) subdiv.x += subdiv.width;
+        if ((char)where & 0b01) subdiv.y += subdiv.height;
+
+        *childIter = new QTNode(subdiv, where);
     }
-    return *children[child];
+
+    return *(*childIter); // Dereference the pointer at the iterator
 }
-void QuadTreeNode::Subdivide()
+void QTNode::Subdivide()
 {
-    if (count > 1)
+    if (Weight() > 3) // I have multiple children
     {
         for (int i = 0; i < 4; ++i)
         {
-            QuadTreeNode& child = AddChild(i);
-            for (Unit* unit : *this)
+            Quadrant quad = Quadrant(i);
+            QTNode* child = GetChild(quad);
+
+            if (!child) child = &AddChild(quad);
+
+            for (Unit* unit : units) { if (child->WithinCoverage(unit->GetPos())) child->units.push_back(unit); } // Populate child node with units
+
+            if (!(child->Weight()) || (child->Weight() == Weight()))
             {
-                if (child.WithinCoverage(unit->GetPos()))
-                {
-                    child.Push(unit);
-                }
+                RemoveChild(quad); // Child has NO elements, needs to be removed
+                continue;
             }
-            if (child.Weight() > 1)
-            {
-                child.Subdivide();
-            }
-            else if (child.Weight() < 0)
-            {
-                RemoveChild(i);
-            }
+            else if (child->Weight() > 1) child->Subdivide(); // Child has multiple elements, it can be subdivided
         }
     }
 }
-void QuadTreeNode::Prune()
+void QTNode::Prune()
 {
-    for (int i = 0; i < 4; ++i)
+    auto ShouldPruneChild = [](QTNode* child) {
+        return (child->units.empty());
+    };
+    for (QTNode* child : children)
     {
-        if (children[i])
+        if (child)
         {
-            if ((children[i]->Weight() == 0) || (children[i]->Weight() == Weight()))
-            {
-                delete children[i];
-                children[i] = nullptr;
-            }
-            else
-            {
-                children[i]->Prune();
-            }
+            if (ShouldPruneChild(child)) RemoveChild(child->quadrant);
+            else child->Prune();
         }
     }
 }
-bool QuadTreeNode::WithinCoverage(Vector2 pt)
+bool QTNode::WithinCoverage(Vector2 pt)
 {
     return (
-        ((pt.x >= coverage.x) && (pt.x < (coverage.x + coverage.width ))) &&
+        ((pt.x >= coverage.x) && (pt.x < (coverage.x + coverage.width))) &&
         ((pt.y >= coverage.y) && (pt.y < (coverage.y + coverage.height)))
         );
 }
-void QuadTreeNode::RemoveChild(int child)
+void QTNode::RemoveChild(Quadrant where)
 {
-    if (children[child])
-    {
-        delete children[child];
-        children[child] = nullptr;
+    auto it = GetChildIter(where);
+    if (*it) { // Do not delete nullptr
+        delete* it;
+        *it = nullptr;
     }
 }
 
-void QuadTreeNode::Reserve(int _count)
-{
-    if (_count == capacity) return;
-
-    capacity = _count;
-    Unit** temp = new Unit * [capacity];
-    for (int i = 0; i < cstm::Min(count, capacity); ++i) { temp[i] = contentsAtLevel[i]; }
-    delete[] contentsAtLevel;
-    contentsAtLevel = temp;
-}
-
-Unit** QuadTreeNode::begin()
-{
-    return contentsAtLevel;
-}
-Unit** QuadTreeNode::end()
-{
-    return contentsAtLevel + count;
-}
-
 #ifdef _DEBUG
-void QuadTreeNode::DrawDebug(int size)
+void QTNode::DrawDebug(int size)
 {
     Rectangle scaledRec = coverage;
     scaledRec.x *= spce::scrn::outp::g_otileWidth;
     scaledRec.y *= spce::scrn::outp::g_otileWidth;
     scaledRec.width *= spce::scrn::outp::g_otileWidth;
     scaledRec.height *= spce::scrn::outp::g_otileWidth;
-    Color thisColor = { rand(), rand(), rand(), 255 };
+    Color thisColor = { (unsigned char)(rand() % 255), (unsigned char)(rand() % 255), (unsigned char)(rand() % 255), (unsigned char)(255) };
     DrawRectangleLinesEx(scaledRec, size * spce::scrn::g_gameScale, thisColor);
-    if (begin())
+    for (Unit* unit : units)
     {
-        for (Unit* unit : *this)
-        {
-            Vector2 unitPos = unit->GetPos();
-            unitPos.x = (unitPos.x * spce::scrn::outp::g_otileWidth);
-            unitPos.y = (unitPos.y * spce::scrn::outp::g_otileWidth);
-            DrawCircleV(unitPos, size * spce::scrn::g_gameScale, thisColor);
-        }
+        Vector2 unitPos = unit->GetPos();
+        unitPos.x = (unitPos.x * spce::scrn::outp::g_otileWidth);
+        unitPos.y = (unitPos.y * spce::scrn::outp::g_otileWidth);
+        //DrawCircleV(unitPos, (float)(size * spce::scrn::g_gameScale), thisColor);
     }
     if (size > 1)
     {
-        for (int i = 0; i < 4; ++i)
+        for (QTNode* child : children)
         {
-            QuadTreeNode* child = GetChild(i);
             if (child) child->DrawDebug(size - 1);
         }
-    }
-}
-void QuadTreeNode::PrintDebug(int depth)
-{
-    printf("{ %f..%f, %f..%f }", coverage.x, coverage.x + coverage.width, coverage.y, coverage.y + coverage.height);
-    for (int i = 0; i < 4; ++i)
-    {
-        for (int j = 0; j < depth; ++j) { printf(" "); }
-        printf("{\n");
-        if (children[i])
-        {
-            children[i]->PrintDebug(depth + 1);
-        }
-        else
-        {
-            for (Unit* unit : *this)
-            {
-                for (int j = 0; j <= depth; ++j) { printf(" "); }
-                printf("{ %f, %f }\n", unit->GetPos().x, unit->GetPos().y);
-            }
-        }
-        for (int j = 0; j < depth; ++j) { printf(" "); }
-        printf("}\n");
     }
 }
 #endif
 
 Board::Board()
 {
-    m_qTree = new QuadTreeNode({ 0,0,8,8 });
-    m_qTree->Reserve(16);
-    for (int x = 0; x < 8; ++x) // Add pawns
+    m_qTree = new QTNode({ 0,0,8,8 }, QTNode::Quadrant::SmallXSmallY);
+    m_qTree->units.reserve(16);
+
+    Unit::UnitColor color = Unit::UnitColor::Black;
+    for (int y = 1; y <= 6; y += 5, color = Unit::UnitColor::White)
     {
-        Unit* unit = new Unit({ (float)x + 0.5f, 1.5f }, Unit::UnitColor::Black);
-        m_qTree->Push(unit);
+        for (int x = 0; x < 8; ++x) // Add pawns
+        {
+            Unit* unit = new Unit({ (float)x + 0.5f, (float)y + 0.5f }, color);
+            m_qTree->units.push_back(unit);
+        }
     }
-    for (int x = 0; x < 8; ++x) // Add pawns
-    {
-        Unit* unit = new Unit({ (float)x + 0.5f, 6.5f }, Unit::UnitColor::White);
-        m_qTree->Push(unit);
-    }
+
     m_qTree->Subdivide();
     m_qTree->Prune();
-    //m_qTree->PrintDebug();
 }
 Board::~Board()
 {
-    for (Unit*& elem : *m_qTree) {
-        delete elem;
+    std::vector<Unit*> consolidated;
+    consolidated.reserve(m_qTree->units.size());
+    for (Unit* elem : m_qTree->units)
+    {
+        if (elem) consolidated.push_back(elem);
     }
+
     delete m_qTree;
+
+    if (s_selected)
+    {
+        for (Unit* unit : consolidated)
+        {
+            if (unit == s_selected)
+            {
+                s_selected = nullptr;
+                break;
+            }
+        }
+        if (s_selected)
+        {
+            delete s_selected;
+            s_selected = nullptr;
+        }
+    }
+
+    for (int i = 0; i < consolidated.size(); ++i)
+    {
+        if (consolidated[i])
+        {
+            delete consolidated[i];
+            consolidated[i] = nullptr;
+        }
+    }
 }
 
 void Board::Draw()
@@ -306,17 +254,17 @@ void Board::Draw()
 
     BeginTextureMode(*s_unitsBuffer); {
 
-        ClearBackground({0,0,0,0});
+        ClearBackground({ 0,0,0,0 });
 
         BeginShaderMode(*s_blackUnitShdr); {
 
-            for (Unit* unit : *m_qTree) { if (unit->IsBlack()) unit->Draw(); }
+            for (Unit* unit : m_qTree->units) { if (unit->IsBlack()) unit->Draw(); }
 
         } EndShaderMode();
 
         BeginShaderMode(*s_whiteUnitShdr); {
 
-            for (Unit* unit : *m_qTree) { if (unit->IsWhite()) unit->Draw(); }
+            for (Unit* unit : m_qTree->units) { if (unit->IsWhite()) unit->Draw(); }
 
         } EndShaderMode();
 
