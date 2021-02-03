@@ -1,7 +1,7 @@
 #pragma once
 
+// Forward declares
 struct Vector2;
-
 class Board;
 
 class Unit

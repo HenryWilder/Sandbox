@@ -9,60 +9,42 @@ int main()
 	int windowWidth = 1280;
 	int windowHeight = 720;
 	InitWindow(windowWidth, windowHeight, "Experimental");
+	SetTargetFPS(60);
 
+#pragma region Declare/Init Vars
 	// Init vars
 	// -------------------------
-	Shader boardShader = LoadShader(NULL, "board.frag");
-	Shader blackUnitShdr = LoadShader(NULL, "unit_black.frag");
-	Shader whiteUnitShdr = LoadShader(NULL, "unit_white.frag");
-	Shader selectedUnitShdr = LoadShader(NULL, "unit_selected.frag");
+	Board::s_boardShader = LoadShader(NULL, "board.frag");
+	Board::s_blackUnitShdr = LoadShader(NULL, "unit_black.frag");
+	Board::s_whiteUnitShdr = LoadShader(NULL, "unit_white.frag");
+	Board::s_selectedUnitShdr = LoadShader(NULL, "unit_selected.frag");
+	Board::s_unitsBuffer = LoadRenderTexture(spce::s::g_boardWidth, spce::s::g_boardWidth);
+	sprite::missing = LoadTexture("missing.png");
 
-	Texture2D missingTexture = LoadTexture("missing.png");
-
-
-	RenderTexture2D unitsBuffer = LoadRenderTexture(spce::scrn::g_boardWidth, spce::scrn::g_boardWidth);
-
-	Board::s_boardShader = &boardShader;
-	Board::s_blackUnitShdr = &blackUnitShdr;
-	Board::s_whiteUnitShdr = &whiteUnitShdr;
-	Board::s_selectedUnitShdr = &selectedUnitShdr;
-	Board::s_unitsBuffer = &unitsBuffer;
-	sprite::missing = &missingTexture;
-
-	Texture2D spriteSet[] = {
-		LoadTexture("pawn.png"),
-		LoadTexture("rook.png"),
-		LoadTexture("knight.png"),
-		LoadTexture("bishop.png"),
-		LoadTexture("queen.png"),
-		LoadTexture("king.png"),
-	};
-	{
-		int i = 0;
-		sprite::pawn = (spriteSet + i++);
-		sprite::rook = (spriteSet + i++);
-		sprite::knight = (spriteSet + i++);
-		sprite::bishop = (spriteSet + i++);
-		sprite::queen = (spriteSet + i++);
-		sprite::king = (spriteSet + i);
-	}
+	sprite::pawn = LoadTexture("pawn.png");
+	sprite::rook = LoadTexture("rook.png");
+	sprite::knight = LoadTexture("knight.png");
+	sprite::bishop = LoadTexture("bishop.png");
+	sprite::queen = LoadTexture("queen.png");
+	sprite::king = LoadTexture("king.png");
 
 	Vector2 cursorPos = {};
 
+#pragma endregion
+
+#pragma region Gameloop
 	// Gameloop
 	// -------------------------
-	SetTargetFPS(60);
 	while (!WindowShouldClose())
 	{
+#pragma region Simulation
 		// Update simulation
 		// ---------------------
-		cursorPos = GetMousePosition();
-		cursorPos = { cursorPos.x / spce::scrn::outp::g_otileWidth, cursorPos.y / spce::scrn::outp::g_otileWidth };
+		cursorPos = ScreenToBoard(GetMousePosition());
 
 		QTNode* hoveredNode = g_board.m_qTree->TraceDeep(cursorPos);
 		if (hoveredNode->Weight())
 		{
-			DrawCircle(spce::scrn::outp::g_oboardWidth, spce::scrn::outp::g_oboardWidth, spce::scrn::outp::g_otileWidth * 0.5f, GREEN);
 			if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
 			{
 				float shortestDist = FLT_MAX;
@@ -78,24 +60,26 @@ int main()
 				}
 				if (shortestDist < 1.0f)
 				{
-					g_board.s_selected = closest;
+					g_board.m_selected = closest;
 					g_board.m_qTree->Eliminate(closest);
 				}
 			}
 		}
-		if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && g_board.s_selected) // Refresh
+		if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && g_board.m_selected) // Refresh
 		{
-			hoveredNode->units.push_back(g_board.s_selected);
+			hoveredNode->units.push_back(g_board.m_selected);
 			g_board.m_qTree->Subdivide();
 			g_board.m_qTree->Prune();
-			g_board.s_selected = nullptr;
+			g_board.m_selected = nullptr;
 		}
 
-		if (IsMouseButtonDown(MOUSE_LEFT_BUTTON) && g_board.s_selected)
+		if (IsMouseButtonDown(MOUSE_LEFT_BUTTON) && g_board.m_selected)
 		{
-			if (g_board.s_selected) g_board.s_selected->Move(cursorPos);
+			if (g_board.m_selected) g_board.m_selected->Move(cursorPos);
 		}
-
+#pragma endregion
+		
+#pragma region Drawing
 		// Begin drawing
 		// ---------------------
 		BeginDrawing(); {
@@ -104,33 +88,37 @@ int main()
 			g_board.Draw();
 			g_board.m_qTree->DrawDebug(g_board.m_qTree->MaxDepth() + 1);
 			{
-				Rectangle rec = hoveredNode->coverage;
-				rec.x *= spce::scrn::outp::g_otileWidth;
-				rec.y *= spce::scrn::outp::g_otileWidth;
-				rec.width *= spce::scrn::outp::g_otileWidth;
-				rec.height *= spce::scrn::outp::g_otileWidth;
-				DrawRectangleRec(rec, ColorAlpha(GREEN, 0.5));
+				DrawRectangleRec(BoardToScreen(hoveredNode->coverage), ColorAlpha(GREEN, 0.5));
+				DrawText(FormatText("%i Units", hoveredNode->units.size()), spce::s::o::g_oBoardWidth, 0, 8, WHITE);
 			}
 			//g_board.m_qTree->TraceDeep(cursorPos);
 
 		} EndDrawing();
-
-		// Prepare for next frame
-		// ---------------------
+#pragma endregion
 	}
+#pragma endregion
 
+#pragma region Cleanup
 	// Unload and free memory
 	// -------------------------
-	UnloadShader(boardShader);
-	UnloadShader(blackUnitShdr);
-	UnloadShader(whiteUnitShdr);
-	UnloadShader(selectedUnitShdr);
 
-	UnloadTexture(*sprite::missing);
-	UnloadRenderTexture(unitsBuffer);
-
-	for (int i = 0; i < 6; ++i) { UnloadTexture(spriteSet[i]); }
+	// Shaders
+	UnloadShader(Board::s_boardShader);
+	UnloadShader(Board::s_blackUnitShdr);
+	UnloadShader(Board::s_whiteUnitShdr);
+	UnloadShader(Board::s_selectedUnitShdr);
+	// Render textures
+	UnloadRenderTexture(Board::s_unitsBuffer);
+	// Sprites
+	UnloadTexture(sprite::missing);
+	UnloadTexture(sprite::pawn);
+	UnloadTexture(sprite::rook);
+	UnloadTexture(sprite::knight);
+	UnloadTexture(sprite::bishop);
+	UnloadTexture(sprite::queen);
+	UnloadTexture(sprite::king);
 
 	CloseWindow();
+#pragma endregion
 	return 0;
 }

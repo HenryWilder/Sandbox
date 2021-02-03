@@ -4,6 +4,8 @@
 #include "Board.h"
 #include "Unit.h"
 
+#pragma region QuadTree
+
 QTNode::~QTNode()
 {
     for (int i = 0; i < 4; ++i)
@@ -165,18 +167,19 @@ void QTNode::RemoveChild(Quadrant where)
 void QTNode::DrawDebug(int size)
 {
     Rectangle scaledRec = coverage;
-    scaledRec.x *= spce::scrn::outp::g_otileWidth;
-    scaledRec.y *= spce::scrn::outp::g_otileWidth;
-    scaledRec.width *= spce::scrn::outp::g_otileWidth;
-    scaledRec.height *= spce::scrn::outp::g_otileWidth;
+    scaledRec.x *= spce::s::o::g_oTileWidth;
+    scaledRec.y *= spce::s::o::g_oTileWidth;
+    scaledRec.width *= spce::s::o::g_oTileWidth;
+    scaledRec.height *= spce::s::o::g_oTileWidth;
     Color thisColor = { (unsigned char)(rand() % 255), (unsigned char)(rand() % 255), (unsigned char)(rand() % 255), (unsigned char)(255) };
-    DrawRectangleLinesEx(scaledRec, size * spce::scrn::g_gameScale, thisColor);
+    DrawRectangleLinesEx(scaledRec, size * spce::s::g_gameScale, thisColor);
+    PrintWeight(thisColor);
     for (Unit* unit : units)
     {
-        Vector2 unitPos = unit->GetPos();
-        unitPos.x = (unitPos.x * spce::scrn::outp::g_otileWidth);
-        unitPos.y = (unitPos.y * spce::scrn::outp::g_otileWidth);
-        //DrawCircleV(unitPos, (float)(size * spce::scrn::g_gameScale), thisColor);
+        Vector2 unitPos = BoardToScreen(unit->GetPos());
+        unitPos.x = (unitPos.x * spce::s::o::g_oTileWidth);
+        unitPos.y = (unitPos.y * spce::s::o::g_oTileWidth);
+        //DrawCircleV(unitPos, (float)(size * spce::s::g_gameScale), thisColor);
     }
     if (size > 1)
     {
@@ -186,10 +189,18 @@ void QTNode::DrawDebug(int size)
         }
     }
 }
+void QTNode::PrintWeight(Color color)
+{
+    DrawText(TextFormat("%i", Weight()), (int)(coverage.x) * spce::s::o::g_oTileWidth, (int)(coverage.y) * spce::s::o::g_oTileWidth, 8, color);
+}
 #endif
+#pragma endregion
+
+#pragma region Board
 
 Board::Board()
 {
+    m_selected = nullptr;
     m_qTree = new QTNode({ 0,0,8,8 }, QTNode::Quadrant::SmallXSmallY);
     m_qTree->units.reserve(16);
 
@@ -217,20 +228,20 @@ Board::~Board()
 
     delete m_qTree;
 
-    if (s_selected)
+    if (m_selected)
     {
         for (Unit* unit : consolidated)
         {
-            if (unit == s_selected)
+            if (unit == m_selected)
             {
-                s_selected = nullptr;
+                m_selected = nullptr;
                 break;
             }
         }
-        if (s_selected)
+        if (m_selected)
         {
-            delete s_selected;
-            s_selected = nullptr;
+            delete m_selected;
+            m_selected = nullptr;
         }
     }
 
@@ -246,37 +257,43 @@ Board::~Board()
 
 void Board::Draw()
 {
-    BeginShaderMode(*s_boardShader); {
+    // Background
+    BeginShaderMode(s_boardShader); {
 
-        DrawTextureEx(*sprite::missing, { 0,0 }, 0.0f, (float)spce::scrn::outp::g_oboardWidth * 0.5f/*missing.png is 2 pixels wide*/, WHITE);
+        DrawTextureEx(sprite::missing, { 0,0 }, 0.0f, (float)spce::s::o::g_oBoardWidth * 0.5f/*missing.png is 2 pixels wide*/, WHITE);
 
     } EndShaderMode();
 
-    BeginTextureMode(*s_unitsBuffer); {
+    // Units
+    BeginTextureMode(s_unitsBuffer); {
 
+        // Clean the buffer
         ClearBackground({ 0,0,0,0 });
 
-        BeginShaderMode(*s_blackUnitShdr); {
+        // Black units
+        BeginShaderMode(s_blackUnitShdr); {
 
             for (Unit* unit : m_qTree->units) { if (unit->IsBlack()) unit->Draw(); }
 
         } EndShaderMode();
 
-        BeginShaderMode(*s_whiteUnitShdr); {
+        // White units
+        BeginShaderMode(s_whiteUnitShdr); {
 
             for (Unit* unit : m_qTree->units) { if (unit->IsWhite()) unit->Draw(); }
 
         } EndShaderMode();
 
-        BeginShaderMode(*s_selectedUnitShdr); {
+        // Selected unit
+        BeginShaderMode(s_selectedUnitShdr); {
 
-            s_selected->Draw();
+            m_selected->Draw();
 
         } EndShaderMode();
 
     } EndTextureMode();
 
-    DrawTextureEx(s_unitsBuffer->texture, { 0,0 }, 0.0f, spce::scrn::g_gameScale, WHITE);
+    DrawTextureEx(s_unitsBuffer.texture, { 0,0 }, 0.0f, spce::s::g_gameScale, WHITE);
 
 #ifdef _DEBUG
     srand(0);
@@ -284,11 +301,11 @@ void Board::Draw()
 #endif
 }
 
-Shader* Board::s_boardShader = nullptr;
-Shader* Board::s_blackUnitShdr = nullptr;
-Shader* Board::s_whiteUnitShdr = nullptr;
-Shader* Board::s_selectedUnitShdr = nullptr;
-RenderTexture2D* Board::s_unitsBuffer = nullptr;
-Unit* Board::s_selected = nullptr;
+Shader Board::s_boardShader;
+Shader Board::s_blackUnitShdr;
+Shader Board::s_whiteUnitShdr;
+Shader Board::s_selectedUnitShdr;
+RenderTexture2D Board::s_unitsBuffer;
 
 Board g_board;
+#pragma endregion

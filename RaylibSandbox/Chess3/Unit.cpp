@@ -5,12 +5,9 @@
 void Unit::Draw()
 {
 	if (this) DrawTextureRec(
-		*sprite::pawn,
+		sprite::pawn,
 		{ 0,0, 16,-16 },
-		Vector2{
-			(pos.x * spce::scrn::g_tileWidth) - (spce::scrn::g_tileWidth * 0.5f),
-			(spce::scrn::g_boardWidth - spce::scrn::g_tileWidth - (pos.y * spce::scrn::g_tileWidth)) + (spce::scrn::g_tileWidth * 0.5f)
-		},
+		BoardToScreen(pos),
 		WHITE);
 }
 
