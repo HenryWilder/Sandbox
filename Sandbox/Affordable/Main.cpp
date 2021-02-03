@@ -131,6 +131,8 @@ int main()
 		Combo(budget);
 		printf("\n");
 	}
+	int done;
+	std::cin >> done;
 
 	return 0;
 }
