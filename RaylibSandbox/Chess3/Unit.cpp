@@ -4,7 +4,14 @@
 
 void Unit::Draw()
 {
-	DrawTextureRec(*sprite::pawn, { 0,0, 16,-16 }, { (pos.x * spce::scrn::g_tileWidth), spce::scrn::g_boardWidth - spce::scrn::g_tileWidth - (pos.y * spce::scrn::g_tileWidth) }, WHITE);
+	if (this) DrawTextureRec(
+		*sprite::pawn,
+		{ 0,0, 16,-16 },
+		Vector2{
+			(pos.x * spce::scrn::g_tileWidth) - (spce::scrn::g_tileWidth * 0.5f),
+			(spce::scrn::g_boardWidth - spce::scrn::g_tileWidth - (pos.y * spce::scrn::g_tileWidth)) + (spce::scrn::g_tileWidth * 0.5f)
+		},
+		WHITE);
 }
 
 void Unit::Move(Vector2 newPos)

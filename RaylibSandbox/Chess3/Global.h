@@ -13,7 +13,7 @@ namespace spce
         constexpr int g_tileArea = g_tileWidth * g_tileWidth; // The total pixels in a space
         constexpr int g_boardWidth = g_tileWidth * game::g_sideTileCount; // The number of pixels on the side of the board
         constexpr int g_totalArea = g_boardWidth * g_boardWidth; // The total pixels in the board
-        constexpr int g_gameScale = 2;
+        constexpr int g_gameScale = 4;
 
         namespace outp // Output
         {

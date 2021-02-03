@@ -173,6 +173,7 @@
   <ItemGroup>
     <None Include="board.frag" />
     <None Include="unit_black.frag" />
+    <None Include="unit_selected.frag" />
     <None Include="unit_white.frag" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

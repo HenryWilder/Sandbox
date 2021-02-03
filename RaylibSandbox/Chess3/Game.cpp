@@ -14,6 +14,7 @@ int main()
 	Shader boardShader = LoadShader(NULL, "board.frag");
 	Shader blackUnitShdr = LoadShader(NULL, "unit_black.frag");
 	Shader whiteUnitShdr = LoadShader(NULL, "unit_white.frag");
+	Shader selectedUnitShdr = LoadShader(NULL, "unit_selected.frag");
 
 	Texture2D missingTexture = LoadTexture("missing.png");
 
@@ -23,6 +24,7 @@ int main()
 	Board::s_boardShader = &boardShader;
 	Board::s_blackUnitShdr = &blackUnitShdr;
 	Board::s_whiteUnitShdr = &whiteUnitShdr;
+	Board::s_selectedUnitShdr = &selectedUnitShdr;
 	Board::s_unitsBuffer = &unitsBuffer;
 	sprite::missing = &missingTexture;
 
@@ -46,8 +48,6 @@ int main()
 
 	Vector2 cursorPos = {};
 
-	Unit* selected = nullptr;
-
 	// Gameloop
 	// -------------------------
 	SetTargetFPS(60);
@@ -56,6 +56,31 @@ int main()
 		// Update simulation
 		// ---------------------
 		cursorPos = GetMousePosition();
+		cursorPos = { cursorPos.x / spce::scrn::outp::g_otileWidth, cursorPos.y / spce::scrn::outp::g_otileWidth };
+
+		QuadTreeNode* hoveredNode = g_board.m_qTree->TraceChild(cursorPos);
+		if (hoveredNode->Weight() > 0)
+		{
+			DrawCircle(spce::scrn::outp::g_oboardWidth, spce::scrn::outp::g_oboardWidth, spce::scrn::outp::g_otileWidth * 0.5f, GREEN);
+			if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+			{
+				g_board.s_selected = hoveredNode->GetElement(0);
+				g_board.m_qTree->Eliminate(g_board.s_selected);
+				g_board.m_qTree->Prune();
+			}
+		}
+		if (g_board.s_selected && IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) // Refresh
+		{
+			hoveredNode->Push(g_board.s_selected);
+			g_board.m_qTree->Subdivide();
+			g_board.m_qTree->Prune();
+			g_board.s_selected = nullptr;
+		}
+
+		if (IsMouseButtonDown(MOUSE_LEFT_BUTTON))
+		{
+			if (g_board.s_selected) g_board.s_selected->Move(cursorPos);
+		}
 
 		// Begin drawing
 		// ---------------------
@@ -63,13 +88,8 @@ int main()
 
 			ClearBackground(BLACK);
 			g_board.Draw();
-			if (selected)
-			{
-				selected->Draw();
-			}
-
-			QuadTreeNode* hoveredNode = g_board.m_qTree->TraceChild({ cursorPos.x / spce::scrn::outp::g_otileWidth, cursorPos.y / spce::scrn::outp::g_otileWidth });
-			if (hoveredNode->Weight() == 1) DrawCircle(spce::scrn::outp::g_oboardWidth, spce::scrn::outp::g_oboardWidth, spce::scrn::outp::g_otileWidth * 0.5f, GREEN);
+			g_board.m_qTree->DrawDebug(g_board.m_qTree->MaxDepth() + 1);
+			g_board.m_qTree->TraceChild(cursorPos);
 
 		} EndDrawing();
 
@@ -82,6 +102,7 @@ int main()
 	UnloadShader(boardShader);
 	UnloadShader(blackUnitShdr);
 	UnloadShader(whiteUnitShdr);
+	UnloadShader(selectedUnitShdr);
 
 	UnloadTexture(*sprite::missing);
 	UnloadRenderTexture(unitsBuffer);

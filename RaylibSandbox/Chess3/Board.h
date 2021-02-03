@@ -20,12 +20,15 @@ public:
     bool WithinCoverage(Vector2 pt);
 
     QuadTreeNode* GetChild(int i) const;
+    QuadTreeNode* GetQuadrant(Vector2 pos);
     QuadTreeNode* TraceChild(Vector2 pos);
 
     Unit* GetElement(int i) const;
     void Reserve(int _count);
     void Push(Unit* const elem);
     void Pop();
+    void Erase(Unit* elem);
+    void Eliminate(Unit* elem);
     QuadTreeNode& AddChild(int child);
     void Subdivide();
     void Prune();
@@ -36,6 +39,7 @@ public:
 
 #ifdef _DEBUG
     void DrawDebug(int size = 1);
+    void PrintDebug(int depth = 0);
 #endif
 
 protected:
@@ -60,13 +64,17 @@ public:
     static Shader* s_boardShader;
     static Shader* s_blackUnitShdr;
     static Shader* s_whiteUnitShdr;
+    static Shader* s_selectedUnitShdr;
     static RenderTexture2D* s_unitsBuffer;
 
+    static Unit* s_selected;
     QuadTreeNode* m_qTree;
 };
 extern Shader* s_boardShader;
 extern Shader* s_blackUnitShdr;
 extern Shader* s_whiteUnitShdr;
+extern Shader* s_selectedUnitShdr;
 extern RenderTexture2D* s_unitsBuffer;
+extern Unit* s_selected;
 
 extern Board g_board;

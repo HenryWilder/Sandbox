@@ -83,5 +83,8 @@
     <None Include="unit_white.frag">
       <Filter>Resource Files\Shaders</Filter>
     </None>
+    <None Include="unit_selected.frag">
+      <Filter>Resource Files\Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

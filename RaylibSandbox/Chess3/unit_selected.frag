@@ -14,10 +14,7 @@ out vec4 finalColor;
 // NOTE: Add here your custom variables
 uniform vec2 resolution = vec2(1280, 720);
 
-uniform vec3 fill		= vec3(80, 80, 90) / 255.0;
-uniform vec3 shade		= vec3(50, 55, 60) / 255.0;
-uniform vec3 outline	= vec3(40, 30, 50) / 255.0;
-uniform vec3 shine		= vec3(100, 100, 110) / 255.0;
+uniform vec3 selection = vec3(44, 200, 37) / 255.0;
 
 void main()
 {
@@ -25,11 +22,9 @@ void main()
 	float y = 1.0/resolution.y;
 
 	vec4 texColor = texture2D(texture0, fragTexCoord);
-	vec3 color = vec3(0.0);
-	color = mix(color, fill,	texColor.r);
-	color = mix(color, shade,	texColor.g);
-	color = mix(color, outline,	texColor.b);
-	color = mix(color, shine,	texColor.r * texColor.g * texColor.b);
+	float alpha = 1.0 - round(texColor.a);
+	vec2 space = sin(fragTexCoord * radians(180.0));
+	float blend = (space.x * space.y);
 
-	finalColor = vec4(color.rgb, round(texColor.a));
+	finalColor = vec4(selection, alpha * blend);
 }

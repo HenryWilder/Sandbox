@@ -57,22 +57,26 @@ QuadTreeNode* QuadTreeNode::GetChild(int i) const
     return children[i];
 }
 
-QuadTreeNode* QuadTreeNode::TraceChild(Vector2 pos)
+QuadTreeNode* QuadTreeNode::GetQuadrant(Vector2 pos)
 {
-    DrawDebug(1);
-    QuadTreeNode* child;
     if (pos.x < coverage.x + (coverage.width * 0.5f)) { // Left
         if (pos.y < coverage.y + (coverage.height * 0.5f)) // Up
-            child = children[0];
+            return children[0];
         else // Right
-            child = children[2];
+            return children[2];
     }
     else { // Right
         if (pos.y < coverage.y + (coverage.height * 0.5f)) // Down
-            child = children[1];
+            return children[1];
         else // Right
-            child = children[3];
+            return children[3];
     }
+}
+
+QuadTreeNode* QuadTreeNode::TraceChild(Vector2 pos)
+{
+    DrawDebug(1);
+    QuadTreeNode* child = GetQuadrant(pos);
     if (child) return child->TraceChild(pos);
     else return this; // this is the closest we're getting
 }
@@ -84,6 +88,22 @@ Unit* QuadTreeNode::GetElement(int i) const
 void QuadTreeNode::Pop()
 {
     if (count) contentsAtLevel[--count] = nullptr;
+}
+void QuadTreeNode::Erase(Unit* elem)
+{
+    int i = 0;
+    for (; i < count - 1; ++i) { if (contentsAtLevel[i] == elem) break; }
+    for (; i < count - 1; ++i) { if (contentsAtLevel[i] == elem) contentsAtLevel[i] = contentsAtLevel[i + 1]; }
+    Pop();
+}
+void QuadTreeNode::Eliminate(Unit* elem)
+{
+    QuadTreeNode* next = GetQuadrant(elem->GetPos());
+    if (next)
+    {
+        next->Erase(elem);
+        next->Eliminate(elem);
+    }
 }
 void QuadTreeNode::Push(Unit* const elem)
 {
@@ -119,32 +139,27 @@ QuadTreeNode& QuadTreeNode::AddChild(int child)
 }
 void QuadTreeNode::Subdivide()
 {
-#ifdef _DEBUG
-    printf("This contains %i Unit*s\n", Weight());
-#endif
-    for (int i = 0; i < 4; ++i)
+    if (count > 1)
     {
-        QuadTreeNode& child = AddChild(i);
-#ifdef _DEBUG
-        printf("Child coverage: { %f..%f, %f..%f }\n",
-            child.coverage.x,
-            ((float)child.coverage.x + (float)child.coverage.width),
-            child.coverage.y,
-            ((float)child.coverage.y + (float)child.coverage.height));
-#endif
-        for (Unit* unit : *this)
+        for (int i = 0; i < 4; ++i)
         {
-#ifdef _DEBUG
-            printf("Unit pos: { %f, %f }, which is %s\n", unit->GetPos().x, unit->GetPos().y, (child.WithinCoverage(unit->GetPos()) ? "within" : "outside"));
-#endif
-            if (child.WithinCoverage(unit->GetPos()))
+            QuadTreeNode& child = AddChild(i);
+            for (Unit* unit : *this)
             {
-                child.Push(unit);
+                if (child.WithinCoverage(unit->GetPos()))
+                {
+                    child.Push(unit);
+                }
+            }
+            if (child.Weight() > 1)
+            {
+                child.Subdivide();
+            }
+            else if (child.Weight() < 0)
+            {
+                RemoveChild(i);
             }
         }
-#ifdef _DEBUG
-        printf("Child contains %i Unit*s\n", child.Weight());
-#endif
     }
 }
 void QuadTreeNode::Prune()
@@ -153,7 +168,7 @@ void QuadTreeNode::Prune()
     {
         if (children[i])
         {
-            if (!children[i]->Weight())
+            if ((children[i]->Weight() == 0) || (children[i]->Weight() == Weight()))
             {
                 delete children[i];
                 children[i] = nullptr;
@@ -216,8 +231,8 @@ void QuadTreeNode::DrawDebug(int size)
         for (Unit* unit : *this)
         {
             Vector2 unitPos = unit->GetPos();
-            unitPos.x = (unitPos.x * spce::scrn::outp::g_otileWidth) + (spce::scrn::outp::g_otileWidth / 2.0f);
-            unitPos.y = (unitPos.y * spce::scrn::outp::g_otileWidth) + (spce::scrn::outp::g_otileWidth / 2.0f);
+            unitPos.x = (unitPos.x * spce::scrn::outp::g_otileWidth);
+            unitPos.y = (unitPos.y * spce::scrn::outp::g_otileWidth);
             DrawCircleV(unitPos, size * spce::scrn::g_gameScale, thisColor);
         }
     }
@@ -230,6 +245,29 @@ void QuadTreeNode::DrawDebug(int size)
         }
     }
 }
+void QuadTreeNode::PrintDebug(int depth)
+{
+    printf("{ %f..%f, %f..%f }", coverage.x, coverage.x + coverage.width, coverage.y, coverage.y + coverage.height);
+    for (int i = 0; i < 4; ++i)
+    {
+        for (int j = 0; j < depth; ++j) { printf(" "); }
+        printf("{\n");
+        if (children[i])
+        {
+            children[i]->PrintDebug(depth + 1);
+        }
+        else
+        {
+            for (Unit* unit : *this)
+            {
+                for (int j = 0; j <= depth; ++j) { printf(" "); }
+                printf("{ %f, %f }\n", unit->GetPos().x, unit->GetPos().y);
+            }
+        }
+        for (int j = 0; j < depth; ++j) { printf(" "); }
+        printf("}\n");
+    }
+}
 #endif
 
 Board::Board()
@@ -238,29 +276,23 @@ Board::Board()
     m_qTree->Reserve(16);
     for (int x = 0; x < 8; ++x) // Add pawns
     {
-        Unit* unit = new Unit({ (float)x, 1.0f }, Unit::UnitColor::Black);
+        Unit* unit = new Unit({ (float)x + 0.5f, 1.5f }, Unit::UnitColor::Black);
         m_qTree->Push(unit);
     }
     for (int x = 0; x < 8; ++x) // Add pawns
     {
-        Unit* unit = new Unit({ (float)x, 6.0f }, Unit::UnitColor::White);
+        Unit* unit = new Unit({ (float)x + 0.5f, 6.5f }, Unit::UnitColor::White);
         m_qTree->Push(unit);
     }
-
     m_qTree->Subdivide();
-    for (int i = 0; i < 4; ++i)
-    {
-        m_qTree->GetChild(i)->Subdivide();
-        for (int j = 0; j < 4; ++j)
-        {
-            m_qTree->GetChild(i)->GetChild(j)->Subdivide();
-        }
-    }
     m_qTree->Prune();
+    //m_qTree->PrintDebug();
 }
 Board::~Board()
 {
-    for (Unit* elem : *m_qTree) { delete elem; }
+    for (Unit*& elem : *m_qTree) {
+        delete elem;
+    }
     delete m_qTree;
 }
 
@@ -274,6 +306,8 @@ void Board::Draw()
 
     BeginTextureMode(*s_unitsBuffer); {
 
+        ClearBackground({0,0,0,0});
+
         BeginShaderMode(*s_blackUnitShdr); {
 
             for (Unit* unit : *m_qTree) { if (unit->IsBlack()) unit->Draw(); }
@@ -283,6 +317,12 @@ void Board::Draw()
         BeginShaderMode(*s_whiteUnitShdr); {
 
             for (Unit* unit : *m_qTree) { if (unit->IsWhite()) unit->Draw(); }
+
+        } EndShaderMode();
+
+        BeginShaderMode(*s_selectedUnitShdr); {
+
+            s_selected->Draw();
 
         } EndShaderMode();
 
@@ -299,6 +339,8 @@ void Board::Draw()
 Shader* Board::s_boardShader = nullptr;
 Shader* Board::s_blackUnitShdr = nullptr;
 Shader* Board::s_whiteUnitShdr = nullptr;
+Shader* Board::s_selectedUnitShdr = nullptr;
 RenderTexture2D* Board::s_unitsBuffer = nullptr;
+Unit* Board::s_selected = nullptr;
 
 Board g_board;
