@@ -1,6 +1,8 @@
 #include "Global.h"
 namespace sprite
 {
+    Texture2D* missing = nullptr;
+
     Texture2D* pawn = nullptr;
     Texture2D* rook = nullptr;
     Texture2D* knight = nullptr;

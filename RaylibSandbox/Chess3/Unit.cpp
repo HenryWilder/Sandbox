@@ -12,3 +12,18 @@ void Unit::Move(Vector2 newPos)
 	pos.x = newPos.x;
 	pos.y = newPos.y;
 }
+
+Vector2 Unit::GetPos() const
+{
+	return pos;
+}
+
+bool Unit::IsBlack() const
+{
+	return color == UnitColor::Black;
+}
+
+bool Unit::IsWhite() const
+{
+	return color == UnitColor::White;
+}

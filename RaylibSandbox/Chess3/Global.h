@@ -29,6 +29,8 @@ typedef Texture Texture2D;
 
 namespace sprite
 {
+    extern Texture2D* missing;
+
     extern Texture2D* pawn;
     extern Texture2D* rook;
     extern Texture2D* knight;
