@@ -41,15 +41,6 @@ float SawtoothWave(int x, int wavelength)
 }
 float RampWave(int x, int wavelength)
 {
-	/***********************************
-	*
-	*	|        /   |
-	*	|      /     |
-	*	0------------1
-	*	|  /         |
-	*	|/           |
-	*
-	***********************************/
 	int wavePoint = (x % wavelength);
 	float reverse = (float)(wavelength - wavePoint);
 	float y = reverse / (float)wavelength;
@@ -57,30 +48,8 @@ float RampWave(int x, int wavelength)
 }
 float TriangleWave(int x, int wavelength)
 {
-	/***********************************
-	*
-	*	   1/4   3/4
-	*	|  /|\    |  |
-	*	| / | \   |  |
-	*	0---+-1/2-+--1
-	*	|   |   \ | /|
-	*	|   |    \|/ |
-	*
-	***********************************/
 	int wavePoint = (x % wavelength);
-	int midpoint = (wavelength / 2);
-	int quarterPoint = midpoint / 2;
-	float m;
-	if ((wavePoint > quarterPoint) && (wavePoint <= (midpoint + quarterPoint * 3)))
-	{
-		m = (float)(wavePoint) * 0.5f; // Downward
-	}
-	else
-	{
-		m = (float)(wavelength - wavePoint - quarterPoint) * 0.5f; // Upward
-	}
-	float y = m / (float)wavelength;
-	return Widen(y);
+	return ((abs(((float)wavePoint / (float)wavelength) - 0.5f) - 0.25f) * 2.0f);
 }
 float SineWave(int x, int wavelength)
 {
