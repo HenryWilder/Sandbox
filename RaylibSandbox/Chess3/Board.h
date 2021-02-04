@@ -6,6 +6,8 @@
 
 #include <vector>
 #include <array>
+#pragma message("Linking Board.h")
+
 
 struct Shader;
 struct RenderTexture;

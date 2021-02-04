@@ -3,6 +3,7 @@
 #include "Global.h"
 #include "Board.h"
 #include "Unit.h"
+#pragma message("Compiling Board.cpp")
 
 #pragma region QuadTree
 

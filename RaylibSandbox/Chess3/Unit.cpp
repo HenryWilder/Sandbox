@@ -1,7 +1,7 @@
 #include <raylib.h>
 #include "Global.h"
 #include "Unit.h"
-
+#pragma message("Compiling Unit.cpp")
 void Unit::Draw()
 {
 	if (this) DrawTextureRec(
