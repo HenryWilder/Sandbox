@@ -152,6 +152,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="AmyMath.h" />
+    <ClInclude Include="GUI_Elements.h" />
   </ItemGroup>
   <ItemGroup>
     <Media Include="audio.wav" />
