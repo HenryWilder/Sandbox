@@ -13,12 +13,17 @@ void DrawCircleC(Circle circle, Color color)
 	DrawCircleV(circle.center, circle.radius, color);
 }
 
+#pragma region Base classes
+
 struct GUI_Elem_Base
 {
-	GUI_Elem_Base(void* _collision) : collision(_collision), color_up(), color_hovered(), color_down(color_hovered) {};
+protected:
+
+	GUI_Elem_Base(void* _collision) : collision(_collision), color_up(), color_hovered(), color_down(color_hovered), b_down(false) {};
 
 	void* collision;
 	Color color_up, color_hovered, color_down;
+	mutable bool b_down;
 
 	virtual bool IsHovered() const = 0;
 	virtual bool IsPressed() const = 0;
@@ -26,13 +31,29 @@ struct GUI_Elem_Base
 	virtual bool IsReleased() const = 0;
 	virtual bool IsUp() const = 0;
 
+	virtual void OnHover() = 0;
+	virtual void OnPress() = 0;
+	virtual void OnRelease() = 0;
+
+public:
+
+	virtual void UpdateButton()
+	{
+		if (IsHovered()) OnHover();
+
+		if (IsPressed()) OnPress();
+		else if (IsReleased()) OnRelease();
+	}
+
 	virtual void Draw() const = 0;
 };
 
-struct Button_Circle : public GUI_Elem_Base
+struct Button_Circle_Base : public GUI_Elem_Base
 {
-	Button_Circle() : GUI_Elem_Base(&circ_collisionShape), circ_collisionShape() {};
-	Button_Circle(Vector2 position, float radius) : GUI_Elem_Base(&circ_collisionShape), circ_collisionShape{ position, radius } {};
+protected:
+
+	Button_Circle_Base() : GUI_Elem_Base(&circ_collisionShape), circ_collisionShape() {};
+	Button_Circle_Base(Vector2 _center, float _radius) : GUI_Elem_Base(&circ_collisionShape), circ_collisionShape{ _center, _radius } {};
 
 	Circle circ_collisionShape;
 
@@ -40,34 +61,98 @@ struct Button_Circle : public GUI_Elem_Base
 		return CheckCollisionPointCircleC(GetMousePosition(), circ_collisionShape);
 	}
 	bool IsPressed() const override {
-		return (IsHovered() && IsMouseButtonPressed(MOUSE_LEFT_BUTTON));
+		bool b = (IsHovered() && IsMouseButtonPressed(MOUSE_LEFT_BUTTON));
+		if (!b_down) b_down = b;
+		return b;
 	}
 	bool IsDown() const override {
-		return (IsHovered() && IsMouseButtonDown(MOUSE_LEFT_BUTTON));
+		return b_down;
 	}
 	bool IsReleased() const override {
-		return (IsHovered() && IsMouseButtonReleased(MOUSE_LEFT_BUTTON));
+		bool b = (b_down && IsMouseButtonReleased(MOUSE_LEFT_BUTTON));
+		if (b_down) b_down = b;
+		return b;
 	}
 	bool IsUp() const override {
-		return (IsHovered() && IsMouseButtonUp(MOUSE_LEFT_BUTTON));
+		return !b_down;
 	}
+
+public:
+
 	void Draw() const override
 	{
 		Color drawColor;
-		if (IsHovered()) {
-			if (IsDown()) drawColor = color_down;
-			else drawColor = color_hovered;
-		} else drawColor = color_up;
+		if (IsHovered()) drawColor = color_hovered;
+		else if (IsDown()) drawColor = color_down;
+		else drawColor = color_up;
 		DrawCircleC(circ_collisionShape, drawColor);
 	}
 };
 
-class Button1 : public Button_Circle
+class Dial_Base : public Button_Circle_Base
 {
+protected:
 
+	Dial_Base(Vector2 _center, float _radius) : Button_Circle_Base(_center, _radius) {};
+
+	void OnHover() override
+	{
+
+	}
+	void OnPress() override
+	{
+
+	}
+	void OnRelease() override
+	{
+
+	}
 };
 
-struct Dial : public GUI_Elem_Base
-{
+#pragma endregion
 
+class Button1 : public Button_Circle_Base
+{
+public:
+
+	Button1(Vector2 _center, float _radius) : Button_Circle_Base(_center, _radius) {};
+
+	void OnHover() override
+	{
+		// TODO: Add hover function
+	}
+	void OnPress() override
+	{
+		// TODO: Add press function
+	}
+	void OnRelease() override
+	{
+		// TODO: Add release function
+	}
+};
+
+class Dial1 : public Dial_Base
+{
+public:
+
+	Dial1(Vector2 _center, float _radius) : Dial_Base(_center, _radius) {};
+
+	void OnHover() override
+	{
+		// TODO: Add hover function
+
+		Dial_Base::OnHover();
+	}
+	void OnPress() override
+	{
+		// TODO: Add press function
+
+		Dial_Base::OnPress();
+	}
+	void OnRelease() override
+	{
+		// TODO: Add release function
+
+		Dial_Base::OnRelease();
+	}
 };
