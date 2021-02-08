@@ -265,6 +265,9 @@ int main() {
 	int note = 0;
 	bool b_noteChanged = true;
 
+	Shader sine_multiply = LoadShader(NULL, "mod_sine_mult.frag");
+	RenderTexture target = LoadRenderTexture(c_audioBufferSize, 1);
+
 #pragma endregion
 
 	while (!WindowShouldClose()) {
@@ -416,6 +419,19 @@ int main() {
 				element.ui.Draw();
 			}
 
+			if (b_noteChanged) // TODO: GPU rendering of audio file
+			{
+				BeginTextureMode(target); {
+
+					BeginShaderMode(sine_multiply); {
+
+						DrawTextureRec(target.texture, Rectangle{ 0.0f, 0.0f, (float)c_audioBufferSize, 0.0f }, Vector2{ 0,0 }, WHITE);
+
+					} EndShaderMode();
+
+				} EndTextureMode();
+			}
+
 		} EndDrawing();
 
 #pragma endregion
@@ -428,6 +444,9 @@ int main() {
 	CloseAudioStream(stream);
 	delete[] data;
 	delete[] buffer;
+
+	UnloadShader(sine_multiply);
+	UnloadRenderTexture(target);
 
 #pragma endregion
 

@@ -32,4 +32,12 @@
       <Filter>Resource Files</Filter>
     </Media>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="mod_sine_mult.frag">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="wavenode.vert">
+      <Filter>Resource Files</Filter>
+    </None>
+  </ItemGroup>
 </Project>

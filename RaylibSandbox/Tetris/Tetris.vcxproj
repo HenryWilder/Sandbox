@@ -157,6 +157,10 @@
   <ItemGroup>
     <Media Include="audio.wav" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="mod_sine_mult.frag" />
+    <None Include="wavenode.vert" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
