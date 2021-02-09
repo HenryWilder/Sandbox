@@ -19,11 +19,16 @@ struct GUI_Elem_Base
 {
 protected:
 
-	GUI_Elem_Base(void* _collision) : collision(_collision), color_up(), color_hovered(), color_down(color_hovered), b_down(false) {};
+	GUI_Elem_Base(Rectangle _collision) : collision(_collision), color_up(), color_hovered(), color_down(color_hovered), b_down(false) {};
 
-	void* collision;
+	Rectangle collision;
 	Color color_up, color_hovered, color_down;
-	mutable bool b_down;
+	bool b_down;
+
+	void SetIsDown(bool val)
+	{
+		b_down = val;
+	}
 
 	virtual bool IsHovered() const = 0;
 	virtual bool IsPressed() const = 0;
@@ -34,6 +39,15 @@ protected:
 	virtual void OnHover() = 0;
 	virtual void OnPress() = 0;
 	virtual void OnRelease() = 0;
+
+	void Press() {
+		SetIsDown(true);
+		OnPress();
+	}
+	void Release() {
+		SetIsDown(false);
+		OnRelease();
+	}
 
 public:
 
@@ -61,9 +75,9 @@ protected:
 		return CheckCollisionPointCircleC(GetMousePosition(), circ_collisionShape);
 	}
 	bool IsPressed() const override {
-		bool b = (IsHovered() && IsMouseButtonPressed(MOUSE_LEFT_BUTTON));
+		bool b = ();
 		if (!b_down) b_down = b;
-		return b;
+		return IsHovered() && IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
 	}
 	bool IsDown() const override {
 		return b_down;
@@ -111,6 +125,8 @@ protected:
 
 #pragma endregion
 
+#pragma region Specializations
+
 class Button1 : public Button_Circle_Base
 {
 public:
@@ -156,3 +172,13 @@ public:
 		Dial_Base::OnRelease();
 	}
 };
+
+#pragma endregion
+
+struct ScreenBufferNode // Quad-Tree
+{
+	ScreenBufferNode* children[4];
+	std::vector<GUI_Elem_Base*> elements;
+};
+
+ScreenBufferNode g_GUIBuffer;

@@ -13,6 +13,12 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Resource Files\Oscillators">
+      <UniqueIdentifier>{20f333b1-bd7e-4faa-8e39-5c3f6f6cfa9f}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resource Files\Effects">
+      <UniqueIdentifier>{f448ac38-252f-4f24-aa08-e892d3ae1e66}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Game.cpp">
@@ -33,11 +39,26 @@
     </Media>
   </ItemGroup>
   <ItemGroup>
-    <None Include="mod_sine_mult.frag">
-      <Filter>Resource Files</Filter>
-    </None>
     <None Include="wavenode.vert">
       <Filter>Resource Files</Filter>
+    </None>
+    <None Include="eff_compress.frag">
+      <Filter>Resource Files\Effects</Filter>
+    </None>
+    <None Include="eff_equalize.frag">
+      <Filter>Resource Files\Effects</Filter>
+    </None>
+    <None Include="eff_reverb.frag">
+      <Filter>Resource Files\Effects</Filter>
+    </None>
+    <None Include="osc_sine_mult.frag">
+      <Filter>Resource Files\Oscillators</Filter>
+    </None>
+    <None Include="osc_sine_add.frag">
+      <Filter>Resource Files\Oscillators</Filter>
+    </None>
+    <None Include="osc_sine_sub.frag">
+      <Filter>Resource Files\Oscillators</Filter>
     </None>
   </ItemGroup>
 </Project>

@@ -8,10 +8,115 @@
 #include <string>
 #include "AmyMath.h"
 
-struct Shape;
-
 constexpr int c_audioBufferSize = 4096;
 constexpr int c_sampleRate = 41000;
+
+namespace aux
+{
+	enum class MOD : int {
+		Add,
+		Multiply,
+		Subtract,
+	};
+	const char* GetModName(MOD mod)
+	{
+		switch (mod) {
+		default: return "ERROR";
+
+		case MOD::Add:		return "add";
+		case MOD::Multiply:	return "mult";
+		case MOD::Subtract: return "sub";
+		}
+	}
+
+	enum class OSC : int {
+		Sine,
+		Square,
+		Sawtooth,
+		Ramp,
+		Triangle,
+		Noise,
+
+		Total
+	};
+	const char* GetOscName(OSC osc)
+	{
+		switch (osc) {
+		default: return "ERROR";
+
+		case OSC::Sine:		return "sine";
+		case OSC::Square:	return "square";
+		case OSC::Sawtooth: return "sawtooth";
+		case OSC::Ramp:		return "ramp";
+		case OSC::Triangle: return "triangle";
+		case OSC::Noise:	return "noise";
+		}
+	}
+
+	enum class EFF : int {
+		Reverb,
+		Equalize,
+		Compress,
+
+		Total
+	};
+	const char* GetEffectName(EFF effect)
+	{
+		switch (effect) {
+		default: return "ERROR";
+
+		case EFF::Reverb:	return "reverb";
+		case EFF::Equalize:	return "equalize";
+		case EFF::Compress: return "compress";
+		}
+	}
+
+	struct OSC_MOD
+	{
+	public:
+		OSC_MOD(OSC type) {
+			const char* oscName = GetOscName(type);
+			for (int i = 0; i < 3; ++i) {
+				mods[i] = LoadShader("wavenode.vert", TextFormat("osc_%s_%s.frag", oscName, GetModName(MOD(i))));
+			}
+		}
+
+		Shader& operator[](MOD mod)
+		{
+			return mods[(int)(mod)];
+		}
+
+		void Unload()
+		{
+			for (Shader m : mods) {
+				UnloadShader(m);
+			}
+		}
+
+	private:
+		Shader mods[3];
+	};
+
+	OSC_MOD oscillators[(int)(OSC::Total)]; // Shader = oscillators[int][MOD]
+	Shader effects[(int)(EFF::Total)]; // Shader = effects[int]
+
+	void Load()
+	{
+		// Oscillators 
+		for (int i = 0; i < (int)(OSC::Total); ++i) {
+			oscillators[i] = OSC_MOD(OSC(i));
+		}
+		// Effects
+		for (int i = 0; i < (int)(EFF::Total); ++i) {
+			effects[i] = LoadShader("wavenode.vert", TextFormat("eff_%s.frag", GetEffectName(EFF(i))));
+		}
+	}
+	void Unload()
+	{
+		for (OSC_MOD osc : oscillators) osc.Unload();
+		for (Shader eff : effects) UnloadShader(eff);
+	}
+}
 
 int MostOf(int cycleSize, int maxSpace)
 {
@@ -23,10 +128,7 @@ float WaveLen(float freq)
 	return c_sampleRate / freq;
 }
 
-enum class Note
-{
-	C, D, E, F, G, A, B,
-};
+enum class Note { C, D, E, F, G, A, B, };
 float Key(Note key, int octave = 4)
 {
 	float notes[] = {
@@ -42,8 +144,9 @@ WFReturn_t Widen(WFReturn_t val)
 {
 	return (((val) * (WFReturn_t)(2)) - (WFReturn_t)(1));
 }
-typedef int WavePos_t;
-typedef float WaveLength_t;
+
+typedef int WavePos_t; typedef float WaveLength_t;
+
 #define WAVEFORM(name) WFReturn_t (name)(WavePos_t x, WaveLength_t wavelength)
 typedef WAVEFORM(*WaveForm);
 
@@ -81,24 +184,149 @@ WAVEFORM(Noise)
 	return (WFReturn_t)Widen((float)rand() / (float)RAND_MAX);
 }
 
+Shader* ShaderOf(WaveForm wave);
+
 #pragma endregion
 
 #pragma region Audio layering
 
+#pragma region Effect classes
+
+// Base class
+class Effect
+{
+public:
+
+	Effect() : shader(nullptr) {};
+
+	virtual void InitShader(Shader* _shader) = 0;
+
+	virtual void Apply(RenderTexture& input, RenderTexture& output) = 0;
+
+protected:
+
+	Shader* shader;
+};
+
+class Compressor : public Effect
+{
+public:
+
+	void Apply(RenderTexture& input, RenderTexture& output) override
+	{
+		BeginTextureMode(output); {
+
+		} EndTextureMode();
+	}
+
+	void InitShader(Shader* _shader) override
+	{
+
+	}
+
+private:
+
+	static Shader* s_shader;
+};
+
+class Equalizer : public Effect
+{
+public:
+
+	Equalizer(float _f0, float _q) {
+		Effect::shader = s_shader;
+		UpdateParams(_f0, _q);
+	}
+
+	void UpdateParams(float _f0, float _q)
+	{
+		f0 = _f0; 
+		q = _q;
+
+		float w0 = 2 * PI * f0 / c_sampleRate;
+		float alpha = sinf(w0) / (2 * q);
+
+		a[0] = (1 + alpha);
+		a[1] = (-2 * cosf(w0));
+		a[2] = (1 - alpha);
+
+		b[0] = ((1 + cosf(w0)) / 2);
+		b[1] = (-(1 + cosf(w0)));
+		b[2] = ((1 + cosf(w0)) / 2);
+
+		float a0 = 1 / a[0];
+		for (float& _a : a) { _a *= a0; }
+		for (float& _b : b) { _b *= a0; }
+	}
+
+	void Prepend(float(&arr)[3], float elem)
+	{
+		for (int i = 2; i > 0; --i) {
+			arr[i] = arr[i - 1];
+		}
+		arr[0] = elem;
+	}
+
+	void Apply(RenderTexture& input, RenderTexture& output) override
+	{
+		BeginTextureMode(output); {
+
+			// TODO: Make this work for the GPU
+
+		} EndTextureMode();
+	}
+
+private:
+
+	// Parameters
+	static Shader* s_shader;
+	float f0; // Cut-off (or center) frequency in Hz
+	float q; // Filter Q
+
+	// Uniforms produced from the parameters
+	float a[3]; // Fi
+	float b[3];
+};
+Shader* Equalizer::s_shader;
+
+class Reverb : public Effect
+{
+public:
+	// Parameters
+	Reverb() {
+
+	}
+
+	void Apply(RenderTexture& input, RenderTexture& output) override
+	{
+		BeginTextureMode(output); {
+
+		} EndTextureMode();
+	}
+
+private:
+	static Shader* s_shader;
+};
+Shader* Reverb::s_shader;
+
+#pragma endregion
+
 struct Oscillator
 {
-	Oscillator() : base(nullptr), pitchScale(1.0f), pitchOffset(0.0f), amplitude(1.0f) {};
-	Oscillator(WaveForm _base) : base(_base), pitchScale(1.0f), pitchOffset(0.0f), amplitude(1.0f) {};
-	Oscillator(WaveForm _base, float _pitchScale, float _amplitude) : base(_base), pitchScale(_pitchScale), pitchOffset(0.0f), amplitude(_amplitude) {};
-	Oscillator(WaveForm _base, float _pitchScale, float _pitchOffset, float _amplitude) : base(_base), pitchScale(_pitchScale), pitchOffset(_pitchOffset), amplitude(_amplitude) {};
+	Oscillator() : base(nullptr), shader(nullptr), pitchScale(1.0f), pitchOffset(0.0f), amplitude(1.0f) {};
+	Oscillator(WaveForm _base) : base(_base), shader(_shader), pitchScale(1.0f), pitchOffset(0.0f), amplitude(1.0f) {};
+	Oscillator(WaveForm _base, float _pitchScale, float _amplitude) : base(_base), shader(_shader), pitchScale(_pitchScale), pitchOffset(0.0f), amplitude(_amplitude) {};
+	Oscillator(WaveForm _base, float _pitchScale, float _pitchOffset, float _amplitude) : base(_base), shader(_shader), pitchScale(_pitchScale), pitchOffset(_pitchOffset), amplitude(_amplitude) {};
 
 	WaveForm base;
+	Shader* shader;
 	float pitchScale, pitchOffset, amplitude;
 
 	WAVEFORM(Function) // Must line up with type WaveForm
 	{
 		return base(x, (wavelength * pitchScale) + pitchOffset) * amplitude;
 	}
+
 };
 
 struct OscUnit;
@@ -226,6 +454,11 @@ bool IsKeyChanged(int key)
 	return (IsKeyPressed(key) || IsKeyReleased(key));
 }
 
+Shader* ShaderOf(WaveForm wave)
+{
+	return nullptr;
+}
+
 int main() {
 
 #pragma region Setup phase
@@ -263,25 +496,24 @@ int main() {
 
 	int noteCount = sizeof(wavelengthArr) / sizeof(float);
 	int note = 0;
-	bool b_noteChanged = true;
+	bool b_audioChanged = true;
 
-	Shader sine_multiply = LoadShader(NULL, "mod_sine_mult.frag");
 	RenderTexture target = LoadRenderTexture(c_audioBufferSize, 1);
 
 #pragma endregion
 
 	while (!WindowShouldClose()) {
 
-#pragma region Simulation phase
+	#pragma region Simulation Phase
 
-#pragma region Keyboard
+		#pragma region Keyboard
 
 		{
 			for (int i = 0; i < (sizeof(kbKeys) / sizeof(int)); ++i)
 			{
 				if (IsKeyChanged(kbKeys[i]))
 				{
-					b_noteChanged = true;
+					b_audioChanged = true;
 
 					if (IsKeyPressed(kbKeys[i]))
 					{
@@ -304,7 +536,7 @@ int main() {
 					}
 				}
 			}
-			if (b_noteChanged)
+			if (b_audioChanged)
 			{
 				int i = 0;
 				for (WaveLength_t n : chord)
@@ -342,7 +574,7 @@ int main() {
 
 				synth1.m_oscilators.push_back(OscUnit(Oscillator(pick, scale, strn), OscUnit::Addative));
 				synth1.m_oscilators[synth1.m_oscilators.size() - 1].ui.SetPos(10.0f + 60.0f * (float)(synth1.m_oscilators.size() - 1));
-				b_noteChanged = true;
+				b_audioChanged = true;
 			}
 			else
 			{
@@ -358,9 +590,11 @@ int main() {
 			}
 		}
 		
-#pragma endregion
+		#pragma endregion
 
-		if (b_noteChanged)
+		#pragma region Update vars
+
+		if (b_audioChanged)
 		{
 			printf("Change\n");
 			//wavelength = wavelengthArr[note = (note + 1) % noteCount];
@@ -372,7 +606,7 @@ int main() {
 		}
 		time += GetFrameTime();
 		if (time > 1.0) time = 0.0;
-		b_noteChanged = false;
+		b_audioChanged = false;
 
 		if (IsAudioStreamProcessed(stream))
 		{
@@ -392,13 +626,34 @@ int main() {
 		pos += (GetFrameTime() * (c_sampleRate));
 		if (pos > MostOf(wavelength, c_audioBufferSize)) pos = 0.0f; // frame count
 		
-#pragma endregion
+		#pragma endregion
 
-#pragma region Drawing phase
+		#pragma region Audio Rendering
+
+		if (b_audioChanged) // TODO: GPU rendering of audio file
+		{
+			BeginTextureMode(target); {
+
+				BeginShaderMode(sine_multiply); {
+
+					DrawTextureRec(target.texture, Rectangle{ 0.0f, 0.0f, (float)c_audioBufferSize, 0.0f }, Vector2{ 0,0 }, WHITE);
+
+				} EndShaderMode();
+
+			} EndTextureMode();
+		}
+
+		#pragma endregion
+
+	#pragma endregion
+
+	#pragma region Drawing Phase
 
 		BeginDrawing(); {
 
 			ClearBackground(BLACK);
+
+			#pragma region Waves
 
 			int bufferSize = MostOf(wavelength, c_audioBufferSize);
 			int bufferSizeOnScreen = bufferSize / 4;
@@ -414,50 +669,36 @@ int main() {
 			}
 			//DrawLine(pos / 4.0f, 0, pos / 4.0f, windowHeight, GREEN);
 
+			#pragma endregion
+
+			#pragma region UI
+
 			for (OscUnit element : synth1.m_oscilators)
 			{
 				element.ui.Draw();
 			}
 
-			if (b_noteChanged) // TODO: GPU rendering of audio file
-			{
-				BeginTextureMode(target); {
-
-					BeginShaderMode(sine_multiply); {
-
-						DrawTextureRec(target.texture, Rectangle{ 0.0f, 0.0f, (float)c_audioBufferSize, 0.0f }, Vector2{ 0,0 }, WHITE);
-
-					} EndShaderMode();
-
-				} EndTextureMode();
-			}
+			#pragma endregion
 
 		} EndDrawing();
 
-#pragma endregion
+	#pragma endregion
 
 	} CloseWindow();
 
 #pragma region Cleanup phase
 
-	CloseAudioDevice();
 	CloseAudioStream(stream);
+	CloseAudioDevice();
+
 	delete[] data;
 	delete[] buffer;
 
-	UnloadShader(sine_multiply);
+	aux::Unload();
+		
 	UnloadRenderTexture(target);
 
 #pragma endregion
 
 	return 0;
 }
-struct Shape
-{
-	int x, y;
-	Color color;
-	void Draw()
-	{
-
-	}
-};

@@ -158,7 +158,12 @@
     <Media Include="audio.wav" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="mod_sine_mult.frag" />
+    <None Include="eff_compress.frag" />
+    <None Include="eff_equalize.frag" />
+    <None Include="eff_reverb.frag" />
+    <None Include="osc_sine_add.frag" />
+    <None Include="osc_sine_mult.frag" />
+    <None Include="osc_sine_sub.frag" />
     <None Include="wavenode.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
