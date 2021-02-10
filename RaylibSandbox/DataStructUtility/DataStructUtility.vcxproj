@@ -21,10 +21,9 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{690f473a-78b8-4629-a6e5-57600e62db5f}</ProjectGuid>
-    <RootNamespace>Tetris</RootNamespace>
+    <ProjectGuid>{dcb89bfe-2d9a-4e38-859a-a4dbd339870c}</ProjectGuid>
+    <RootNamespace>DataStructUtility</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
-    <ProjectName>RaylibSandboxProject4</ProjectName>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
@@ -123,8 +122,8 @@
     <Link>
       <SubSystem>Console</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>raylib.lib;kernel32.lib;user32.lib;gdi32.lib;winmm.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)Library\raylib\bin\x64\Debug.DLL;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>raylib.lib;kernel32.lib;user32.lib;gdi32.lib;winmm.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -143,43 +142,15 @@
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
       <OptimizeReferences>true</OptimizeReferences>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalDependencies>raylib.lib;kernel32.lib;user32.lib;gdi32.lib;winmm.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib</AdditionalDependencies>
       <AdditionalLibraryDirectories>$(SolutionDir)Library\raylib\bin\x64\Release.DLL;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>raylib.lib;kernel32.lib;user32.lib;gdi32.lib;winmm.lib;winspool.lib;comdlg32.lib;advapi32.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;odbc32.lib;odbccp32.lib</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Game.cpp" />
+    <ClCompile Include="DataStructUtility.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="AmyMath.h" />
-    <ClInclude Include="GUI_Elements.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <Media Include="audio.wav" />
-  </ItemGroup>
-  <ItemGroup>
-    <None Include="Combines\cmb_add.frag" />
-    <None Include="Combines\cmb_ave.frag" />
-    <None Include="Combines\cmb_mix.frag" />
-    <None Include="Combines\cmb_mult.frag" />
-    <None Include="Combines\cmb_sub.frag" />
-    <None Include="Combines\v_cmb.vert" />
-    <None Include="display.frag" />
-    <None Include="EffectShaders\eff_compress.frag" />
-    <None Include="EffectShaders\eff_delay.frag" />
-    <None Include="EffectShaders\eff_equalize.frag" />
-    <None Include="EffectShaders\eff_reverb.frag" />
-    <None Include="EffectShaders\v_eff.vert" />
-    <None Include="OscShaders\osc_noise.frag" />
-    <None Include="OscShaders\osc_sine.frag" />
-    <None Include="OscShaders\osc_sawtooth.frag" />
-    <None Include="OscShaders\osc_ramp.frag" />
-    <None Include="OscShaders\osc_square.frag" />
-    <None Include="OscShaders\osc_triangle.frag" />
-    <None Include="OscShaders\v_osc.vert" />
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="missing.PNG" />
+    <Image Include="mono_font.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

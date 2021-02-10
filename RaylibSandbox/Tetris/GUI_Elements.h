@@ -1,79 +1,19 @@
 #pragma once
 #include <raylib.h>
 
-struct Circle
-{
-	Vector2 center;
-	float radius;
-};
-bool CheckCollisionPointCircleC(Vector2 point, Circle circle)
-{
-	return CheckCollisionPointCircle(point, circle.center, circle.radius);
-}
-void DrawCircleC(Circle circle, Color color)
-{
-	DrawCircleV(circle.center, circle.radius, color);
-}
-
 #pragma region Base classes
 
-class GUI_TextBox
+class Widget
 {
 protected:
-	GUI_TextBox() :
-		text(std::string("")),
-		x(0),
-		y(0),
-		fontSize(8),
-		textColor(WHITE) {};
-
-	GUI_TextBox(const char* _text, int _x, int _y, Color _textColor) :
-		text(_text),
-		x(_x),
-		y(_y),
-		textColor(_textColor) {};
-
-	GUI_TextBox(const std::string& _text, int _x, int _y, Color _textColor) :
-		text(_text),
-		x(_x),
-		y(_y),
-		textColor(_textColor) {};
-
-	GUI_TextBox(const char* _text, Vector2 _pos, Color _textColor) :
-		text(_text),
-		x((int)_pos.x),
-		y((int)_pos.y),
-		textColor(_textColor) {};
-
-	GUI_TextBox(const std::string& _text, Vector2 _pos, Color _textColor) :
-		text(_text),
-		x((int)_pos.x),
-		y((int)_pos.y),
-		textColor(_textColor) {};
-
-public:
-	void Draw()
-	{
-		DrawText(text.c_str(), x, y, fontSize, textColor);
-	}
-
-private:
-	std::string text;
-	int x, y;
-	int fontSize;
-	Color textColor;
-};
-
-class GUI_Elem_Base
-{
-protected:
-	GUI_Elem_Base(Rectangle _collision, Color _color_up, Color _color_hovered, Color _color_down) :
+	Widget(Rectangle _collision, Color _tint_up, Color _tint_hovered, Color _tint_down, Texture2D _texture) :
 		collision(_collision),
-		color_up(_color_up),
-		color_hovered(_color_hovered),
-		color_down(_color_down),
+		tint_up(_tint_up),
+		tint_hovered(_tint_hovered),
+		tint_down(_tint_down),
 		b_down(false),
-		b_hovering(false) {};
+		b_hovering(false),
+		texture(_texture) {};
 
 public:
 	bool IsHovered() const {
@@ -110,20 +50,21 @@ public:
 	virtual void Draw() const = 0;
 
 protected:
-	Rectangle collision;
-	Color color_up, color_hovered, color_down;
-	bool b_down, b_hovering;
+	Rectangle collision; // 16 bytes
+	Color tint_up, tint_hovered, tint_down; // 3 * 4 (12) bytes
+	bool b_down, b_hovering; // 2 * 1 (2) bytes
+	Texture texture; // 20 bytes
 };
 
 #pragma endregion
 
 #pragma region Specializations
 
-class Button1 : public Button_Circle_Base
+class Button1 : public Widget
 {
 public:
 
-	Button1(Vector2 _center, float _radius) : Button_Circle_Base(_center, _radius) {};
+	Button1(Vector2 _center, float _radius) : Widget(_center, _radius) {};
 
 	void OnHover() override
 	{
@@ -141,10 +82,12 @@ public:
 
 #pragma endregion
 
-struct ScreenBufferNode // Quad-Tree
+struct WidgetCollection // Quad-Tree
 {
-	ScreenBufferNode* children[4];
+	WidgetCollection* children[4];
 	std::vector<GUI_Elem_Base*> elements;
 };
 
-ScreenBufferNode g_GUIBuffer;
+static WidgetCollection g_ui{
+
+};

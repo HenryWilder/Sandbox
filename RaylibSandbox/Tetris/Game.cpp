@@ -29,7 +29,7 @@ out vec4 fragColor;
 void main()
 {
 // Send vertex attributes to fragment shader
-fragTexCoord = vec2(vertexTexCoord.x, 0);
+fragTexCoord = vec2(vertexTexCoord);
 fragColor = vertexColor;
 
 vec3 pos = vertexPosition;
@@ -127,7 +127,7 @@ float amp = 0.0;
 finalColor = vec4(amp, vec2(0.0), 1.0);
 })" };
 
-const char* BuildVertShader(const char* uniformInserts = "", const char* posCode = "")
+const char* BuildVertShader(const char* uniformInserts = "", const char* posCode = "", const char* fragTexCoordCode = "")
 {
 	const char* out = TextFormat(
 		R"(#version 330
@@ -151,7 +151,9 @@ out vec4 fragColor;
 void main()
 {
 // Send vertex attributes to fragment shader
-fragTexCoord = vec2(vertexTexCoord);
+// fragTexCoord
+fragTexCoord = vertexTexCoord;
+%s
 fragColor = vertexColor;
 
 // Pos code
@@ -162,6 +164,7 @@ vec3 pos = vertexPosition;
 gl_Position = mvp*vec4(pos, 1.0);
 })",
 uniformInserts,
+fragTexCoordCode,
 posCode
 	);
 
@@ -511,8 +514,8 @@ Shader* Reverb::s_shader;
 
 struct Oscillator
 {
-	const char* timingCodeInsert;
-	const char* oscCodeInsert;
+	const char* timingCode = BuildVertShader();
+	const char* oscCode = BuildFragShader();
 };
 
 // USER INTERFACE
@@ -539,6 +542,15 @@ bool IsKeyChanged(int key)
 	return (IsKeyPressed(key) || IsKeyReleased(key));
 }
 
+void ModifyVertex(Mesh& mesh, int vertex, Vector3 newPos)
+{
+	float* vecPtr = (float*)(&newPos);
+	for (int i = 0; i < 3; ++i)
+	{
+		mesh.vertices[(vertex * 3) + i] = vecPtr[i];
+	}
+}
+
 int main() {
 
 #pragma region Setup phase
@@ -558,61 +570,71 @@ int main() {
 	SetTargetFPS(c_frameRate);
 
 	Shader shader = LoadShaderCode(
-		BuildVertShader(),
+		BuildVertShader(
+			// Uniforms
+			"",
+			// Code
+			"pos.z *= 10.0;",
+			// UV manipulation
+			"fragTexCoord.x *= 3.0;"
+		),
 		BuildFragShader(
 			// Uniforms
 			"",
 			// Code
-			"amp = sin(radians(360.0) * time);"
-			"finalColor.y = (abs(fragTexCoord.y - amp) < 0.001 ? 1.0 : 0.0);",
+			"amp = sin(radians(360.0) * time);",
 			// Include rand() function?
 			false
 		)
 	);
 
-	Shader display = LoadShaderCode(
-		BuildVertShader(),
-		BuildFragShader(
-			// Uniforms
-			"",
-			// Code
-			"float fragInputVal = texture2D(texture0, fragTexCoord).x;"
-			"float dist = abs(fragInputVal + 0.5 - fragTexCoord.y);"
-			"amp = texture2D(texture0, vec2(fragTexCoord.x * 3.2, fragTexCoord.y)).x;"
-			"finalColor.y = (abs(fragTexCoord.y - amp) < 0.001 ? 1.0 : 0.0);"
-		)
-	);
-
 	RenderTexture target = LoadRenderTexture(c_audioBufferSize, windowHeight);
+
+	Model notes = LoadModelFromMesh(GenMeshPlane(1.0f, 1.0f, 1, 1));
+	UnloadMesh(notes.meshes[0]);
+	notes.meshes[0] = GenMeshPlane(4.0f, 1.0f, 2, 1);
+
+	ModifyVertex(notes.meshes[0], 0, { 10.0f, 1.0f, 1.0f });
+
+	Texture2D texture = LoadTexture("missing.PNG");
+	notes.materials[0].maps[MAP_DIFFUSE].texture = texture;
+	notes.materials[0].shader = shader;
+	Camera camera = { { 0.0f, 5.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 1.0f }, 45.0f, CAMERA_ORTHOGRAPHIC };
 
 	while (!WindowShouldClose())
 	{
-		BeginTextureMode(target); {
+		BeginDrawing(); {
 
 			ClearBackground(BLACK);
 
-			BeginShaderMode(shader); {
+			BeginMode3D(camera); {
 
-				DrawTextureRec(target.texture, Rectangle{ 0, 0, (float)c_audioBufferSize, (float)windowHeight }, { 0,0 }, WHITE);
+				DrawModel(notes, { 0.0f, 0.0f, 0.0f }, 1.0f, WHITE);
 
-			} EndShaderMode();
+				for (int i = 1; i < notes.meshes[0].vertexCount; ++i)
+				{
+					Vector3 p1, p2;
+					float* p1f = (float*)(&p1);
+					float* p2f = (float*)(&p2);
+					for (int j = 0; j < 3; ++j)
+					{
+						p1f[j] = notes.meshes[0].vertices[(i * 3) + j];
+						p2f[j] = notes.meshes[0].vertices[((i - 1) * 3) + j];
+					}
 
-		} EndTextureMode();
+					DrawLine3D(p1, p2, GREEN);
+				}
 
-		BeginDrawing(); {
-
-			BeginShaderMode(display); {
-
-				DrawTextureRec(target.texture, Rectangle{ 0, 0, (float)windowWidth, (float)windowHeight }, { 0,0 }, WHITE);
-
-			} EndShaderMode();
+			} EndMode3D();
 
 		} EndDrawing();
 	}
 
+	UnloadModel(notes);
+
 	UnloadRenderTexture(target);
 
-	UnloadShader(display);
+	UnloadTexture(texture);
 
 	UnloadShader(shader);
 
