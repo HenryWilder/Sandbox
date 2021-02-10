@@ -127,7 +127,7 @@ float amp = 0.0;
 finalColor = vec4(amp, vec2(0.0), 1.0);
 })" };
 
-const char* BuildVertShader(const char* posCode = "", const char* uniformInserts = "")
+const char* BuildVertShader(const char* uniformInserts = "", const char* posCode = "")
 {
 	const char* out = TextFormat(
 		R"(#version 330
@@ -151,7 +151,7 @@ out vec4 fragColor;
 void main()
 {
 // Send vertex attributes to fragment shader
-fragTexCoord = vec2(vertexTexCoord.x, 0);
+fragTexCoord = vec2(vertexTexCoord);
 fragColor = vertexColor;
 
 // Pos code
@@ -159,17 +159,17 @@ vec3 pos = vertexPosition;
 %s
 
 // Calculate final vertex position
-gl_Position = mvp * vec4(pos, 1.0);
+gl_Position = mvp*vec4(pos, 1.0);
 })",
 uniformInserts,
 posCode
 	);
 
-	printf("Vertex shader code built!\n%s\n\n", out);
+	//printf("\n-------------------------\nVertex shader code built!\n-------------------------\n\n%s\n~~~~~~~~~~~~\n\n", out);
 
 	return out;
 }
-const char* BuildFragShader(const char* ampCode = "", const char* uniformInserts = "", bool b_usesRand = false)
+const char* BuildFragShader(const char* uniformInserts = "", const char* ampCode = "",  bool b_usesRand = false)
 {
 	const char* out = TextFormat(
 		R"(#version 330
@@ -187,23 +187,24 @@ out vec4 finalColor;
 
 // Custom uniforms
 %s
-
-// rand()
 %s
-
 void main()
 {
 float time = fragTexCoord.x;
+
+finalColor = vec4(vec3(0.0), 1.0);
 
 // Amp code
 float amp = 0.0;
 %s
 
-finalColor = vec4(amp, vec2(0.0), 1.0);
+finalColor.x = amp;
 })",
 		uniformInserts,
 		(b_usesRand ?
-			R"(highp float rand(vec2 co)
+			R"(
+// rand()
+highp float rand(vec2 co)
 {
 highp float a = 12.9898;
 highp float b = 78.233;
@@ -211,12 +212,13 @@ highp float c = 43758.5453;
 highp float dt = dot(co.xy, vec2(a, b));
 highp float sn = mod(dt, 3.14);
 return fract(sin(sn) * c);
-})"
+}
+)"
 			: ""),
 		ampCode
 	);
 
-	printf("Fragment shader code built!\n%s\n\n", out);
+	//printf("\n---------------------------\nFragment shader code built!\n---------------------------\n\n%s\n~~~~~~~~~~~~\n\n", out);
 
 	return out;
 }
@@ -557,10 +559,29 @@ int main() {
 
 	Shader shader = LoadShaderCode(
 		BuildVertShader(),
-		BuildFragShader("amp = sin(time);")
+		BuildFragShader(
+			// Uniforms
+			"",
+			// Code
+			"amp = sin(radians(360.0) * time);"
+			"finalColor.y = (abs(fragTexCoord.y - amp) < 0.001 ? 1.0 : 0.0);",
+			// Include rand() function?
+			false
+		)
 	);
 
-	Shader display = LoadShader(NULL, "display.frag");
+	Shader display = LoadShaderCode(
+		BuildVertShader(),
+		BuildFragShader(
+			// Uniforms
+			"",
+			// Code
+			"float fragInputVal = texture2D(texture0, fragTexCoord).x;"
+			"float dist = abs(fragInputVal + 0.5 - fragTexCoord.y);"
+			"amp = texture2D(texture0, vec2(fragTexCoord.x * 3.2, fragTexCoord.y)).x;"
+			"finalColor.y = (abs(fragTexCoord.y - amp) < 0.001 ? 1.0 : 0.0);"
+		)
+	);
 
 	RenderTexture target = LoadRenderTexture(c_audioBufferSize, windowHeight);
 
@@ -572,7 +593,7 @@ int main() {
 
 			BeginShaderMode(shader); {
 
-				DrawTextureRec(target.texture, canvas, { 0,0 }, WHITE);
+				DrawTextureRec(target.texture, Rectangle{ 0, 0, (float)c_audioBufferSize, (float)windowHeight }, { 0,0 }, WHITE);
 
 			} EndShaderMode();
 
@@ -582,7 +603,7 @@ int main() {
 
 			BeginShaderMode(display); {
 
-				DrawTextureRec(target.texture, canvas, { 0,0 }, WHITE);
+				DrawTextureRec(target.texture, Rectangle{ 0, 0, (float)windowWidth, (float)windowHeight }, { 0,0 }, WHITE);
 
 			} EndShaderMode();
 
