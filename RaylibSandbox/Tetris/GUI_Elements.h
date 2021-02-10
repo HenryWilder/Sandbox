@@ -15,112 +15,102 @@ void DrawCircleC(Circle circle, Color color)
 
 #pragma region Base classes
 
-struct GUI_Elem_Base
+class GUI_TextBox
 {
 protected:
+	GUI_TextBox() :
+		text(std::string("")),
+		x(0),
+		y(0),
+		fontSize(8),
+		textColor(WHITE) {};
 
-	GUI_Elem_Base(Rectangle _collision) : collision(_collision), color_up(), color_hovered(), color_down(color_hovered), b_down(false) {};
+	GUI_TextBox(const char* _text, int _x, int _y, Color _textColor) :
+		text(_text),
+		x(_x),
+		y(_y),
+		textColor(_textColor) {};
 
-	Rectangle collision;
-	Color color_up, color_hovered, color_down;
-	bool b_down;
+	GUI_TextBox(const std::string& _text, int _x, int _y, Color _textColor) :
+		text(_text),
+		x(_x),
+		y(_y),
+		textColor(_textColor) {};
 
-	void SetIsDown(bool val)
+	GUI_TextBox(const char* _text, Vector2 _pos, Color _textColor) :
+		text(_text),
+		x((int)_pos.x),
+		y((int)_pos.y),
+		textColor(_textColor) {};
+
+	GUI_TextBox(const std::string& _text, Vector2 _pos, Color _textColor) :
+		text(_text),
+		x((int)_pos.x),
+		y((int)_pos.y),
+		textColor(_textColor) {};
+
+public:
+	void Draw()
 	{
-		b_down = val;
+		DrawText(text.c_str(), x, y, fontSize, textColor);
 	}
 
-	virtual bool IsHovered() const = 0;
-	virtual bool IsPressed() const = 0;
-	virtual bool IsDown() const = 0;
-	virtual bool IsReleased() const = 0;
-	virtual bool IsUp() const = 0;
+private:
+	std::string text;
+	int x, y;
+	int fontSize;
+	Color textColor;
+};
 
+class GUI_Elem_Base
+{
+protected:
+	GUI_Elem_Base(Rectangle _collision, Color _color_up, Color _color_hovered, Color _color_down) :
+		collision(_collision),
+		color_up(_color_up),
+		color_hovered(_color_hovered),
+		color_down(_color_down),
+		b_down(false),
+		b_hovering(false) {};
+
+public:
+	bool IsHovered() const {
+		return b_hovering;
+	}
+	virtual bool IsDown() const {
+		return b_down;
+	}
+
+protected:
 	virtual void OnHover() = 0;
+	virtual void OnEndHover() = 0;
 	virtual void OnPress() = 0;
 	virtual void OnRelease() = 0;
 
+public:
 	void Press() {
-		SetIsDown(true);
+		b_down = true;
 		OnPress();
 	}
 	void Release() {
-		SetIsDown(false);
+		b_down = false;
 		OnRelease();
 	}
-
-public:
-
-	virtual void UpdateButton()
-	{
-		if (IsHovered()) OnHover();
-
-		if (IsPressed()) OnPress();
-		else if (IsReleased()) OnRelease();
+	void MouseEnter() {
+		b_hovering = true;
+		OnHover();
+	}
+	void MouseExit() {
+		b_hovering = false;
+		OnEndHover();
 	}
 
 	virtual void Draw() const = 0;
-};
 
-struct Button_Circle_Base : public GUI_Elem_Base
-{
 protected:
-
-	Button_Circle_Base() : GUI_Elem_Base(&circ_collisionShape), circ_collisionShape() {};
-	Button_Circle_Base(Vector2 _center, float _radius) : GUI_Elem_Base(&circ_collisionShape), circ_collisionShape{ _center, _radius } {};
-
-	Circle circ_collisionShape;
-
-	bool IsHovered() const override {
-		return CheckCollisionPointCircleC(GetMousePosition(), circ_collisionShape);
-	}
-	bool IsPressed() const override {
-		bool b = ();
-		if (!b_down) b_down = b;
-		return IsHovered() && IsMouseButtonPressed(MOUSE_LEFT_BUTTON);
-	}
-	bool IsDown() const override {
-		return b_down;
-	}
-	bool IsReleased() const override {
-		bool b = (b_down && IsMouseButtonReleased(MOUSE_LEFT_BUTTON));
-		if (b_down) b_down = b;
-		return b;
-	}
-	bool IsUp() const override {
-		return !b_down;
-	}
-
-public:
-
-	void Draw() const override
-	{
-		Color drawColor;
-		if (IsHovered()) drawColor = color_hovered;
-		else if (IsDown()) drawColor = color_down;
-		else drawColor = color_up;
-		DrawCircleC(circ_collisionShape, drawColor);
-	}
-};
-
-class Dial_Base : public Button_Circle_Base
-{
-protected:
-
-	Dial_Base(Vector2 _center, float _radius) : Button_Circle_Base(_center, _radius) {};
-
-	void OnHover() override
-	{
-
-	}
-	void OnPress() override
-	{
-
-	}
-	void OnRelease() override
-	{
-
-	}
+	Rectangle collision;
+	Color color_up, color_hovered, color_down;
+	bool b_down, b_hovering;
 };
 
 #pragma endregion
@@ -144,32 +134,6 @@ public:
 	void OnRelease() override
 	{
 		// TODO: Add release function
-	}
-};
-
-class Dial1 : public Dial_Base
-{
-public:
-
-	Dial1(Vector2 _center, float _radius) : Dial_Base(_center, _radius) {};
-
-	void OnHover() override
-	{
-		// TODO: Add hover function
-
-		Dial_Base::OnHover();
-	}
-	void OnPress() override
-	{
-		// TODO: Add press function
-
-		Dial_Base::OnPress();
-	}
-	void OnRelease() override
-	{
-		// TODO: Add release function
-
-		Dial_Base::OnRelease();
 	}
 };
 

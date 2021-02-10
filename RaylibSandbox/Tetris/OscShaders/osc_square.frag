@@ -6,6 +6,7 @@ in vec4 fragColor;
 
 // Input uniform heights
 uniform sampler2D texture0;
+uniform sampler2D texture1;
 uniform vec4 colDiffuse;
 
 // Output fragment color

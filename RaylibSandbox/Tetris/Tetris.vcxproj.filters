@@ -19,6 +19,9 @@
     <Filter Include="Resource Files\Effects">
       <UniqueIdentifier>{f448ac38-252f-4f24-aa08-e892d3ae1e66}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Resource Files\CombineTypes">
+      <UniqueIdentifier>{8774836e-87fe-49b2-ae59-14404d6ff5fc}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Game.cpp">
@@ -39,26 +42,62 @@
     </Media>
   </ItemGroup>
   <ItemGroup>
-    <None Include="wavenode.vert">
+    <None Include="Combines\cmb_add.frag">
+      <Filter>Resource Files\CombineTypes</Filter>
+    </None>
+    <None Include="Combines\cmb_ave.frag">
+      <Filter>Resource Files\CombineTypes</Filter>
+    </None>
+    <None Include="Combines\cmb_mix.frag">
+      <Filter>Resource Files\CombineTypes</Filter>
+    </None>
+    <None Include="Combines\cmb_mult.frag">
+      <Filter>Resource Files\CombineTypes</Filter>
+    </None>
+    <None Include="Combines\cmb_sub.frag">
+      <Filter>Resource Files\CombineTypes</Filter>
+    </None>
+    <None Include="EffectShaders\eff_compress.frag">
+      <Filter>Resource Files\Effects</Filter>
+    </None>
+    <None Include="EffectShaders\eff_equalize.frag">
+      <Filter>Resource Files\Effects</Filter>
+    </None>
+    <None Include="EffectShaders\eff_reverb.frag">
+      <Filter>Resource Files\Effects</Filter>
+    </None>
+    <None Include="OscShaders\osc_sine.frag">
+      <Filter>Resource Files\Oscillators</Filter>
+    </None>
+    <None Include="OscShaders\osc_sawtooth.frag">
+      <Filter>Resource Files\Oscillators</Filter>
+    </None>
+    <None Include="OscShaders\osc_ramp.frag">
+      <Filter>Resource Files\Oscillators</Filter>
+    </None>
+    <None Include="OscShaders\osc_noise.frag">
+      <Filter>Resource Files\Oscillators</Filter>
+    </None>
+    <None Include="OscShaders\osc_square.frag">
+      <Filter>Resource Files\Oscillators</Filter>
+    </None>
+    <None Include="OscShaders\osc_triangle.frag">
+      <Filter>Resource Files\Oscillators</Filter>
+    </None>
+    <None Include="EffectShaders\eff_delay.frag">
+      <Filter>Resource Files\Effects</Filter>
+    </None>
+    <None Include="OscShaders\v_osc.vert">
+      <Filter>Resource Files\Oscillators</Filter>
+    </None>
+    <None Include="Combines\v_cmb.vert">
+      <Filter>Resource Files\CombineTypes</Filter>
+    </None>
+    <None Include="EffectShaders\v_eff.vert">
+      <Filter>Resource Files\Effects</Filter>
+    </None>
+    <None Include="display.frag">
       <Filter>Resource Files</Filter>
-    </None>
-    <None Include="eff_compress.frag">
-      <Filter>Resource Files\Effects</Filter>
-    </None>
-    <None Include="eff_equalize.frag">
-      <Filter>Resource Files\Effects</Filter>
-    </None>
-    <None Include="eff_reverb.frag">
-      <Filter>Resource Files\Effects</Filter>
-    </None>
-    <None Include="osc_sine_mult.frag">
-      <Filter>Resource Files\Oscillators</Filter>
-    </None>
-    <None Include="osc_sine_add.frag">
-      <Filter>Resource Files\Oscillators</Filter>
-    </None>
-    <None Include="osc_sine_sub.frag">
-      <Filter>Resource Files\Oscillators</Filter>
     </None>
   </ItemGroup>
 </Project>

@@ -9,23 +9,239 @@
 #include "AmyMath.h"
 
 constexpr int c_audioBufferSize = 4096;
-constexpr int c_sampleRate = 41000;
+constexpr int c_sampleRate = 48000;
+
+static const char* s_baseVertShader = { R"(#version 330
+
+// Input vertex attributes
+in vec3 vertexPosition;
+in vec2 vertexTexCoord;
+in vec3 vertexNormal;
+in vec4 vertexColor;
+
+// Input uniform values
+uniform mat4 mvp;
+
+// Output vertex attributes (to fragment shader)
+out vec2 fragTexCoord;
+out vec4 fragColor;
+
+void main()
+{
+// Send vertex attributes to fragment shader
+fragTexCoord = vec2(vertexTexCoord.x, 0);
+fragColor = vertexColor;
+
+vec3 pos = vertexPosition;
+
+%s
+
+// Calculate final vertex position
+gl_Position = mvp * vec4(pos, 1.0);
+})" };
+static const char* s_baseFragShader = { R"(#version 330
+
+// Input vertex attributes (from vertex shader)
+in vec2 fragTexCoord;
+in vec4 fragColor;
+
+// Input uniform heights
+uniform sampler2D texture0;
+uniform vec4 colDiffuse;
+
+// Output fragment color
+out vec4 finalColor;
+
+// Custom uniforms
+%s
+
+highp float rand(vec2 co)
+{
+highp float a = 12.9898;
+highp float b = 78.233;
+highp float c = 43758.5453;
+highp float dt= dot(co.xy ,vec2(a,b));
+highp float sn= mod(dt,3.14);
+return fract(sin(sn) * c);
+}
+
+void main()
+{
+float time = fragTexCoord.x;
+
+float amp = 0.0;
+
+%s
+
+finalColor = vec4(amp, vec2(0.0), 1.0);
+})" };
+static const char* s_baseCmbShader = { R"(#version 330
+
+// Input vertex attributes (from vertex shader)
+in vec2 fragTexCoord;
+in vec4 fragColor;
+
+// Input uniform heights
+uniform sampler2D texture0;
+uniform vec4 colDiffuse;
+uniform sampler2D texture1;
+
+// Output fragment color
+out vec4 finalColor;
+
+void main()
+{
+float a = texture2D(texture0, fragTexCoord).x;
+float b = texture2D(texture1, fragTexCoord).x;
+
+float amp = 0.0;
+
+%s
+
+finalColor = vec4(amp, vec2(0.0), 1.0);
+})" };
+static const char* s_baseEffShader = { R"(#version 330
+
+// Input vertex attributes (from vertex shader)
+in vec2 fragTexCoord;
+in vec4 fragColor;
+
+// Input uniform heights
+uniform sampler2D texture0;
+uniform vec4 colDiffuse;
+uniform float totalSize = float(1024);
+
+// Output fragment color
+out vec4 finalColor;
+
+void main()
+{
+float time = fragTexCoord.x;
+float t = 1 / totalSize;
+float source = texture2D(texture0, vec2(t,0)).x;
+
+float amp = 0.0;
+
+%s
+
+finalColor = vec4(amp, vec2(0.0), 1.0);
+})" };
+
+const char* BuildVertShader(const char* posCode = "", const char* uniformInserts = "")
+{
+	const char* out = TextFormat(
+		R"(#version 330
+
+// Input vertex attributes
+in vec3 vertexPosition;
+in vec2 vertexTexCoord;
+in vec3 vertexNormal;
+in vec4 vertexColor;
+
+// Input uniform values
+uniform mat4 mvp;
+
+// Output vertex attributes (to fragment shader)
+out vec2 fragTexCoord;
+out vec4 fragColor;
+
+// Custom uniforms
+%s
+
+void main()
+{
+// Send vertex attributes to fragment shader
+fragTexCoord = vec2(vertexTexCoord.x, 0);
+fragColor = vertexColor;
+
+// Pos code
+vec3 pos = vertexPosition;
+%s
+
+// Calculate final vertex position
+gl_Position = mvp * vec4(pos, 1.0);
+})",
+uniformInserts,
+posCode
+	);
+
+	printf("Vertex shader code built!\n%s\n\n", out);
+
+	return out;
+}
+const char* BuildFragShader(const char* ampCode = "", const char* uniformInserts = "", bool b_usesRand = false)
+{
+	const char* out = TextFormat(
+		R"(#version 330
+
+// Input vertex attributes (from vertex shader)
+in vec2 fragTexCoord;
+in vec4 fragColor;
+
+// Input uniform heights
+uniform sampler2D texture0;
+uniform vec4 colDiffuse;
+
+// Output fragment color
+out vec4 finalColor;
+
+// Custom uniforms
+%s
+
+// rand()
+%s
+
+void main()
+{
+float time = fragTexCoord.x;
+
+// Amp code
+float amp = 0.0;
+%s
+
+finalColor = vec4(amp, vec2(0.0), 1.0);
+})",
+		uniformInserts,
+		(b_usesRand ?
+			R"(highp float rand(vec2 co)
+{
+highp float a = 12.9898;
+highp float b = 78.233;
+highp float c = 43758.5453;
+highp float dt = dot(co.xy, vec2(a, b));
+highp float sn = mod(dt, 3.14);
+return fract(sin(sn) * c);
+})"
+			: ""),
+		ampCode
+	);
+
+	printf("Fragment shader code built!\n%s\n\n", out);
+
+	return out;
+}
 
 namespace aux
 {
-	enum class MOD : int {
+	enum class CMB : int {
 		Add,
 		Multiply,
 		Subtract,
+		Average,
+		Mix,
+
+		Total
 	};
-	const char* GetModName(MOD mod)
+	const char* GetCmbName(CMB cmb)
 	{
-		switch (mod) {
+		switch (cmb) {
 		default: return "ERROR";
 
-		case MOD::Add:		return "add";
-		case MOD::Multiply:	return "mult";
-		case MOD::Subtract: return "sub";
+		case CMB::Add:		return "add";
+		case CMB::Multiply:	return "mult";
+		case CMB::Subtract: return "sub";
+		case CMB::Average: return "ave";
+		case CMB::Mix: return "mix";
 		}
 	}
 
@@ -57,10 +273,11 @@ namespace aux
 		Reverb,
 		Equalize,
 		Compress,
+		Delay,
 
 		Total
 	};
-	const char* GetEffectName(EFF effect)
+	const char* GetEffName(EFF effect)
 	{
 		switch (effect) {
 		default: return "ERROR";
@@ -68,73 +285,54 @@ namespace aux
 		case EFF::Reverb:	return "reverb";
 		case EFF::Equalize:	return "equalize";
 		case EFF::Compress: return "compress";
+		case EFF::Delay: return "delay";
 		}
 	}
 
-	struct OSC_MOD
-	{
-	public:
-		OSC_MOD(OSC type) {
-			const char* oscName = GetOscName(type);
-			for (int i = 0; i < 3; ++i) {
-				mods[i] = LoadShader("wavenode.vert", TextFormat("osc_%s_%s.frag", oscName, GetModName(MOD(i))));
-			}
-		}
-
-		Shader& operator[](MOD mod)
-		{
-			return mods[(int)(mod)];
-		}
-
-		void Unload()
-		{
-			for (Shader m : mods) {
-				UnloadShader(m);
-			}
-		}
-
-	private:
-		Shader mods[3];
-	};
-
-	OSC_MOD oscillators[(int)(OSC::Total)]; // Shader = oscillators[int][MOD]
-	Shader effects[(int)(EFF::Total)]; // Shader = effects[int]
+	Shader oscillators[(int)(OSC::Total)];
+	Shader combines[(int)(CMB::Total)];
+	Shader effects[(int)(EFF::Total)];
 
 	void Load()
 	{
 		// Oscillators 
-		for (int i = 0; i < (int)(OSC::Total); ++i) {
-			oscillators[i] = OSC_MOD(OSC(i));
+		for (int o = 0; o < (int)(OSC::Total); ++o) {
+			oscillators[o] = LoadShader(
+				"v_osc.vert",
+				TextFormat("osc_%s.frag", GetOscName(OSC(o)))
+			);
+		}
+		// Combines
+		for (int c = 0; c < (int)(CMB::Total); ++c) {
+			combines[c] = LoadShader(
+				"v_cmb.vert",
+				TextFormat("cmb_%s.frag", GetCmbName(CMB(c)))
+			);
 		}
 		// Effects
-		for (int i = 0; i < (int)(EFF::Total); ++i) {
-			effects[i] = LoadShader("wavenode.vert", TextFormat("eff_%s.frag", GetEffectName(EFF(i))));
+		for (int e = 0; e < (int)(EFF::Total); ++e) {
+			effects[e] = LoadShader(
+				"v_eff.vert",
+				TextFormat("eff_%s.frag", GetEffName(EFF(e)))
+			);
 		}
 	}
 	void Unload()
 	{
-		for (OSC_MOD osc : oscillators) osc.Unload();
-		for (Shader eff : effects) UnloadShader(eff);
+		for (Shader osc : oscillators)	UnloadShader(osc);
+		for (Shader cmb : combines)		UnloadShader(cmb);
+		for (Shader eff : effects)		UnloadShader(eff);
 	}
 }
 
-int MostOf(int cycleSize, int maxSpace)
+namespace render
 {
-	return (maxSpace / cycleSize) * cycleSize;
+
 }
 
 float WaveLen(float freq)
 {
 	return c_sampleRate / freq;
-}
-
-enum class Note { C, D, E, F, G, A, B, };
-float Key(Note key, int octave = 4)
-{
-	float notes[] = {
-		WaveLen(262),WaveLen(293.665),WaveLen(329.628),WaveLen(349.228),WaveLen(391.995),WaveLen(440),WaveLen(493.883),
-		WaveLen(523.25), WaveLen(587.33) };
-	return notes[(int)key + (7 * (octave - 4))];
 }
 
 #pragma region Base wave functions
@@ -183,8 +381,6 @@ WAVEFORM(Noise)
 {
 	return (WFReturn_t)Widen((float)rand() / (float)RAND_MAX);
 }
-
-Shader* ShaderOf(WaveForm wave);
 
 #pragma endregion
 
@@ -313,392 +509,269 @@ Shader* Reverb::s_shader;
 
 struct Oscillator
 {
-	Oscillator() : base(nullptr), shader(nullptr), pitchScale(1.0f), pitchOffset(0.0f), amplitude(1.0f) {};
-	Oscillator(WaveForm _base) : base(_base), shader(_shader), pitchScale(1.0f), pitchOffset(0.0f), amplitude(1.0f) {};
-	Oscillator(WaveForm _base, float _pitchScale, float _amplitude) : base(_base), shader(_shader), pitchScale(_pitchScale), pitchOffset(0.0f), amplitude(_amplitude) {};
-	Oscillator(WaveForm _base, float _pitchScale, float _pitchOffset, float _amplitude) : base(_base), shader(_shader), pitchScale(_pitchScale), pitchOffset(_pitchOffset), amplitude(_amplitude) {};
-
-	WaveForm base;
-	Shader* shader;
-	float pitchScale, pitchOffset, amplitude;
-
-	WAVEFORM(Function) // Must line up with type WaveForm
-	{
-		return base(x, (wavelength * pitchScale) + pitchOffset) * amplitude;
-	}
-
+	const char* timingCodeInsert;
+	const char* oscCodeInsert;
 };
-
-struct OscUnit;
 
 // USER INTERFACE
+//#include "GUI_Elements.h"
 
-#include "GUI_Elements.h"
-
-struct SynthCtrl
+struct OscUnit : private Oscillator
 {
-	SynthCtrl(OscUnit* _parent) : parent(_parent), collision({ 10.0f, 10.0f, 200.0f, 50.0f }) {};
-
-	OscUnit* parent;
-	Rectangle collision;
-
-	void Draw();
-
-	void SetPos(float newY)
-	{
-		collision.y = newY;
-	}
+	const char* combineCodeInsert;
+	float pitchScale, ampScale;
 };
 
-struct OscUnit // Make sure the first synth is always ADDATIVE
+class Synth
 {
-	enum CombineType
-	{
-		Addative,
-		Subtractive,
-		Multiplicative,
-	};
-	static std::string CMBName(CombineType cmb)
-	{
-		switch (cmb)
-		{
-		case Addative:
-			return "Addative";
-			break;
-		case Subtractive:
-			return "Subtractive";
-			break;
-		case Multiplicative:
-			return "Multiplicative";
-			break;
-		}
-	}
-
-	OscUnit() : osc(Oscillator()), cmb(Addative), ui(this) { };
-	OscUnit(Oscillator _osc) : osc(_osc), cmb(Addative), ui(this) { };
-	OscUnit(Oscillator _osc, CombineType _cmb) : osc(_osc), cmb(_cmb), ui(this) { };
-
-	Oscillator osc;
-	CombineType cmb;
-	SynthCtrl ui;
-};
-
-void SynthCtrl::Draw()
-{
-	Color color = DARKGRAY;
-	if (CheckCollisionPointRec(GetMousePosition(), collision)) color = GRAY;
-	DrawRectangleRec(collision, color);
-	DrawText(FormatText("Width: %f\nStrength: %f\nCmb: %s", parent->osc.pitchScale, parent->osc.amplitude, OscUnit::CMBName(parent->cmb).c_str()), collision.x + 5, collision.y + 5, 10, WHITE);
-}
-
-struct Synth
-{
-	Synth() : m_oscilators() {};
-	Synth(std::vector<OscUnit> _oscs) : m_oscilators(_oscs) {};
+	Synth() : m_oscilators({ OscUnit() }) {};
+	Synth(const std::vector<OscUnit>& _oscs) : m_oscilators(_oscs) {};
 
 	std::vector<OscUnit> m_oscilators;
-
-	WAVEFORM(Function) // Must line up with type WaveForm
-	{
-		WFReturn_t out = (WFReturn_t)(0);
-		for (OscUnit unit : m_oscilators)
-		{
-			WFReturn_t result = unit.osc.Function(x, wavelength);
-			switch (unit.cmb)
-			{
-			case OscUnit::Addative:
-				out += result;
-				break;
-			case OscUnit::Subtractive:
-				out -= result;
-				break;
-			case OscUnit::Multiplicative:
-				out *= result;
-				break;
-			}
-		}
-		return out;
-	}
 };
 
 #pragma endregion
-
-void FillAudioStream(AudioStream& stream, short* out_buff, WaveForm func, WaveLength_t wavelength = Key(Note::C,4), int volume = 32000)
-{
-	for (WavePos_t x = (WavePos_t)(0); x < c_audioBufferSize; x += (WavePos_t)(1))
-	{
-		out_buff[x] = (short)(func(x, wavelength) * (float)volume);
-	}
-}
-void FillAudioStream(AudioStream& stream, short* out_buff, Synth synth, WaveLength_t wavelength = Key(Note::C,4), int volume = 32000)
-{
-	for (WavePos_t x = (WavePos_t)(0); x < c_audioBufferSize; x += (WavePos_t)(1))
-	{
-		out_buff[x] = (short)(synth.Function(x, wavelength) * (float)volume);
-	}
-}
-void FillAudioStreamChord(AudioStream& stream, short* out_buff, Synth synth, std::vector<WaveLength_t> chord, int volume = 32000)
-{
-	for (WavePos_t x = (WavePos_t)(0); x < c_audioBufferSize; x += (WavePos_t)(1))
-	{
-		out_buff[x] = 0;
-		for (WaveLength_t note : chord)
-		{
-			out_buff[x] += (short)((synth.Function(x, note) * (float)volume));
-		}
-	}
-}
 
 bool IsKeyChanged(int key)
 {
 	return (IsKeyPressed(key) || IsKeyReleased(key));
 }
 
-Shader* ShaderOf(WaveForm wave)
-{
-	return nullptr;
-}
-
 int main() {
 
 #pragma region Setup phase
 
-	int windowWidth{ 1280 }, windowHeight{ 720 };
+	int windowWidth = 1280;
+	int windowHeight = 720;
+
+	Rectangle canvas; {
+		canvas.x = 0;
+		canvas.y = 0;
+		canvas.width = windowWidth;
+		canvas.height = windowHeight;
+	}
+
 	InitWindow(windowWidth, windowHeight, "A program I'm making in C++");
 	constexpr int c_frameRate = 30;
 	SetTargetFPS(c_frameRate);
 
-	InitAudioDevice();
-	AudioStream stream = InitAudioStream(c_sampleRate, 8 * sizeof(short), 1);
-	short* data = new short[c_audioBufferSize];
-	PlayAudioStream(stream);
-	int delay = 0;
-	int update = 0;
-	int wavelength = (int)WaveLen(440); // Must be almost perfectly evenly divisible by buffer size
-	float pos = 0.0f;
-	float time = 0.0f;
-	bool frameToggle = false;
+	Shader shader = LoadShaderCode(
+		BuildVertShader(),
+		BuildFragShader("amp = sin(time);")
+	);
 
-	Synth synth1 = Synth({
-		OscUnit(Oscillator(SineWave, 1.0f, 1.0f), OscUnit::Addative)
-	});
+	Shader display = LoadShader(NULL, "display.frag");
 
-	short* buffer = new short[c_audioBufferSize];
-	int bufferSize;
+	RenderTexture target = LoadRenderTexture(c_audioBufferSize, windowHeight);
 
-	float wavelengthArr[] = {
-		Key(Note::C, 4), Key(Note::D, 4), Key(Note::E, 4), Key(Note::F, 4), Key(Note::G, 4), Key(Note::A, 4), Key(Note::B, 4),
-		Key(Note::C, 5) };
-
-	std::vector<WaveLength_t> chord;
-	int kbKeys[] = { KEY_A, KEY_S, KEY_D, KEY_F, KEY_J, KEY_K, KEY_L, KEY_SEMICOLON };
-	int kbKeysChordLocs[sizeof(kbKeys) / sizeof(int)] = { -1 };
-
-	int noteCount = sizeof(wavelengthArr) / sizeof(float);
-	int note = 0;
-	bool b_audioChanged = true;
-
-	RenderTexture target = LoadRenderTexture(c_audioBufferSize, 1);
-
-#pragma endregion
-
-	while (!WindowShouldClose()) {
-
-	#pragma region Simulation Phase
-
-		#pragma region Keyboard
-
-		{
-			for (int i = 0; i < (sizeof(kbKeys) / sizeof(int)); ++i)
-			{
-				if (IsKeyChanged(kbKeys[i]))
-				{
-					b_audioChanged = true;
-
-					if (IsKeyPressed(kbKeys[i]))
-					{
-						printf("Key pressed\n");
-						chord.push_back(wavelengthArr[i]);
-						kbKeysChordLocs[i] = chord.size() - 1;
-						printf("kbKeysChordLocs[%i] = %i\n", i, kbKeysChordLocs[i]);
-					}
-					if (IsKeyReleased(kbKeys[i]))
-					{
-						printf("Key released\n");
-						printf("kbKeysChordLocs[%i] (%i) Due to be erased\n", i, kbKeysChordLocs[i]);
-						auto it = chord.begin() + kbKeysChordLocs[i];
-						chord.erase(it, it+1);
-						for (int& k : kbKeysChordLocs)
-						{
-							if (k > kbKeysChordLocs[i]) --k;
-						}
-						kbKeysChordLocs[i] = -1;
-					}
-				}
-			}
-			if (b_audioChanged)
-			{
-				int i = 0;
-				for (WaveLength_t n : chord)
-				{
-					printf("chord[%i]: %f\n", i++, n);
-				}
-			}
-		}
-
-		if (IsKeyPressed(KEY_SPACE))
-		{
-			std::pair<std::string, WaveForm> options[] = { {"sine", SineWave}, {"square", SquareWave}, {"ramp", RampWave}, {"sawtooth", SawtoothWave}, {"noise", Noise}, {"triangle", TriangleWave}, };
-			std::cout << "Waveform options:\n";
-			for (std::pair<std::string, WaveForm> choice : options)
-			{
-				std::cout << choice.first.c_str() << "\n";
-			}
-			std::string phrase;
-			std::cout << "> ";
-			std::cin >> phrase;
-			WaveForm pick = nullptr;
-			for (std::pair<std::string, WaveForm> choice : options)
-			{
-				if (phrase == choice.first) pick = choice.second;
-			}
-
-			if (pick)
-			{
-				std::cout << "wavelength scale:\n> ";
-				float scale;
-				std::cin >> scale;
-				std::cout << "Strength:\n> ";
-				float strn;
-				std::cin >> strn;
-
-				synth1.m_oscilators.push_back(OscUnit(Oscillator(pick, scale, strn), OscUnit::Addative));
-				synth1.m_oscilators[synth1.m_oscilators.size() - 1].ui.SetPos(10.0f + 60.0f * (float)(synth1.m_oscilators.size() - 1));
-				b_audioChanged = true;
-			}
-			else
-			{
-				if (phrase == std::string("remove"))
-				{
-					synth1.m_oscilators.pop_back();
-					std::cout << "Oscillator removed.\n";
-				}
-				else
-				{
-					std::cout << "Failed to find a match.\n";
-				}
-			}
-		}
-		
-		#pragma endregion
-
-		#pragma region Update vars
-
-		if (b_audioChanged)
-		{
-			printf("Change\n");
-			//wavelength = wavelengthArr[note = (note + 1) % noteCount];
-			delete[] buffer;
-			bufferSize = MostOf(wavelength, c_audioBufferSize);
-			buffer = new short[bufferSize];
-			FillAudioStreamChord(stream, data, synth1, chord, 10000);
-			memcpy(buffer, data, bufferSize * sizeof(short));
-		}
-		time += GetFrameTime();
-		if (time > 1.0) time = 0.0;
-		b_audioChanged = false;
-
-		if (IsAudioStreamProcessed(stream))
-		{
-			UpdateAudioStream(stream, buffer, bufferSize);
-			
-			//if (frameToggle = !frameToggle)
-			//{
-			//	printf("\\\n");
-			//}
-			//else
-			//{
-			//	printf("/\n");
-			//}
-		}
-		delay = (delay + 1) % (c_frameRate); // frame count
-
-		pos += (GetFrameTime() * (c_sampleRate));
-		if (pos > MostOf(wavelength, c_audioBufferSize)) pos = 0.0f; // frame count
-		
-		#pragma endregion
-
-		#pragma region Audio Rendering
-
-		if (b_audioChanged) // TODO: GPU rendering of audio file
-		{
-			BeginTextureMode(target); {
-
-				BeginShaderMode(sine_multiply); {
-
-					DrawTextureRec(target.texture, Rectangle{ 0.0f, 0.0f, (float)c_audioBufferSize, 0.0f }, Vector2{ 0,0 }, WHITE);
-
-				} EndShaderMode();
-
-			} EndTextureMode();
-		}
-
-		#pragma endregion
-
-	#pragma endregion
-
-	#pragma region Drawing Phase
-
-		BeginDrawing(); {
+	while (!WindowShouldClose())
+	{
+		BeginTextureMode(target); {
 
 			ClearBackground(BLACK);
 
-			#pragma region Waves
+			BeginShaderMode(shader); {
 
-			int bufferSize = MostOf(wavelength, c_audioBufferSize);
-			int bufferSizeOnScreen = bufferSize / 4;
-			int x = 1;
-			DrawLine(0, windowHeight / 2, windowWidth, windowHeight / 2, RAYWHITE);
-			DrawLine(bufferSizeOnScreen, 0, bufferSizeOnScreen, windowHeight, BLUE);
-			DrawLine(c_audioBufferSize / 4, 0, c_audioBufferSize / 4, windowHeight, YELLOW);
-			for (; x < c_audioBufferSize; ++x)
-			{
-				DrawLine(((x) / 4), ((((float)(data[x]) / 32000.0f) + 1.0f) / 2.0f) * ((float)windowHeight / 3.0f) + ((float)windowHeight / 3.0f),
-						 ((x-1) / 4), ((((float)(data[x-1]) / 32000.0f) + 1.0f) / 2.0f) * ((float)windowHeight / 3.0f) + ((float)windowHeight / 3.0f),
-						 RED);
-			}
-			//DrawLine(pos / 4.0f, 0, pos / 4.0f, windowHeight, GREEN);
+				DrawTextureRec(target.texture, canvas, { 0,0 }, WHITE);
 
-			#pragma endregion
+			} EndShaderMode();
 
-			#pragma region UI
+		} EndTextureMode();
 
-			for (OscUnit element : synth1.m_oscilators)
-			{
-				element.ui.Draw();
-			}
+		BeginDrawing(); {
 
-			#pragma endregion
+			BeginShaderMode(display); {
+
+				DrawTextureRec(target.texture, canvas, { 0,0 }, WHITE);
+
+			} EndShaderMode();
 
 		} EndDrawing();
+	}
 
-	#pragma endregion
-
-	} CloseWindow();
-
-#pragma region Cleanup phase
-
-	CloseAudioStream(stream);
-	CloseAudioDevice();
-
-	delete[] data;
-	delete[] buffer;
-
-	aux::Unload();
-		
 	UnloadRenderTexture(target);
 
-#pragma endregion
+	UnloadShader(display);
+
+	UnloadShader(shader);
+
+	CloseWindow();
 
 	return 0;
+
+//	InitAudioDevice();
+//	AudioStream stream = InitAudioStream(c_sampleRate, 8 * sizeof(short), 1);
+//	short* data = new short[c_audioBufferSize];
+//	PlayAudioStream(stream);
+//
+//	aux::Load();
+//
+//	LoadShaderCode();
+//
+//	bool b_audioChanged = true;
+//
+//	RenderTexture target = LoadRenderTexture(c_audioBufferSize, 1);
+//
+//#pragma endregion
+//
+//	while (!WindowShouldClose()) {
+//
+//	#pragma region Simulation Phase
+//
+//		#pragma region Keyboard
+//
+//		{
+//			for (int i = 0; i < (sizeof(kbKeys) / sizeof(int)); ++i)
+//			{
+//				if (IsKeyChanged(kbKeys[i]))
+//				{
+//					b_audioChanged = true;
+//
+//					if (IsKeyPressed(kbKeys[i]))
+//					{
+//						printf("Key pressed\n");
+//						chord.push_back(wavelengthArr[i]);
+//						kbKeysChordLocs[i] = chord.size() - 1;
+//						printf("kbKeysChordLocs[%i] = %i\n", i, kbKeysChordLocs[i]);
+//					}
+//					if (IsKeyReleased(kbKeys[i]))
+//					{
+//						printf("Key released\n");
+//						printf("kbKeysChordLocs[%i] (%i) Due to be erased\n", i, kbKeysChordLocs[i]);
+//						auto it = chord.begin() + kbKeysChordLocs[i];
+//						chord.erase(it, it+1);
+//						for (int& k : kbKeysChordLocs)
+//						{
+//							if (k > kbKeysChordLocs[i]) --k;
+//						}
+//						kbKeysChordLocs[i] = -1;
+//					}
+//				}
+//			}
+//			if (b_audioChanged)
+//			{
+//				int i = 0;
+//				for (WaveLength_t n : chord)
+//				{
+//					printf("chord[%i]: %f\n", i++, n);
+//				}
+//			}
+//		}
+//
+//		if (IsKeyPressed(KEY_SPACE))
+//		{
+//			std::pair<std::string, WaveForm> options[] = { {"sine", SineWave}, {"square", SquareWave}, {"ramp", RampWave}, {"sawtooth", SawtoothWave}, {"noise", Noise}, {"triangle", TriangleWave}, };
+//			std::cout << "Waveform options:\n";
+//			for (std::pair<std::string, WaveForm> choice : options)
+//			{
+//				std::cout << choice.first.c_str() << "\n";
+//			}
+//			std::string phrase;
+//			std::cout << "> ";
+//			std::cin >> phrase;
+//			WaveForm pick = nullptr;
+//			for (std::pair<std::string, WaveForm> choice : options)
+//			{
+//				if (phrase == choice.first) pick = choice.second;
+//			}
+//
+//			if (pick)
+//			{
+//				std::cout << "wavelength scale:\n> ";
+//				float scale;
+//				std::cin >> scale;
+//				std::cout << "Strength:\n> ";
+//				float strn;
+//				std::cin >> strn;
+//
+//				synth1.m_oscilators.push_back(OscUnit());
+//				synth1.m_oscilators[synth1.m_oscilators.size() - 1].ui.SetPos(10.0f + 60.0f * (float)(synth1.m_oscilators.size() - 1));
+//				b_audioChanged = true;
+//			}
+//			else
+//			{
+//				if (phrase == std::string("remove"))
+//				{
+//					synth1.m_oscilators.pop_back();
+//					std::cout << "Oscillator removed.\n";
+//				}
+//				else
+//				{
+//					std::cout << "Failed to find a match.\n";
+//				}
+//			}
+//		}
+//		
+//		#pragma endregion
+//
+//		#pragma region Update vars
+//		
+//		// TODO
+//
+//		#pragma endregion
+//
+//		#pragma region Audio Rendering
+//
+//		// TODO
+//
+//		#pragma endregion
+//
+//	#pragma endregion
+//
+//	#pragma region Drawing Phase
+//
+//		BeginDrawing(); {
+//
+//			ClearBackground(BLACK);
+//
+//			#pragma region Waves
+//
+//			DrawTextureRec();
+//
+//			int bufferSize = MostOf(wavelength, c_audioBufferSize);
+//			int bufferSizeOnScreen = bufferSize / 4;
+//			int x = 1;
+//			DrawLine(0, windowHeight / 2, windowWidth, windowHeight / 2, RAYWHITE);
+//			DrawLine(bufferSizeOnScreen, 0, bufferSizeOnScreen, windowHeight, BLUE);
+//			DrawLine(c_audioBufferSize / 4, 0, c_audioBufferSize / 4, windowHeight, YELLOW);
+//			for (; x < c_audioBufferSize; ++x)
+//			{
+//				DrawLine(((x) / 4), ((((float)(data[x]) / 32000.0f) + 1.0f) / 2.0f) * ((float)windowHeight / 3.0f) + ((float)windowHeight / 3.0f),
+//						 ((x-1) / 4), ((((float)(data[x-1]) / 32000.0f) + 1.0f) / 2.0f) * ((float)windowHeight / 3.0f) + ((float)windowHeight / 3.0f),
+//						 RED);
+//			}
+//			//DrawLine(pos / 4.0f, 0, pos / 4.0f, windowHeight, GREEN);
+//
+//			#pragma endregion
+//
+//			#pragma region UI
+//
+//			for (OscUnit element : synth1.m_oscilators)
+//			{
+//				element.ui.Draw();
+//			}
+//
+//			#pragma endregion
+//
+//		} EndDrawing();
+//
+//	#pragma endregion
+//
+//	} CloseWindow();
+//
+//#pragma region Cleanup phase
+//
+//	CloseAudioStream(stream);
+//	CloseAudioDevice();
+//
+//	delete[] data;
+//	delete[] buffer;
+//
+//	aux::Unload();
+//		
+//	UnloadRenderTexture(target);
+//
+//#pragma endregion
+//
+//	return 0;
 }

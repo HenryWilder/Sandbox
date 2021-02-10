@@ -158,13 +158,25 @@
     <Media Include="audio.wav" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="eff_compress.frag" />
-    <None Include="eff_equalize.frag" />
-    <None Include="eff_reverb.frag" />
-    <None Include="osc_sine_add.frag" />
-    <None Include="osc_sine_mult.frag" />
-    <None Include="osc_sine_sub.frag" />
-    <None Include="wavenode.vert" />
+    <None Include="Combines\cmb_add.frag" />
+    <None Include="Combines\cmb_ave.frag" />
+    <None Include="Combines\cmb_mix.frag" />
+    <None Include="Combines\cmb_mult.frag" />
+    <None Include="Combines\cmb_sub.frag" />
+    <None Include="Combines\v_cmb.vert" />
+    <None Include="display.frag" />
+    <None Include="EffectShaders\eff_compress.frag" />
+    <None Include="EffectShaders\eff_delay.frag" />
+    <None Include="EffectShaders\eff_equalize.frag" />
+    <None Include="EffectShaders\eff_reverb.frag" />
+    <None Include="EffectShaders\v_eff.vert" />
+    <None Include="OscShaders\osc_noise.frag" />
+    <None Include="OscShaders\osc_sine.frag" />
+    <None Include="OscShaders\osc_sawtooth.frag" />
+    <None Include="OscShaders\osc_ramp.frag" />
+    <None Include="OscShaders\osc_square.frag" />
+    <None Include="OscShaders\osc_triangle.frag" />
+    <None Include="OscShaders\v_osc.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
