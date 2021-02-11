@@ -71,37 +71,37 @@ uniform vec2 resolution = vec2(1280, 720);
 %s%s%s
 void main()
 {
-float x = 1 / resolution.x;
-float y = 1 / resolution.y;
-
-vec4 color = vec4(vec3(0.0), 1.0);
-
-// Pixel color calculation
-// -----------------------------------------@
-%s
-// -----------------------------------------@
-// Return
-
-finalColor = color;
+    float x = 1 / resolution.x;
+    float y = 1 / resolution.y;
+    
+    vec4 color = vec4(vec3(0.0), 1.0);
+    
+    // Pixel color calculation
+    // -----------------------------------------@
+    %s
+    // -----------------------------------------@
+    // Return
+    
+    finalColor = color;
 })",
 uniformInserts,
 (b_usesTimeUniform ?
  R"(
-// Time
+// Time uniform (uses Raylib GetTime() function)
 uniform float time = float(0.0);
 )"
 	: ""),
 (b_usesRand ?
  R"(
-// Implementation for rand() function
+// Random float from vector2
 highp float rand(vec2 co)
 {
-highp float a = 12.9898;
-highp float b = 78.233;
-highp float c = 43758.5453;
-highp float dt = dot(co.xy, vec2(a, b));
-highp float sn = mod(dt, 3.14);
-return fract(sin(sn) * c);
+    highp float a = 12.9898;
+    highp float b = 78.233;
+    highp float c = 43758.5453;
+    highp float dt = dot(co.xy, vec2(a, b));
+    highp float sn = mod(dt, 3.14);
+    return fract(sin(sn) * c);
 }
 )"
 	: ""),
@@ -146,6 +146,10 @@ int main()
 
 	InitWindow(windowWidth, windowHeight, "Test");
 	SetTargetFPS(60);
+
+	Image checked = GenImageChecked(32, 32, 16, 16, BLACK, ColorAlpha(MAGENTA, 0.1f));
+	Texture2D missing = LoadTextureFromImage(checked);
+	UnloadImage(checked);
 
 	Texture2D image = LoadTexture("test.png");
 
@@ -199,8 +203,7 @@ int main()
 	int cursorBlink = 0;
 	bool b_usesTime = false;
 	int shaderTimeLoc = 0;
-
-	Font font = LoadFont("mono_font.png");
+	bool dontClear = false;
 
 	// Gameloop
 	// -------------------------
@@ -251,12 +254,16 @@ int main()
 
 		if (IsKeyPressed(KEY_ENTER))
 		{
-			codeInsert.insert(cursor, 1, '\n');
-			cursor++;
+			codeInsert.insert(cursor++, 1, '\n');
+			codeInsert.insert(cursor++, 1, ' ');
+			codeInsert.insert(cursor++, 1, ' ');
+			codeInsert.insert(cursor++, 1, ' ');
+			codeInsert.insert(cursor++, 1, ' ');
 			b_changed = true;
 		}
 		if (b_changed)
 		{
+			cursorBlink = 0;
 			UnloadShader(shader);
 			b_usesTime = (codeInsert.find("time") != std::string::npos);
 			fragCode = BuildFragShader(
@@ -265,12 +272,22 @@ int main()
 				(codeInsert.find("rand(") != std::string::npos),
 				b_usesTime
 			);
-			shader = LoadShaderCode(BuildVertShader(), fragCode.c_str());
-			float res[2] = { windowWidth, windowHeight };
-			SetShaderValue(shader, GetShaderLocation(shader, "resolution"), res, UNIFORM_VEC2);
-			shaderTimeLoc = GetShaderLocation(shader, "time");
-			cursorBlink = 0;
-			b_changed = false;
+
+			dontClear = (codeInsert.find("// Don't clear the frame, please.") != std::string::npos);
+
+			if ( (fragCode.find("for")   == std::string::npos) && // Loops are forbidden
+				 (fragCode.find("while") == std::string::npos) )
+			{
+				shader = LoadShaderCode(BuildVertShader(), fragCode.c_str());
+				float res[2] = { windowWidth, windowHeight };
+				SetShaderValue(shader, GetShaderLocation(shader, "resolution"), res, UNIFORM_VEC2);
+				shaderTimeLoc = GetShaderLocation(shader, "time");
+			}
+			else
+			{
+				shader = GetShaderDefault();
+				b_changed = false;
+			}
 		}
 
 		if (b_usesTime)
@@ -282,32 +299,56 @@ int main()
 		// Draw phase
 		// -------------------------
 
+		auto DrawCode = [&fragCode, cursorBlink, cursor]() {
+			std::string disp = fragCode;
+
+			if (cursorBlink < 30)
+			{
+				int dispPos = disp.find('@') + (size_t)cursor + 2 + 4;
+
+				if (disp[dispPos] == '\n')
+					disp.insert(dispPos, 1, '_');
+				else
+					disp.replace(dispPos, 1, 1, '_');
+			}
+
+			DrawText(disp.c_str(), 5, 5, 8, WHITE);
+		};
+
 		BeginDrawing(); {
 
 			ClearBackground(BLACK);
 			
-			BeginShaderMode(shader); {
-			
-				DrawTextureRec(target.texture, { 0, 0, (float)windowWidth, (float)windowHeight }, {0,0}, WHITE);
-			
-			} EndShaderMode();
+			if (shader.id == GetShaderDefault().id)
+			{
+				DrawTextureRec(missing, { 0, 0, (float)windowWidth, (float)windowHeight }, { 0,0 }, WHITE);
+			}
+			else
+			{
+				BeginTextureMode(target); {
 
-			std::string disp = fragCode;
+					if (!dontClear) ClearBackground(BLACK);
+					DrawCode();
 
-			if (cursorBlink < 30) disp.insert(disp.find('@') + (size_t)cursor + 2, 1, '|');
-			else disp.insert(disp.find('@') + (size_t)cursor + 2, 1, ' ');
+				} EndTextureMode();
 
-			DrawTextEx(font, disp.c_str(), { 0, 0 }, 16, 2, WHITE);
+				BeginShaderMode(shader); {
+
+					DrawTextureRec(target.texture, { 0, 0, (float)windowWidth, -(float)windowHeight }, { 0,0 }, WHITE);
+
+				} EndShaderMode();
+			}
+
+			DrawCode();
 
 		} EndDrawing();
 	}
-	
-	UnloadFont(font);
 
 	UnloadShader(problemChild);
 	UnloadShader(shader);
 
 	UnloadTexture(image);
+	UnloadTexture(missing);
 	UnloadImage(img);
 
 	UnloadRenderTexture(target);
