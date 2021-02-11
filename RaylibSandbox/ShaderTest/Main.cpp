@@ -46,11 +46,13 @@ posCode
 
 	return out;
 }
+
 const char* BuildFragShader(
 	const char* uniformInserts = "",
 	const char* ampCode = "",
 	bool b_usesRand = false,
-	bool b_usesTimeUniform = false)
+	bool b_usesTimeUniform = false,
+	bool b_usesVeryRand = false)
 {
 	const char* out = TextFormat(
 		R"(#version 330
@@ -68,7 +70,13 @@ out vec4 finalColor;
 
 // Custom uniforms
 uniform vec2 resolution = vec2(1280, 720);
-%s%s%s
+%s%s%s%s
+/**********************************************************
+* Comment "Don't clear the frame, please." anywhere to
+* prevent the ClearBackground() function from being called
+* in the game loop.
+**********************************************************/
+
 void main()
 {
     float x = 1 / resolution.x;
@@ -90,9 +98,12 @@ uniformInserts,
 // Time uniform (uses Raylib GetTime() function)
 uniform float time = float(0.0);
 )"
-	: ""),
-(b_usesRand ?
+	:
  R"(
+// Use "time" anywhere to implement the time uniform
+)"),
+(b_usesRand ?
+R"(
 // Random float from vector2
 highp float rand(vec2 co)
 {
@@ -104,7 +115,27 @@ highp float rand(vec2 co)
     return fract(sin(sn) * c);
 }
 )"
-	: ""),
+	:
+R"(
+// Use "rand(" anywhere to implement the rand(vec2) function"
+)"),
+(b_usesVeryRand ?
+R"(
+// Random float from vector2
+highp float veryRand(vec2 co)
+{
+    highp float a = 12.9898;
+    highp float b = 78.233;
+    highp float c = 43758.5453;
+    highp float dt = dot(co.xy, vec2(a, b));
+    highp float sn = mod(dt, 3.14);
+    return fract(sin(sn) * c * mod(time, 1.0));
+}
+)"
+	:
+R"(
+// Use "veryRand(" anywhere to implement a time-based rand function"
+)"),
 		ampCode
 	);
 
@@ -114,11 +145,9 @@ highp float rand(vec2 co)
 }
 
 int main()
-{
-	Image img = LoadImage("test.png");
-	
-	int windowWidth = img.width;
-	int windowHeight = img.height;
+{	
+	int windowWidth = 1280;
+	int windowHeight = 720;
 
 	// Position (0,0) on the window
 	Vector2 zeroZero; {
@@ -144,39 +173,13 @@ int main()
 		virtualRec.height = windowHeight * scaleDiff;
 	}
 
-	InitWindow(windowWidth, windowHeight, "Test");
+	SetConfigFlags(FLAG_WINDOW_RESIZABLE);
+	InitWindow(windowWidth, windowHeight, "Raylib Shader Toy");
 	SetTargetFPS(60);
 
 	Image checked = GenImageChecked(32, 32, 16, 16, BLACK, ColorAlpha(MAGENTA, 0.1f));
 	Texture2D missing = LoadTextureFromImage(checked);
 	UnloadImage(checked);
-
-	Texture2D image = LoadTexture("test.png");
-
-	// This is the shader I want to set the uniforms of
-	Shader problemChild = LoadShader(NULL, "shader.frag");
-
-	// Uniforms
-	// -----------------------------
-
-	// Resolution uniform
-	// The resolution won't be changing at runtime, but I want the shader to be flexible.
-	int resolution_UniformLoc = GetShaderLocation(problemChild, "resolution"); // <--- This is where the issue is
-
-	float resolution[2]; {
-		resolution[0] = (float)windowWidth;
-		resolution[1] = (float)windowHeight;
-	}
-
-	SetShaderValue(problemChild, resolution_UniformLoc, resolution, UNIFORM_VEC2);
-
-	// Cursor position uniform
-	//int cursorPos_UniformLoc = GetShaderLocation(problemChild, "cursorPos"); // <--- This is where the issue is
-
-	//float cursorPos[2]; {
-	//	cursorPos[0] = 0.0f;
-	//	cursorPos[1] = 0.0f;
-	//}
 
 	// Just a blank canvas the size of the window so the UVs don't get messed up
 	RenderTexture2D target = LoadRenderTexture(windowWidth, windowHeight);
@@ -211,10 +214,17 @@ int main()
 	{
 		// Update variables
 		// -------------------------
+		if (GetScreenWidth() != windowWidth || GetScreenHeight() != windowHeight)
+		{
+			windowWidth = GetScreenWidth();
+			windowHeight = GetScreenHeight();
+			b_changed = true;
+		}
+
 		cursorBlink = (cursorBlink + 1) % 60;
 		frameToggle = (frameToggle + 1) % 3;
 		int typed = GetCharPressed();
-		if (typed)
+		if (typed >= ' ' && typed <= '~')
 		{
 			codeInsert.insert(cursor, 1, (char)typed);
 			cursor++;
@@ -265,19 +275,24 @@ int main()
 		{
 			cursorBlink = 0;
 			UnloadShader(shader);
-			b_usesTime = (codeInsert.find("time") != std::string::npos);
-			fragCode = BuildFragShader(
-				"",
-				codeInsert.c_str(),
-				(codeInsert.find("rand(") != std::string::npos),
-				b_usesTime
-			);
 
-			dontClear = (codeInsert.find("// Don't clear the frame, please.") != std::string::npos);
+			b_usesTime = false;
+			dontClear = false;
 
-			if ( (fragCode.find("for")   == std::string::npos) && // Loops are forbidden
-				 (fragCode.find("while") == std::string::npos) )
+			if ( (fragCode.find("for(")    == std::string::npos) && // Loops are forbidden
+			     (fragCode.find("for (")   == std::string::npos) &&
+				 (fragCode.find("while(")  == std::string::npos) &&
+				 (fragCode.find("while (") == std::string::npos) )
 			{
+				b_usesTime = (codeInsert.find("time") != std::string::npos) || (codeInsert.find("veryRand(") != std::string::npos);
+				fragCode = BuildFragShader(
+					"",
+					codeInsert.c_str(),
+					(codeInsert.find("rand(") != std::string::npos),
+					b_usesTime,
+					(codeInsert.find("veryRand(") != std::string::npos)					
+				);
+				dontClear = (codeInsert.find("// Don't clear the frame, please.") != std::string::npos);
 				shader = LoadShaderCode(BuildVertShader(), fragCode.c_str());
 				float res[2] = { windowWidth, windowHeight };
 				SetShaderValue(shader, GetShaderLocation(shader, "resolution"), res, UNIFORM_VEC2);
@@ -286,8 +301,8 @@ int main()
 			else
 			{
 				shader = GetShaderDefault();
-				b_changed = false;
 			}
+			b_changed = false;
 		}
 
 		if (b_usesTime)
@@ -344,12 +359,9 @@ int main()
 		} EndDrawing();
 	}
 
-	UnloadShader(problemChild);
 	UnloadShader(shader);
 
-	UnloadTexture(image);
 	UnloadTexture(missing);
-	UnloadImage(img);
 
 	UnloadRenderTexture(target);
 
