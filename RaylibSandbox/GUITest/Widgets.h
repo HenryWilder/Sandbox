@@ -6,6 +6,21 @@
 #include <any>
 #include <variant>
 
+template<class T>
+class Validator
+{
+public:
+	Validator() : b_valid(false), m_value{} {};
+	Validator(T _value) : b_valid(true), m_value(_value) {};
+
+	operator bool() { return b_valid; }
+	operator T() { return m_value; }
+
+private:
+	bool b_valid;
+	T m_value;
+};
+
 struct PaddedRec
 {
 	/*************************************************
@@ -37,10 +52,10 @@ struct PaddedCirc
 };
 
 // Base widget class
-class Widget
+class Widget_Base
 {
 public: // Constructors
-	Widget(bool _hidden = false, bool _volatile = false)
+	Widget_Base(bool _hidden = false, bool _volatile = false)
 		: b_hidden(_hidden), b_dirty(true), b_volatile(_volatile) {};
 
 public: // Variable helper functions
@@ -60,12 +75,24 @@ private: // Vars
 	mutable bool b_dirty;				// Whether the widget needs to be re-drawn this frame
 };
 
+class WidgetEstate_Interface
+{
+public:
+	WidgetEstate_Interface(Rectangle _estate) : estate(_estate) {};
+
+	Rectangle GetEstate() const;
+
+private:
+	Rectangle estate;
+};
+bool CheckCollisionPointWidget(Vector2 pt, const Widget_Base* widget);
+
 // Interface for enabling overall fade effects on a widget
-class WidgetTransparency
+class WidgetTransparency_Interface
 {
 protected:
-	WidgetTransparency() : alpha(1.0f) {};
-	WidgetTransparency(float _alpha) : alpha(_alpha) {};
+	WidgetTransparency_Interface() : alpha(1.0f) {};
+	WidgetTransparency_Interface(float _alpha) : alpha(_alpha) {};
 
 protected:
 	Color Apply(Color color);	// Applies transparency to an input tint
@@ -74,18 +101,19 @@ protected:
 	float alpha;	// Opacity of the widget
 };
 
-// Widget which can be hovered/clicked
-class Widget_Interaction : public Widget
+// Widget_Base which can be hovered/clicked
+class WidgetInteraction_Interface : public Widget_Base, WidgetEstate_Interface
 {
 public: // Constructors
-	Widget_Interaction(Rectangle _shape)
-		: Widget(), collision(_shape), b_hovered(false), b_down(false) {};
-	Widget_Interaction(Rectangle _shape, bool _hidden)
-		: Widget(_hidden), collision(_shape), b_hovered(false), b_down(false) {};
+	WidgetInteraction_Interface(Rectangle _shape)
+		: Widget_Base(), WidgetEstate_Interface(_shape), b_hovered(false), b_down(false) {};
+	WidgetInteraction_Interface(Rectangle _shape, bool _hidden)
+		: Widget_Base(_hidden), WidgetEstate_Interface(_shape), b_hovered(false), b_down(false) {};
 
 public: // Variable helper functions
 	bool IsHovered() const;				// Test whether the widget is being hovered
 	bool IsDown()	 const;				// Test whether the mouse press-button is down on the widget
+	Rectangle GetEstate() const;
 
 protected: // Bindings
 	virtual void OnPress() = 0;			// Binding for when the widget gets pressed
@@ -102,38 +130,66 @@ public: // UI-handler interaction functions
 	void MouseLeave();					// Tell the widget the mouse has left its collision
 
 private: // Vars
-	Rectangle collision;				// Space the mouse must be inside of to be considered a collision
 	bool
 		b_hovered,						// Whether the widget is being hovered by the mouse
 		b_down;							// Whether the mouse is down while hovering the widget
 };
-bool CheckCollisionPointWidget(Vector2 pt, const Widget* widget);
+
+class WidgetMaterial_Interface : protected WidgetEstate_Interface
+{
+public:
+	WidgetMaterial_Interface(Rectangle _estate, Color _tint) : WidgetEstate_Interface(_estate), tint(_tint) {};
+
+protected: virtual void Draw(Rectangle) const = 0;
+public:    void Draw() const;
+
+protected:
+	  Color tint;							// The color tint to apply to the texture when drawing
+};
 
 // Interface for a single texture that replaces the widget's rectangle at draw-time
-class Widget_Texture
+class WidgetTexture_Interface : public WidgetMaterial_Interface
 {
 public: // Enums
-	enum class TileMode					// How to handle texture-shape mismatch
+	enum class TileMode : unsigned char	// How to handle texture-shape mismatch
 	{
 		None, Fill, Fit, Stretch, Repeat,
 	};
 
 public: // Constructors
-	Widget_Texture(Texture2D _tex, TileMode _tileHandling, Color _tint, Vector2 _scale)
-		: tex(_tex), tileHandling(_tileHandling), tint(_tint), scale(_scale) {};
+	WidgetTexture_Interface(Rectangle _estate, Texture2D _tex, Color _tint = WHITE, TileMode _tileHandling = TileMode::None) :
+		WidgetMaterial_Interface(_estate, _tint),
+		tex(_tex),
+		src({ 0, 0, (float)_tex.width, (float)_tex.height}),
+		tileHandling(_tileHandling) {};
 
-private: // Vars
+	WidgetTexture_Interface(Rectangle _estate, Texture2D _tex, Rectangle _src, Color _tint = WHITE, TileMode _tileHandling = TileMode::None) :
+		WidgetMaterial_Interface(_estate, _tint),
+		tex(_tex),
+		src(_src),
+		tileHandling(_tileHandling) {};
+
+protected:
+	void Draw(Rectangle dest) const override;
+
+protected: // Vars
 	Texture2D tex;						// The texture to draw the element with
-	TileMode tileHandling;
-	Color tint;							// The color tint to apply to the texture when drawing
-	Vector2 scale;						// The scaling to apply to the texture (applied after being matched to the shape)
+	Rectangle src;						// What section of the texture to sample
+	TileMode tileHandling;				// How to handle source-destination dimensions mismatch
+};
+
+class WidgetColor_Interface : public WidgetMaterial_Interface
+{
+public:
+	WidgetColor_Interface(Rectangle _estate, Color _tint) : WidgetMaterial_Interface(_estate, _tint) {};
+	void Draw(Rectangle shape) const override;
 };
 
 // Interface for text inside a box
-class TextBox
+class WidgetTextBox_Interface
 {
 public: // Constructors
-	TextBox(Rectangle _box,
+	WidgetTextBox_Interface(Rectangle _box,
 			const std::string& _str = "",			// Leave _str as "" when the first value of str should come from a SetString() call
 			PaddedRec _pad = {0.0f, 0.0f, 0.0f, 0.0f},
 			float _fontSize = 8.0f) :
@@ -171,17 +227,32 @@ private: // Vars
 class WidgetCollecion
 {
 public:
+	void Crop();
+	void CropRecursive();
+
 	void Draw() const;
 
+	bool CheckPointInside(Vector2 pt) const;
+
+	WidgetCollecion* Traverse(Vector2 pt);
+	Widget_Base* ContainingElement(Vector2 pt);
+	Widget_Base* FindElementAt(Vector2 pt);
+
+	void ContainingElement_Multi(std::vector<Widget_Base*>& out, Vector2 pt);
+	void FindElementAt_Multi(std::vector<Widget_Base*>& out, Vector2 pt);
+
 public:
-	std::vector<WidgetCollecion*> children;
-	std::vector<Widget*> elements;
+	Rectangle realEstate;
+	std::vector<Widget_Base*> elements;
+	std::vector<WidgetCollecion> children;
 };
 
 class GUI
 {
 public:
 	void Draw() const;
+	void CheckCollisions(Vector2 cursor);
+	void Crop();
 
 public:
 	RenderTexture2D uiBuffer;

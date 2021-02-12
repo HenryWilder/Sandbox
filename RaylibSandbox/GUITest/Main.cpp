@@ -1,67 +1,98 @@
 #include <raylib.h>
 #include "Widgets.h"
 
-class A
+namespace gui
 {
-public:
-	A(int v = 0) : m_val(v) {};
+	class Image : public Widget_Base, WidgetTransparency_Interface
+	{
+	public:
+		Image(Texture2D _tex, Rectangle _estate) :
+			Widget_Base(),
+			WidgetTransparency_Interface(1.0f),
+			mat(new WidgetTexture_Interface(_estate, _tex)) {};
 
-	int m_val;
+		Image(Color _color, Rectangle _estate) :
+			Widget_Base(),
+			WidgetTransparency_Interface(1.0f),
+			mat(new WidgetColor_Interface(_estate, _color)) {};
 
-protected:
-	virtual void BindModify(int oldVal, int& newVal) { printf("Called class A binding.\n"); };
+		~Image() {
+			delete mat;
+		}
 
-public:
-	void Modify(int newVal) {
-		printf("new value: %i\n", newVal);
-		BindModify(m_val, newVal);
-		printf("final value: %i\n", newVal);
-		m_val = newVal;
-		printf("m_val updated to: %i\n", m_val);
-	}
-};
-class B : public A
-{
-public:
-	B(int v = 0) : A(v) {};
-};
-class C : public A
-{
-public:
-	C(int v = 0) : A(v) {};
-
-	void BindModify(int oldVal, int& newVal) override {
-		newVal = 22; // I don't want it to change.
-		printf("Called class C binding.\n");
-		printf("value changed to %i\n", newVal);
+		void Draw() const override
+		{
+			Draw();
+		}
+	private:
+		WidgetMaterial_Interface* mat;
 	};
-};
+
+	class Button : public Widget_Base, WidgetInteraction_Interface, WidgetTransparency_Interface
+	{
+	public:
+		Button(Rectangle _collision, WidgetMaterial_Interface* _norm, WidgetMaterial_Interface* _hover, WidgetMaterial_Interface* _press, WidgetMaterial_Interface* _disabled) :
+			Widget_Base(),
+			WidgetInteraction_Interface(_collision),
+			WidgetTransparency_Interface(),
+			b_disabled(false),
+			mat_normal(_norm),
+			mat_hovered(_hover),
+			mat_pressed(_press),
+			mat_disabled(_disabled)
+			{};
+
+		void Draw() const override
+		{
+			if (b_disabled) mat_disabled->Draw();
+			else if (WidgetInteraction_Interface::IsDown()) mat_pressed->Draw();
+			else if (WidgetInteraction_Interface::IsHovered()) mat_hovered->Draw();
+			else mat_normal->Draw();
+		}
+
+	protected: // Vars
+		bool b_disabled;
+		WidgetMaterial_Interface* mat_normal;
+		WidgetMaterial_Interface* mat_hovered;
+		WidgetMaterial_Interface* mat_pressed;
+		WidgetMaterial_Interface* mat_disabled;
+	};
+}
 
 int main()
 {
 	int windowWidth = 1280;
 	int windowHeight = 720;
-
-	A* testB = new B(1);
-	A* testC = new C(1);
-
-	testB->Modify(3);
-	testC->Modify(3);
-
-	printf("%i\n", (testB->m_val));
-	printf("%i\n", (testC->m_val));
-
-	delete testB;
-	delete testC;
-
-	return 0;
-
-	InitWindow(1280, 720, "GUI test");
+	InitWindow(windowWidth, windowHeight, "GUI test");
 	SetTargetFPS(60);
 
-	GUI g_ui{
-		// TODO: Fill out widgets
+	Texture2D test = LoadTexture("test.png");
+
+	Image checker = GenImageChecked(2, 2, 1, 1, BLACK, MAGENTA);
+	Texture2D missing = LoadTextureFromImage(checker);
+	UnloadImage(checker);
+
+	GUI g_ui // Entire GUI
+	{
+		LoadRenderTexture(windowWidth, windowHeight), // UI buffer
+
+		WidgetCollecion // Widgets
+		{
+			Rectangle{}, // Collection area
+			// Elements
+			{
+				new gui::Image(missing, Rectangle{0,0,128,128}),
+				new gui::Button(Rectangle{128,0,128,128}, new WidgetColor_Interface(),),
+			},
+			// Children
+			{
+				// TODO
+			}
+		}
 	};
+	g_ui.Crop();
+	
+	*(Rectangle*)((reinterpret_cast<char*>(&(g_ui.widgets.elements[1]))) + sizeof(Widget_Base)) // Oh god
 
 	while (!WindowShouldClose())
 	{
@@ -73,11 +104,15 @@ int main()
 		// -------
 		BeginDrawing(); {
 
-			ClearBackground(RAYWHITE);
+			ClearBackground(WHITE);
+			
 			g_ui.Draw();
 
 		} EndDrawing();
 	}
+
+	UnloadTexture(missing);
+	UnloadTexture(test);
 
 	CloseWindow();
 

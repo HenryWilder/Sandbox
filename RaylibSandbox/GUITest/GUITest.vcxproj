@@ -154,6 +154,9 @@
     <ClInclude Include="Helpers.h" />
     <ClInclude Include="Widgets.h" />
   </ItemGroup>
+  <ItemGroup>
+    <Image Include="test.png" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
