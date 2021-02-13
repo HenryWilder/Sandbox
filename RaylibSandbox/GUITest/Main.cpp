@@ -1,120 +1,106 @@
 #include <raylib.h>
-#include "Widgets.h"
+#include "GuiFunctions.h"
 
-namespace gui
+void GameLoop(std::vector<GUIButton> buttons)
 {
-	class Image : public Widget_Base, WidgetTransparency_Interface
-	{
-	public:
-		Image(Texture2D _tex, Rectangle _estate) :
-			Widget_Base(),
-			WidgetTransparency_Interface(1.0f),
-			mat(new WidgetTexture_Interface(_estate, _tex)) {};
-
-		Image(Color _color, Rectangle _estate) :
-			Widget_Base(),
-			WidgetTransparency_Interface(1.0f),
-			mat(new WidgetColor_Interface(_estate, _color)) {};
-
-		~Image() {
-			delete mat;
-		}
-
-		void Draw() const override
-		{
-			Draw();
-		}
-	private:
-		WidgetMaterial_Interface* mat;
-	};
-
-	class Button : public Widget_Base, WidgetInteraction_Interface, WidgetTransparency_Interface
-	{
-	public:
-		Button(Rectangle _collision, WidgetMaterial_Interface* _norm, WidgetMaterial_Interface* _hover, WidgetMaterial_Interface* _press, WidgetMaterial_Interface* _disabled) :
-			Widget_Base(),
-			WidgetInteraction_Interface(_collision),
-			WidgetTransparency_Interface(),
-			b_disabled(false),
-			mat_normal(_norm),
-			mat_hovered(_hover),
-			mat_pressed(_press),
-			mat_disabled(_disabled)
-			{};
-
-		void Draw() const override
-		{
-			if (b_disabled) mat_disabled->Draw();
-			else if (WidgetInteraction_Interface::IsDown()) mat_pressed->Draw();
-			else if (WidgetInteraction_Interface::IsHovered()) mat_hovered->Draw();
-			else mat_normal->Draw();
-		}
-
-	protected: // Vars
-		bool b_disabled;
-		WidgetMaterial_Interface* mat_normal;
-		WidgetMaterial_Interface* mat_hovered;
-		WidgetMaterial_Interface* mat_pressed;
-		WidgetMaterial_Interface* mat_disabled;
-	};
-}
-
-int main()
-{
-	int windowWidth = 1280;
-	int windowHeight = 720;
-	InitWindow(windowWidth, windowHeight, "GUI test");
-	SetTargetFPS(60);
-
-	Texture2D test = LoadTexture("test.png");
-
-	Image checker = GenImageChecked(2, 2, 1, 1, BLACK, MAGENTA);
-	Texture2D missing = LoadTextureFromImage(checker);
-	UnloadImage(checker);
-
-	GUI g_ui // Entire GUI
-	{
-		LoadRenderTexture(windowWidth, windowHeight), // UI buffer
-
-		WidgetCollecion // Widgets
-		{
-			Rectangle{}, // Collection area
-			// Elements
-			{
-				new gui::Image(missing, Rectangle{0,0,128,128}),
-				new gui::Button(Rectangle{128,0,128,128}, new WidgetColor_Interface(),),
-			},
-			// Children
-			{
-				// TODO
-			}
-		}
-	};
-	g_ui.Crop();
-	
-	*(Rectangle*)((reinterpret_cast<char*>(&(g_ui.widgets.elements[1]))) + sizeof(Widget_Base)) // Oh god
-
 	while (!WindowShouldClose())
 	{
 		// Simulation
 		// ----------
-		// TODO
+		
+		// Update GUI
+		{
+			SetMouseCursor(MOUSE_CURSOR_DEFAULT);
 
+			for (GUIButton& button : buttons)
+			{
+				ButtonStateFlags state = GetButtonState(button);
+
+				button.state = state;
+			}
+		}
+		
 		// Drawing
 		// -------
 		BeginDrawing(); {
 
-			ClearBackground(WHITE);
-			
-			g_ui.Draw();
+			ClearBackground(BLACK);
+
+			// Draw GUI
+			{
+				SetMouseCursor(MOUSE_CURSOR_DEFAULT);
+
+				for (GUIButton& button : buttons)
+				{
+					if (IsButtonStateHovered(button.state))
+					{
+						SetMouseCursor(MOUSE_CURSOR_POINTING_HAND);
+						break;
+					}
+				}
+				for (GUIButton& button : buttons)
+				{
+					DrawGUIButton(button, button.state);
+				}
+			}
 
 		} EndDrawing();
 	}
+}
 
-	UnloadTexture(missing);
-	UnloadTexture(test);
+void InitProgram(int windowWidth, int windowHeight, const char* windowName, int fps)
+{
+	InitWindow(windowWidth, windowHeight, windowName);
+	SetTargetFPS(fps);
+
+	Image img = GenImageColor(128, 128, WHITE);
+	g_defaultTexture = LoadTextureFromImage(img);
+	UnloadImage(img);
+
+	std::vector<GUIButton> buttons{
+		GUIButton(Rectangle{ 0, 0, 128, 64 }, GUIMat(DARKBLUE), GUIMat(BLUE), GUIMat(SKYBLUE), GUIMat(GRAY)),
+		GUIButton(Rectangle{ 128, 0, 128, 64 }, GUIMat(DARKBLUE), GUIMat(BLUE), GUIMat(SKYBLUE), GUIMat(GRAY)),
+		GUIButton(Rectangle{ 256, 0, 128, 64 }, GUIMat(DARKBLUE), GUIMat(BLUE), GUIMat(SKYBLUE), GUIMat(GRAY)),
+	};
+
+	GameLoop(buttons);
+
+	for (GUIButton& button : buttons)
+	{
+		UnloadGUIMat(button.mat_default);
+		UnloadGUIMat(button.mat_disabled);
+		UnloadGUIMat(button.mat_hovered);
+		UnloadGUIMat(button.mat_pressed);
+	}
+
+	UnloadTexture(g_defaultTexture);
 
 	CloseWindow();
+}
 
+enum TestState {
+	Dirty,
+	Clean,
+	Falling,
+	Active,
+	LowHealth,
+	TurningHead,
+};
+
+int main()
+{
+	MatStateMachine<TestState> states(
+		{ // Possible states
+			{ Dirty,		GUIMat(BROWN)	},
+			{ Clean,		GUIMat(SKYBLUE) },
+			{ Falling,		GUIMat(ORANGE)	},
+			{ Active,		GUIMat(YELLOW)	},
+			{ LowHealth,	GUIMat(RED)		},
+			{ TurningHead,	GUIMat(BLUE)	},
+		}, // Init state
+		Clean
+	);
+
+	InitProgram(1280, 720, "GUI Test", 60);
 	return 0;
 }

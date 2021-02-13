@@ -25,7 +25,7 @@ struct PaddedRec
 {
 	/*************************************************
 	*
-	*	Offsets are relative to the shape they pad.
+	*	Offsets are relative to the collision they pad.
 	*
 	*	          Top
 	*	    .------|------.
@@ -151,7 +151,7 @@ protected:
 class WidgetTexture_Interface : public WidgetMaterial_Interface
 {
 public: // Enums
-	enum class TileMode : unsigned char	// How to handle texture-shape mismatch
+	enum class TileMode : unsigned char	// How to handle texture-collision mismatch
 	{
 		None, Fill, Fit, Stretch, Repeat,
 	};
@@ -182,7 +182,7 @@ class WidgetColor_Interface : public WidgetMaterial_Interface
 {
 public:
 	WidgetColor_Interface(Rectangle _estate, Color _tint) : WidgetMaterial_Interface(_estate, _tint) {};
-	void Draw(Rectangle shape) const override;
+	void Draw(Rectangle collision) const override;
 };
 
 // Interface for text inside a box
@@ -214,7 +214,7 @@ public: // Variable helper functions
 	const std::string& GetString_ConstRef() const;	// Get a read-only reference to str
 	std::string& GetString_Ref();					// Get a writable reference to str (WARNING: ignores OnStringChange())
 	void SetString(std::string _str);				// Set the value of str, calling OnStringChange() in the process
-	void Resize(Rectangle newShape);				// Change the shape of the element, calling OnResize() in the process
+	void Resize(Rectangle newShape);				// Change the collision of the element, calling OnResize() in the process
 
 private: // Vars
 	Rectangle box;									// The box the string will be displayed inside of

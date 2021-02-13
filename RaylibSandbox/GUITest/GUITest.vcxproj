@@ -147,10 +147,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="GuiFunctions.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Widgets.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="GuiFunctions.h" />
     <ClInclude Include="Helpers.h" />
     <ClInclude Include="Widgets.h" />
   </ItemGroup>

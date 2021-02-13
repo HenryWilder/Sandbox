@@ -244,7 +244,7 @@ void WidgetMaterial_Interface::Draw() const
 	Draw(GetEstate());
 }
 
-void WidgetColor_Interface::Draw(Rectangle shape) const
+void WidgetColor_Interface::Draw(Rectangle collision) const
 {
 	DrawRectangleRec(GetEstate(), tint);
 }
