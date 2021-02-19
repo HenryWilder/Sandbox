@@ -45,6 +45,15 @@
     <ClCompile Include="Freddy.cpp">
       <Filter>Characters\Source</Filter>
     </ClCompile>
+    <ClCompile Include="Animatronics.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="random.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Example.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="random.h">
@@ -68,5 +77,51 @@
     <ClInclude Include="Freddy.h">
       <Filter>Characters\Headers</Filter>
     </ClInclude>
+    <ClInclude Include="Animatronics.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Example.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Chica_ShowStage.PNG">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Freddy_ShowStage.PNG">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Bonnie_ShowStage.PNG">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Foxy_PirateCove_0.PNG">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Map.PNG">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Foxy_PirateCove_1.PNG">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Foxy_PirateCove_2.PNG">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Foxy_WestHall.PNG">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Office.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="perspective.frag">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="perspective.vert">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="static.frag">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

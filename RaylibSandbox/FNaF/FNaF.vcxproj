@@ -150,21 +150,42 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Animatronic.cpp" />
+    <ClCompile Include="Animatronics.cpp" />
     <ClCompile Include="Bonnie.cpp" />
     <ClCompile Include="Bullies.cpp" />
     <ClCompile Include="Chica.cpp" />
+    <ClCompile Include="Example.cpp" />
     <ClCompile Include="Foxy.cpp" />
     <ClCompile Include="Freddy.cpp" />
+    <ClCompile Include="random.cpp" />
     <ClCompile Include="Source.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Animatronic.h" />
+    <ClInclude Include="Animatronics.h" />
     <ClInclude Include="Bonnie.h" />
     <ClInclude Include="Bullies.h" />
     <ClInclude Include="Chica.h" />
+    <ClInclude Include="Example.h" />
     <ClInclude Include="Foxy.h" />
     <ClInclude Include="Freddy.h" />
     <ClInclude Include="random.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Bonnie_ShowStage.PNG" />
+    <Image Include="Chica_ShowStage.PNG" />
+    <Image Include="Foxy_PirateCove_0.PNG" />
+    <Image Include="Foxy_PirateCove_1.PNG" />
+    <Image Include="Foxy_PirateCove_2.PNG" />
+    <Image Include="Foxy_WestHall.PNG" />
+    <Image Include="Freddy_ShowStage.PNG" />
+    <Image Include="Map.PNG" />
+    <Image Include="Office.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="perspective.frag" />
+    <None Include="perspective.vert" />
+    <None Include="static.frag" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
