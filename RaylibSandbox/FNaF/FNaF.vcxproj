@@ -174,6 +174,8 @@
   <ItemGroup>
     <Image Include="Bonnie_ShowStage.PNG" />
     <Image Include="Chica_ShowStage.PNG" />
+    <Image Include="FNaF Map-01.png" />
+    <Image Include="FNaF_CamOpenButton-01.png" />
     <Image Include="Foxy_PirateCove_0.PNG" />
     <Image Include="Foxy_PirateCove_1.PNG" />
     <Image Include="Foxy_PirateCove_2.PNG" />
@@ -186,6 +188,10 @@
     <None Include="perspective.frag" />
     <None Include="perspective.vert" />
     <None Include="static.frag" />
+  </ItemGroup>
+  <ItemGroup>
+    <Media Include="Ambience.wav" />
+    <Media Include="Night1Call.wav" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

@@ -6,7 +6,7 @@
 struct CamButton
 {
 	CamButton() = default;
-	CamButton(Cam _cam, Vector2 pos) : collision{ pos.x, pos.y, 60.0f, 44.0f }, cam(_cam) {};
+	CamButton(Cam _cam, Vector2 pos) : collision{ pos.x, pos.y, 80.0f, 50.0f }, cam(_cam) {};
 
 	Rectangle collision;
 	Cam cam;
@@ -36,8 +36,8 @@ void DrawButton(CamButton& button, Color color)
 {
 	DrawRectangleRec(button.collision, color);
 	DrawRectangleLinesEx(button.collision, 3, WHITE);
-	DrawText("CAM", button.collision.x + 5, button.collision.y + 4, 20, WHITE);
-	DrawText(GetCamName(button.cam), button.collision.x + 5, button.collision.y + 20, 20, WHITE);
+	DrawText("CAM", (int)button.collision.x + 5, (int)button.collision.y + 4, 20, WHITE);
+	DrawText(GetCamName(button.cam), (int)button.collision.x + 5, (int)button.collision.y + 20, 20, WHITE);
 }
 
 int main()
@@ -60,23 +60,24 @@ int main()
 
 	Animatronic* characters[4] = { &bonnie, &chica, &freddy, &foxy };
 
-	Texture imTheMapimTheMapimTheMapIMTHEMAAAAAAAP = LoadTexture("Map.PNG");
+	Texture imTheMapimTheMapimTheMapIMTHEMAAAAAAAP = LoadTexture("FNaF Map-01.png");
+	Texture theButtonBarThingyOnTheBottomThatOpensTheCameras = LoadTexture("FNaF_CamOpenButton-01.png");
 
 	Texture office = LoadTexture("Office.PNG");
 	Shader staticShader = LoadShader(NULL, "static.frag");
 
 	CamButton buttons[] = {
-		CamButton(Cam::Cam1A, Vector2{1292,480}),
-		CamButton(Cam::Cam1B, Vector2{1240,560}),
-		CamButton(Cam::Cam1C, Vector2{1200,680}),
-		CamButton(Cam::Cam2A, Vector2{1235,878}),
-		CamButton(Cam::Cam2B, Vector2{1235,973}),
-		CamButton(Cam::Cam3,  Vector2{1140,836}),
-		CamButton(Cam::Cam4A, Vector2{1452,878}),
-		CamButton(Cam::Cam4B, Vector2{1452,973}),
-		CamButton(Cam::Cam5,  Vector2{1100,600}),
-		CamButton(Cam::Cam6,  Vector2{1555,825}),
-		CamButton(Cam::Cam7,  Vector2{1600,575}),
+		CamButton(Cam::Cam1A, Vector2{1498,492}),
+		CamButton(Cam::Cam1B, Vector2{1470,570}),
+		CamButton(Cam::Cam1C, Vector2{1425,680}),
+		CamButton(Cam::Cam2A, Vector2{1500,844}),
+		CamButton(Cam::Cam2B, Vector2{1500,900}),
+		CamButton(Cam::Cam3,  Vector2{1380,818}),
+		CamButton(Cam::Cam4A, Vector2{1647,844}),
+		CamButton(Cam::Cam4B, Vector2{1647,900}),
+		CamButton(Cam::Cam5,  Vector2{1322,609}),
+		CamButton(Cam::Cam6,  Vector2{1793,795}),
+		CamButton(Cam::Cam7,  Vector2{1795,610}),
 	};
 
 	int frame = 0;
@@ -89,20 +90,24 @@ int main()
 					   0.0f, WHITE);
 	};
 
+	InitAudioDevice();
+
+	Sound night1PhoneCall = LoadSound("Night1Call.wav");
+
+	while (true) {
+		if (IsAudioDeviceReady()) break;
+	}
+	
+	PlaySound(night1PhoneCall);
+
 	while (!WindowShouldClose())
 	{
-#if _DEBUG
-		int i = 32;
-#endif
+		DEBUG_ONLY(int i = 32;)
 		for (Animatronic* anim : characters) {
 			anim->Tick();
-#if _DEBUG
-			DrawText(FormatText("Time left: %i", anim->cooldown), 0, i += 32, 24, WHITE);
-#endif
+			DEBUG_ONLY(DrawText(FormatText("Time left: %i", anim->cooldown), 0, i += 32, 24, WHITE);)
 		}
-#if _DEBUG
-		DrawText(FormatText("Freddy's stored crits: %i", freddy.storedCrits), 0, 256, 24, WHITE);
-#endif
+		DEBUG_ONLY(DrawText(FormatText("Freddy's stored crits: %i", freddy.storedCrits), 0, 256, 24, WHITE);)
 
 		if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
 		{
@@ -147,6 +152,8 @@ int main()
 			//if (windowWidth < 0.0f) officeRot = 0.0f;
 		}
 
+		SetSoundVolume(night1PhoneCall, ((1.0f - officeRot) * 0.5f) + 0.5f);
+
 		BeginDrawing();
 		{
 			ClearBackground(BLACK);
@@ -154,7 +161,10 @@ int main()
 			if (b_watchingCams) {
 
 				for (Animatronic* anim : characters) {
-					if (anim->IsOnCam(activeCam)) anim->DrawSprite(frame);
+					if (anim->IsOnCam(activeCam))
+					{
+						DrawTexture(anim->GetTexture(frame), 0, 0, WHITE);
+					}
 				}
 
 				DrawTexture(imTheMapimTheMapimTheMapIMTHEMAAAAAAAP, 0, 0, WHITE);
@@ -169,13 +179,15 @@ int main()
 			else {
 				for (Animatronic* anim : characters) {
 					if (anim->IsOnCam(Cam::eDoor) || anim->IsOnCam(Cam::wDoor)) {
-						Texture* tex = anim->GetSprite(frame);
-						if (tex) DrawTextureWithPerspective(*tex);
+						Texture2D tex = anim->GetTexture(frame);
+						DrawTextureWithPerspective(tex);
 					}
 				}
 
 				DrawTextureWithPerspective(office);
 			}
+
+			DrawTexture(theButtonBarThingyOnTheBottomThatOpensTheCameras, 0, 0, WHITE);
 
 #if _DEBUG
 			DrawText(TextFormat("Rot: %f", officeRot), 0, 32, 48, WHITE);
@@ -187,8 +199,10 @@ int main()
 	}
 
 	UnloadTexture(imTheMapimTheMapimTheMapIMTHEMAAAAAAAP);
+	UnloadTexture(theButtonBarThingyOnTheBottomThatOpensTheCameras);
 	UnloadTexture(office);
 
+	CloseAudioDevice();
 	CloseWindow();
 
 	return 0;

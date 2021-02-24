@@ -112,6 +112,12 @@
     <Image Include="Office.png">
       <Filter>Resource Files</Filter>
     </Image>
+    <Image Include="FNaF Map-01.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="FNaF_CamOpenButton-01.png">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
   <ItemGroup>
     <None Include="perspective.frag">
@@ -123,5 +129,13 @@
     <None Include="static.frag">
       <Filter>Resource Files</Filter>
     </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Media Include="Ambience.wav">
+      <Filter>Resource Files</Filter>
+    </Media>
+    <Media Include="Night1Call.wav">
+      <Filter>Resource Files</Filter>
+    </Media>
   </ItemGroup>
 </Project>
