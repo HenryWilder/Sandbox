@@ -1,30 +1,82 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup>
-    <ClCompile Include="main.cpp" />
-    <ClCompile Include="Transistor.cpp" />
-    <ClCompile Include="Abstraction.cpp" />
-    <ClCompile Include="Serialization.cpp" />
-    <ClCompile Include="Globals.cpp" />
-    <ClCompile Include="CustomTypes.cpp" />
-    <ClCompile Include="BasicMath.cpp" />
-    <ClCompile Include="IDSystem.cpp" />
+    <ClCompile Include="Abstraction.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="BasicMath.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="CustomTypes.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Globals.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="IDSystem.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="main.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Serialization.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Transistor.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Transistor.h" />
-    <ClInclude Include="Abstraction.h" />
-    <ClInclude Include="Serialization.h" />
-    <ClInclude Include="Circuit.h" />
-    <ClInclude Include="Globals.h" />
-    <ClInclude Include="CustomTypes.h" />
-    <ClInclude Include="BasicMath.h" />
-    <ClInclude Include="IDSystem.h" />
+    <ClInclude Include="Abstraction.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="BasicMath.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="Circuit.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="Globals.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="IDSystem.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="Serialization.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="Transistor.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="CustomTypes.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="stl_extended.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="pretty.frag" />
-    <None Include="grid.frag" />
+    <None Include="grid.frag">
+      <Filter>Resources</Filter>
+    </None>
+    <None Include="pretty.frag">
+      <Filter>Resources</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="saved_diagram.txt" />
+    <Filter Include="Headers">
+      <UniqueIdentifier>{c04e0bec-f34f-4407-a142-a4ce741d73a9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source">
+      <UniqueIdentifier>{2154c1af-10d9-4669-8ce3-729d6f1a062b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{d6e338f9-28e6-42d0-852c-9b48f814f514}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <Text Include="saved_diagram.txt">
+      <Filter>Resources</Filter>
+    </Text>
   </ItemGroup>
 </Project>

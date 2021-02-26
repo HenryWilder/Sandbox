@@ -7,11 +7,6 @@
 #include "Abstraction.h"
 #include "Serialization.h"
 
-__interface IInterface
-{
-
-};
-
 class Transistor;
 class Component;
 
@@ -28,7 +23,7 @@ struct InputMode
     union Data
     {
         struct WireData {
-            Transistor* start;
+            ID_t start;
             Transistor::Connection* draggingWire;
             Transistor::Connection::Shape shape;
         };
@@ -47,12 +42,16 @@ Rectangle RecVec2(Vector2 start, Vector2 end)
     return rec;
 }
 
+#define TRANSISTOR_FIND(id) Transistor::s_transistorMap.find((id))
+#define TRANSISTOR_VALID(id) Transistor::s_transistorMap.valid((id))
+constexpr ID_t nullID = Transistor::s_transistorMap.nPos;
+
 /************************************************************
 * 
 *   START OF PROGRAM
 * 
 ************************************************************/
-
+#include "IDSystem.h"
 int main(void)
 {
     InitWindow(g_windowWidth, g_windowHeight, "Electron Architect");
@@ -67,8 +66,8 @@ int main(void)
 
     bool b_moveActive = false;
     bool b_selectionIsExplicit = false; // Whether the current selection was created explicitly by the user (with a selection box) vs just an on-the-spot hover promotion to implied selection.
-    std::vector<Transistor*> selection;
-    IntRect selectionSpace = {};
+    std::vector<ID_t> selection;
+    IntRect selectionSpace;
 
     auto ClearSelection = [&selection, &b_selectionIsExplicit]() {
         selection.clear();
@@ -104,7 +103,7 @@ int main(void)
             float delta = 0.0f;
             if (GetMouseWheelMove() < 0.0f) // Zoom out
             {
-                delta = -(camera.zoom / 2);
+                delta = -(camera.zoom * 0.5f);
             }
             else // Zoom in
             {
@@ -141,10 +140,10 @@ int main(void)
                 break;
             }
         }
-        Transistor* transistorHovering = nullptr;
-        for (Transistor* transistor : Transistor::s_allTransistors) {
-            if (!transistor->IsHidden() && cursorPos == transistor->GetPos()) {
-                transistorHovering = transistor;
+        ID_t transistorHovering = nullID;
+        for (auto [id, transistor] : Transistor::s_transistorMap) {
+            if (!transistor->TestFlags(Transistor::Flag::IS_HIDDEN) && cursorPos == transistor->GetPos()) {
+                transistorHovering = id;
                 break;
             }
         }
@@ -158,16 +157,15 @@ int main(void)
             if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) // Start a wire
             {
                 wireStart = cursorPos;
-                mode.data.wire.start = nullptr;
-                for (Transistor* check : Transistor::s_allTransistors)
+                mode.data.wire.start = nullID;
+                for (auto [id, transistor] : Transistor::s_transistorMap)
                 {
-                    if (check->GetPos() == cursorPos)
-                    {
-                        mode.data.wire.start = check;
+                    if (transistor->GetPos() == cursorPos) {
+                        mode.data.wire.start = id;
                         break;
                     }
                 }
-                if (!mode.data.wire.start) mode.data.wire.start = new Transistor(cursorPos);
+                if (!mode.data.wire.start) mode.data.wire.start = Transistor::Create(cursorPos);
                 mode.mode = InputMode::Mode::Wire;
             }
             // M2
@@ -190,21 +188,27 @@ int main(void)
             // M1
             if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) // Finish drawing wire
             {
-                Transistor* endTransistor = nullptr;
-                for (Transistor* check : Transistor::s_allTransistors)
+                ID_t endTransistor = nullID;
+                
+                for (auto [id, transistor] : Transistor::s_transistorMap) // Search for an overlapping transistor to solder
                 {
-                    if (check->GetPos() == cursorPos)
+                    if (transistor->GetPos() == cursorPos)
                     {
-                        endTransistor = check;
-                        check->SolderInput(mode.data.wire.start, mode.data.wire.shape);
+                        endTransistor = id;
+                        transistor->SolderInput(mode.data.wire.start, mode.data.wire.shape);
                         break;
                     }
                 }
-                if (!endTransistor) endTransistor = new Transistor(mode.data.wire.start, cursorPos, mode.data.wire.shape);
-                if (endTransistor == mode.data.wire.start)
-                {
-                    delete mode.data.wire.start; // TODO: Make sure this is correct
+
+                if (!endTransistor) { // No transistor exists at the location
+                    endTransistor = Transistor::Create(cursorPos);
+                    endTransistor->SolderInput(mode.data.wire.start, mode.data.wire.shape);
                 }
+                else if (endTransistor == mode.data.wire.start) // End overlaps the start
+                {
+                    Transistor::Destroy(mode.data.wire.start);
+                }
+
                 mode.mode = InputMode::Mode::None;
             }
         }
@@ -214,23 +218,19 @@ int main(void)
         {
             if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON) && selection.empty()) // Select a single transistor for moving
             {
-                if (transistorHovering)
-                {
+                if (transistorHovering) {
                     selection.push_back(transistorHovering);
                 }
-                else if (componentHovering) // Drag component
-                {
+                else if (componentHovering) { // Drag component
                     componentHovering->SelectTransistors(selection);
                 }
                 b_moveActive = true;
             }
             if ((IsKeyPressed(KEY_DELETE) || IsKeyPressed(KEY_BACKSPACE)) && !selection.empty()) // Delete selection
             {
-                for (Transistor*& elem : selection)
-                {
-                    elem->ClearReferences();
-                    delete elem;
-                    elem = nullptr;
+                for (ID_t& id : selection) {
+                    Transistor::Destroy(id);
+                    id = nullID;
                 }
                 ClearSelection();
             }
@@ -246,7 +246,7 @@ int main(void)
                 }
                 else if (componentHovering) // Delete component
                 {
-                    componentHovering->ClearReferences();
+                    componentHovering->Destroy();
                     delete componentHovering;
                     componentHovering = nullptr;
                 }
@@ -264,14 +264,14 @@ int main(void)
                 if (selectionStart != cursorPos) // The selection is a box and not a point
                 {
                     size_t reservation = 0;
-                    for (Transistor* check : Transistor::s_allTransistors)
+                    for (auto [id, transistor] : Transistor::s_transistorMap)
                     {
-                        if (selectionSpace.Contains(check->GetPos())) reservation++; // Add all transistors whose positions are within the collision
+                        if (selectionSpace.Contains(transistor->GetPos())) reservation++; // Add all transistors whose positions are within the collision
                     }
                     selection.reserve(reservation);
-                    for (Transistor* check : Transistor::s_allTransistors)
+                    for (auto [id, transistor] : Transistor::s_transistorMap)
                     {
-                        if (selectionSpace.Contains(check->GetPos())) selection.push_back(check); // Add all transistors whose positions are within the collision
+                        if (selectionSpace.Contains(transistor->GetPos())) selection.push_back(id); // Add all transistors whose positions are within the collision
                     }
                 }
                 b_selectionIsExplicit = true;
@@ -296,16 +296,17 @@ int main(void)
             }
             else if (((abs(cursorPosDelta.x) >= g_gridSize)  || (abs(cursorPosDelta.y) >= g_gridSize)) && IsMouseButtonDown(MOUSE_MIDDLE_BUTTON))
             {
-                for (Transistor* elem : selection)
+                for (ID_t id : selection)
                 {
-                    elem->ChangePos(cursorPosDelta);
+                    TRANSISTOR_FIND(id)->second->ChangePos(cursorPosDelta);
                 }
             }
 
-            for (Transistor* elem : selection) // Update all component casings
+            for (ID_t id : selection) // Update all component casings
             {
-                if (elem == nullptr) continue;
-                if (elem->GetComponent()) elem->GetComponent()->UpdateCasing();
+                if (id) continue;
+                auto [_id, transistor] = *TRANSISTOR_FIND(id);
+                if (transistor->GetComponent()) transistor->GetComponent()->UpdateCasing();
             }
         }
         else // Not dragging
@@ -314,14 +315,11 @@ int main(void)
             {
                 if (IsKeyDown(KEY_LEFT_ALT))
                 {
-                    std::vector<Transistor*> selectionCopy;
+                    std::vector<ID_t> selectionCopy;
                     for (size_t i = 0; i < selection.size(); ++i)
                     {
-                        Transistor* copy = new Transistor();
-                        copy->SetPos(selection[i]->GetPos());
-                        copy->SetGateType(selection[i]->GetGateType());
-                        selectionCopy.push_back(copy);
-                        Transistor::s_allTransistors.push_back(copy);
+                        auto it = TRANSISTOR_FIND(selection[i]);
+                        if (TRANSISTOR_VALID(it)) selectionCopy.push_back(Transistor::Create(it->second->GetPos(), it->second->GetGateType()));
                     }
                     for (size_t i = 0; i < selection.size(); ++i)
                     {
@@ -341,13 +339,12 @@ int main(void)
         // Evaluation
         {
             std::vector<Transistor*> evaluationList;
-            for (Transistor* transistor : Transistor::s_allTransistors)
-            {
-                if (transistor->InputOnly()) evaluationList.push_back(transistor); // Start of a branch
+
+            for (auto [id, transistor] : Transistor::s_transistorMap) {
+                if (transistor->InputOnly()) evaluationList.push_back(transistor);
             }
 
-            for (Transistor* transistor : evaluationList)
-            {
+            for (Transistor* transistor : evaluationList) {
                 transistor->GetEvaluation();
             }
         }
@@ -450,27 +447,25 @@ int main(void)
 
         DrawRectangleRec((Rectangle)selectionSpace, ColorAlpha(YELLOW, 0.2f));
 
-        for (Transistor* check : Transistor::s_allTransistors)
+        for (auto [id, transistor] : Transistor::s_transistorMap)
         {
-            if (selectionSpace.Contains(check->GetPos()))
+            if (selectionSpace.Contains(transistor->GetPos()))
             {
-                check->Highlight(YELLOW, 2.0f);
+                transistor->Highlight(YELLOW, 2.0f);
             }
         }
 
         if (!selection.empty()) // Highlight selection
         {
-            for (Transistor* select : selection)
-            {
-                select->Highlight(YELLOW, 2.0f);
+            for (ID_t select : selection) {
+                TRANSISTOR_FIND(select)->second->Highlight(YELLOW, 2.0f);
             }
         }
         else if (mode.mode == InputMode::Mode::Gate)
         {
             // Show branches
-            if (transistorHovering)
-            {
-                transistorHovering->Highlight(YELLOW, 2.0f);
+            if (transistorHovering) {
+                TRANSISTOR_FIND(transistorHovering)->second->Highlight(YELLOW, 2.0f);
                 // TODO: Highlight wires
             }
         }
@@ -486,10 +481,13 @@ int main(void)
         }
 
         if (componentHovering && !(transistorHovering || b_moveActive)) componentHovering->Highlight({32,32,0,255});
-        else if (transistorHovering) transistorHovering->Highlight(YELLOW, 2.0f);
+        else if (transistorHovering) {
+            auto [id, transistor] = *Transistor::s_transistorMap.find(transistorHovering);
+            if (transistor) transistor->Highlight(YELLOW, 2.0f);
+        }
 
         // Transistors
-        for (Transistor* transistor : Transistor::s_allTransistors) { transistor->Draw(); }
+        for (auto [id, transistor] : Transistor::s_transistorMap) { transistor->Draw(); }
 
         // Draw cursor
         {
@@ -502,11 +500,11 @@ int main(void)
 
         EndMode2D();
 
-        DrawText(TextFormat("Transistors: %i\nZoom: %f\nCursor position: (%i, %i)", Transistor::s_allTransistors.size(), camera.zoom, cursorPos.x, cursorPos.y), 0, 0, 8, WHITE);
+        DrawText(TextFormat("Transistors: %i\nZoom: %f\nCursor position: (%i, %i)", Transistor::s_transistorMap.size(), camera.zoom, cursorPos.x, cursorPos.y), 0, 0, 8, WHITE);
 
         EndDrawing();
 
-        for (Transistor* transistor : Transistor::s_allTransistors) { transistor->FrameReset(); }
+        for (auto [id, transistor] : Transistor::s_transistorMap) { transistor->FrameReset(); }
     }
 
     // Return memory to heap
@@ -518,7 +516,7 @@ int main(void)
 
     for (Component* component : Component::s_allComponents) { delete component; } // Must come before transistors
 
-    for (Transistor* transistor : Transistor::s_allTransistors) { delete transistor; }
+    for (auto [id, transistor] : Transistor::s_transistorMap) { delete transistor; }
 
     return 0;
 }

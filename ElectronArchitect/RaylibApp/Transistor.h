@@ -2,6 +2,26 @@
 #include <vector>
 #include "IDSystem.h"
 
+class Transistor;
+
+struct ID_t // Hhhhhhhhhhhhhh
+{
+private:
+    uint32_t id;
+
+public:
+    constexpr ID_t() : id(0) {};
+    constexpr ID_t(uint32_t _id) : id(_id) {};
+
+    operator uint32_t();
+    Transistor* operator->();
+    Transistor* operator*();
+    ID_t& operator=(ID_t b);
+    operator bool();
+    bool operator==(ID_t b);
+    bool operator!=(ID_t b);
+};
+
 struct Color;
 struct Vector2;
 struct Int2;
@@ -26,7 +46,13 @@ public:
 
         Size // Used for %
     };
+private:
+    bool ANY(std::vector<Transistor*>& in);
+    bool NOR(std::vector<Transistor*>& in);
+    bool AND(std::vector<Transistor*>& in);
+    bool XOR(std::vector<Transistor*>& in);
 
+public:
     struct Connection // Connections will never have "new" or "delete" called, so there will never be a dangling reference.
     {
         enum class Shape : char
@@ -38,7 +64,7 @@ public:
 
             Size // Total directions (for %)
         };
-        Connection() : shape{ Shape::XFirst }, connector{ (ID_t)IDFlags::NULLID } {};
+        Connection() : shape{ Shape::XFirst }, connector{ } {};
         Connection(ID_t _connector) : shape{ Shape::XFirst }, connector{ _connector } {};
         Connection(ID_t _connector, Shape _shape) : shape{ (_shape == Shape::Size ? Shape::XFirst : _shape) }, connector{ _connector } {};
 
@@ -49,63 +75,52 @@ public:
         static Shape NextShape(Shape);
     };
 
-    Transistor() : input{ }, output{ }, pos( ), type( Gate::Simple ), flags(0), containingComponent(nullptr) {};
-    Transistor(Gate _type) : input{ }, output{ }, pos( ), type( _type ), flags(0), containingComponent(nullptr) {};
-    Transistor(Int2 _pos) : input{ }, output{ }, pos(_pos), type( Gate::Simple ), flags(0), containingComponent(nullptr) {};
-    Transistor(Gate _type, Int2 _pos) : input{ }, output{ }, pos( _pos ), type( _type ), flags(0), containingComponent(nullptr) {};
-    Transistor(ID_t _input) : input{ (_input) }, output{ }, pos( ), type( ), flags(0), containingComponent(nullptr) { SolderInput(_input); };
-    Transistor(ID_t _input, Int2 _pos) : input{ }, output{ }, pos( _pos ), type(), flags(0), containingComponent(nullptr) { SolderInput(_input); };
-    Transistor(ID_t _input, Int2 _pos, Connection::Shape _shape) : input{ }, output{ }, pos( _pos ), type(  ), flags(0), containingComponent(nullptr) { SolderInput(_input, _shape); };
+    enum Flag : unsigned char {
+        DRAWN_TF = 0b00001,
+        EVALUATED_TF = 0b00010,
+        BEING_EVALUATED = 0b00100,
+        EVALUATION = 0b01000,
+        IS_HIDDEN = 0b10000,
+    };
+    static Flag operator|(Flag a, Flag b);
 
-    ~Transistor() { printf("Transistor deleted!\n"); }
+    Transistor()
+        : prev{ }, next{ }, pos( ), type( Gate::Simple ), flags(0), containingComponent(nullptr) {};
+    Transistor(Int2 _pos, Gate _type = Gate::Simple)
+        : prev{ }, next{ }, pos( _pos ), type( _type ), flags(0), containingComponent(nullptr) {};
 
-    static std::unordered_map<ID_t, Validator<Transistor>> s_transistorMap; // Map of all transistors (as validators). This is used in place of pointers to transistors themselves.
-    static Validator<Transistor>* Get(ID_t id);
-    static ID_t Create(const Transistor& transistor);
-    static ID_t Create();
-    static void Destroy(const ID_t id);
+    static IDMap<ID_t, Transistor*> s_transistorMap; // Map of all transistors (as validators). This is used in place of pointers to transistors themselves.
 
-    static ID_t s_validTransistorCount;
-
-    Connection input[2];
-    Connection output[2];
-    
 private:
+    ID_t myID;
+    std::vector<Connection> prev;
+    std::vector<Connection> next;
     Int2 pos;
     Gate type;
-    enum Flag : unsigned char {
-        DRAWN_TF =          0b00000001,
-        EVALUATED_TF =      0b00000010,
-        BEING_EVALUATED =   0b00000100,
-        EVALUATION =        0b00001000,
-        IS_HIDDEN =         0b00010000,
-    };
-    char flags;
-
-public:
-    bool IsDrawnThisFrame() const;
-    bool IsEvaluatedThisFrame() const;
-    bool IsBeingEvaluated() const;
-    bool CurrentEvaluation() const;
-    bool IsHidden() const;
-
-    void SetDrawnThisFrame(bool set);
-    void SetEvaluatedThisFrame(bool set);
-    void SetBeingEvaluated(bool set);
-    void SetCurrentEvaluation(bool set);
-    void SetHidden(bool set);
-
-private:
+    unsigned char flags;
     Component* containingComponent;
 
+public:
+    static Transistor* Get(ID_t id);
+    static ID_t Create(Int2 _pos = Int2(), Gate _type = Gate::Simple);
+    static void Destroy(const ID_t id);
+
+    unsigned char TestFlags(unsigned char flags) const;
+    unsigned char TestFlags(Flag flags) const;
+    void SetFlags(unsigned char flags, unsigned char set);
+    void SetFlags(Flag flags, unsigned char set);
+    void SetFlags(unsigned char flags, bool set);
+    void SetFlags(Flag flags, bool set);
+
+    ID_t GetID();
+
+private:
+    std::vector<Transistor*> Validate(std::vector<Connection>& arr);
     void Evaluate();
-    Connection* AvailIn();
-    Connection* AvailOut();
 
     static Int2 JointPos(Int2 start, Int2 end, Connection::Shape direction);
 
 public:
-
     Gate GetGateType() const;
     void SetGateType(Gate _type);
     void IncrementGate();
@@ -114,10 +129,6 @@ public:
     
     void Hide();
     void UnHide();
-
-    int WhichInputSocketAmI(ID_t connector) const;
-    int WhichOutputSocketAmI(ID_t connector) const;
-    bool IsConnected(ID_t connector) const;
 
     Int2 GetPos() const;
     void SetPos(Int2 newPos);
@@ -131,8 +142,9 @@ public:
     bool DesolderOutput(ID_t what);
 
     bool OutputOnly() const;    // Is the start of a tree
-    bool InputOnly() const;     //Is the end of a tree
+    bool InputOnly() const;     // Is the end of a tree
     bool ConnectsExternally() const;
+    bool IsDisconnected() const;
 
     bool GetEvaluation();
 
@@ -150,13 +162,9 @@ public:
 
     void FrameReset();
 
-    void ClearReferences();
-
     friend void Save(const std::vector<ID_t>&);
     friend void Load(std::vector<ID_t>&);
 };
-
-extern std::unordered_map<ID_t, Validator<Transistor>> s_transistorMap;
 
 char GateToSymbol(Transistor::Gate type);
 Transistor::Gate SymbolToGate(char symbol);

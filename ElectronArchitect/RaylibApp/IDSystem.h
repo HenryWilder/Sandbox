@@ -2,43 +2,67 @@
 #include <type_traits>
 #include <typeinfo>
 #include <unordered_map>
+#include <list>
+#include "stl_extended.h"
 
-template<class Type>
-class Validator
+template<typename KEY, typename VAL>
+class IDMap
 {
 public:
-    Validator() : b_valid(false), m_payload() {};
-    Validator(const Type& payload) : b_valid(true), m_payload(payload) {};
+    using Map_t     = std::unordered_map<KEY, VAL>;
+    using KeyList_t = std::list<KEY>;
 
-    bool IsValid() const { return b_valid; }
-    void Invalidate() { b_valid = false; }
+    static constexpr KEY nPos = (KEY)(0);
 
-    Type& GetPayload_Reference() { return m_payload; }
-    Type GetPayload_Copy() const { return m_payload; }
+    bool valid(typename Map_t::const_iterator elem) { return !(elem == items.end()); }
+    bool valid(KEY key) { return !((key == nPos) || (items.find(key) == items.end())); }
 
-    Validator& operator=(const Type& src)
-    {
-        if (!b_valid)
-        {
-            m_payload = src;
-            b_valid = true;
-        }
-        else
-        {
-            printf("Overwrite attempted on in-use memory! Please invalidate and wait for references to update before overwriting.\n");
-        }
-        return *this;
+    typename Map_t::iterator find(KEY id) {
+        auto it = items.find(id);
+        if (it != items.end()) return it;
+        else return typename Map_t::iterator{};
     }
 
+    KEY push(VAL val)
+    {
+        KEY id;
+
+        if (!invalids.empty()) { // First check if there's an invalid key we can use
+            id = invalids.front();
+            invalids.pop_front();
+        }
+        else { // Create a new id if the list of invalid keys is empty
+            id = (int)items.size();
+        }
+
+        if (id != nPos) items[id] = val;
+        return id;
+    }
+
+    void erase(KEY id) {
+        if (valid(id)) {
+            items.erase(id);
+            invalids.push_back(id);
+        }
+    }
+
+    auto begin() {
+        return items.begin();
+    }
+    auto end() {
+        return items.end();
+    }
+    auto size() {
+        return items.size();
+    }
+
+    IDMap() {
+        items[nPos] = VAL();
+        invalids = {};
+    };
+
 private:
-    bool b_valid;
-    Type m_payload;
+    Map_t items;
+    KeyList_t invalids;
 };
-
-typedef uint_fast32_t ID_t; // In case I decide to make it different later, I can change it here and it'll change all instances of ID_t.
-enum class IDFlags : ID_t
-{
-    NULLID = 1 << (std::numeric_limits<ID_t>::digits - 1),
-};
-
-bool IsIDValid(ID_t id);
+template<typename KEY, typename VAL> constexpr KEY IDMap<KEY,VAL>::nPos;

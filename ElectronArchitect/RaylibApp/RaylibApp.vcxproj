@@ -60,6 +60,7 @@
       <PreprocessToFile>true</PreprocessToFile>
       <PreprocessSuppressLineNumbers>true</PreprocessSuppressLineNumbers>
       <PreprocessKeepComments>true</PreprocessKeepComments>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -81,6 +82,7 @@
       <ConformanceMode>true</ConformanceMode>
       <AdditionalIncludeDirectories>$(SolutionDir)Library\raylib\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessToFile>true</PreprocessToFile>
+      <LanguageStandard>stdcpp17</LanguageStandard>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>
@@ -112,6 +114,7 @@
     <ClInclude Include="Globals.h" />
     <ClInclude Include="IDSystem.h" />
     <ClInclude Include="Serialization.h" />
+    <ClInclude Include="stl_extended.h" />
     <ClInclude Include="Transistor.h" />
   </ItemGroup>
   <ItemGroup>

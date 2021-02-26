@@ -7,123 +7,34 @@
 #include "Transistor.h"
 #include "Abstraction.h"
 
-Component::Component(std::vector<Transistor*>& selection, Int2 position)
+Component::Component(std::vector<ID_t>& selection, Int2 position)
 {
-    m_componentTransistorCount = selection.size();
+    size_t componentTransistorCount = selection.size();
     s_allComponents.push_back(this);
 
     IntRect rectangle(Int2(-g_gridSize), Int2(g_gridSize, -g_gridSize));
 
-    m_inputCount = 0;
-    m_internalCount = 0;
-    m_outputCount = 0;
+    size_t inputCount = 0;
+    size_t internalCount = 0;
+    size_t outputCount = 0;
 
-    std::vector<Transistor*> toBePushed;
+    std::vector<ID_t> toBePushed;
 
-    for (Transistor* elem : selection)
+    for (ID_t id : selection)
     {
-        char externalIO = 0b00000;
-        if ((!elem->input[0].connector) && (!elem->input[1].connector)) externalIO = 0b10001; // If both are nullptrs, then this is output-only
-        else
-        {
-            if ((elem->input[0].connector) && (std::find(selection.begin(), selection.end(), elem->input[0].connector) == selection.end())) externalIO |= 0b0001;
-            if ((elem->input[1].connector) && (std::find(selection.begin(), selection.end(), elem->input[1].connector) == selection.end())) externalIO |= 0b0010;
-        }
+        Transistor* elem = *id;
 
-        if ((!elem->output[0].connector) && (!elem->output[1].connector)) externalIO = 0b10100; // If both are nullptrs, then this is input-only
-        else
-        {
-            if ((elem->output[0].connector) && (std::find(selection.begin(), selection.end(), elem->output[0].connector) == selection.end())) externalIO |= 0b0100;
-            if ((elem->output[1].connector) && (std::find(selection.begin(), selection.end(), elem->output[1].connector) == selection.end())) externalIO |= 0b1000;
-        }
-        if (externalIO & 0b10000) printf("Some real bullshit happened"); // How the fuck does this happen
+        // Something something something uhhhh look at the github backup
+        // If it isn't there that's completely understandable and I'm sorry ;w;
+        // It wasn't anything important I don't think, just something about determining whether a Transistor was an input or output
 
-        Int2 elemPos(0);
-        switch ((((externalIO & 0b0011) > 0) * 0b01) | (((externalIO & 0b1100) > 0) * 0b10)) // Convert the 4 bits of data into just 2
-        {
-        default:
-        case 0b00: // Entirely contained within the selection
-            m_internalCount++;
-            break;
-
-        case 0b01: // Has only input(s) outside the selection
-            elemPos.x = -g_gridSize;
-            elemPos.y = (int)((size_t)g_gridSize * m_inputCount);
-            m_inputCount++;
-            break;
-
-        case 0b10: // Has only output(s) outside the selection
-            elemPos.x = g_gridSize;
-            elemPos.y = (int)((size_t)g_gridSize * m_outputCount);
-            m_outputCount++;
-            break;
-
-        case 0b11: // Connects externally both on input and output
-            
-            // The output transistor will be created here
-            elemPos.x = g_gridSize;
-            elemPos.y = (int)((size_t)g_gridSize * m_outputCount);
-            m_outputCount++;
-            rectangle.m_cornerMax.y = Max(elemPos.y, rectangle.m_cornerMax.y);
-
-            {
-                Transistor* output = new Transistor(position + elemPos);
-                toBePushed.push_back(output); // We'll push them all at once later so we don't invalidate the iterator.
-                ++m_componentTransistorCount;
-
-                /*********************
-                *
-                *   i-->a-->o
-                *   becomes
-                *   i-->a-->b-->o
-                *
-                *   i-->a-->o
-                *   i---'
-                *   becomes
-                *   i-->a-->b-->o
-                *   i---'
-                *
-                *   i-->a-->o
-                *       '-->o
-                *   becomes
-                *   i-->a-->b-->o
-                *           '-->o
-                *
-                *   i-->a-->o
-                *   i---"-->o
-                *   becomes
-                *   i-->a-->b-->o
-                *   i---'   '-->o
-                *
-                *********************/
-                // Find *which* output to connect (non-exclusive)
-                if (externalIO & 0b0100)
-                {
-                    output->output[0].connector = elem->output[0].connector;
-                    elem->output[0].connector = output;
-                    int port = output->output[0].connector->GetInputIndex(elem);
-                    output->output[0].connector->input[port] = output;
-                }
-                if (externalIO & 0b1000)
-                {
-                    output->output[1].connector = elem->output[1].connector;
-                    if (elem->output[0].connector != output) elem->output[1].connector = output; // There may already be an internal connection in output[0]
-                    int port = output->output[1].connector->GetInputIndex(elem);
-                    output->output[1].connector->input[port] = output;
-                }
-            }
-
-            // elem will always be the input
-            elemPos.x = -g_gridSize;
-            elemPos.y = (int)((size_t)g_gridSize * m_inputCount++);
-            break;
-        }
-        rectangle.m_cornerMax.y = Max(elemPos.y, rectangle.m_cornerMax.y);
-        elem->SetPos(position + elemPos);
+        rectangle.m_cornerMax.y = Max(elem->GetPos().y, rectangle.m_cornerMax.y);
+        elem->SetPos(position + elem->GetPos());
         elem->SetComponent(this);
     }
+
     selection.reserve(selection.size() + toBePushed.size());
-    for (Transistor* push : toBePushed)
+    for (ID_t push : toBePushed)
     {
         selection.push_back(push);
     }
@@ -131,50 +42,6 @@ Component::Component(std::vector<Transistor*>& selection, Int2 position)
     m_caseShape = rectangle;
     m_caseShape.Move(position);
     m_caseShape.GrowBorder(1);
-
-    printf("Position: { %i, %i }", position.x, position.y);
-    printf("Rectangle: {\n    x = %i,\n    y = %i,\n    width = %i,\n    height = %i\n}\n", m_caseShape.m_cornerMin.x, m_caseShape.m_cornerMin.y, m_caseShape.Range().x, m_caseShape.Range().y);
-
-    m_componentTransistors = new Transistor[m_componentTransistorCount]();
-
-    size_t currentIndex[3] = { 0, m_inputCount, m_componentTransistorCount - m_outputCount }; // { inputs, internals, outputs }
-    for (Transistor* elem : selection)
-    {
-        char externalIO = 1;
-
-        if ((!elem->input[0].connector && !elem->input[1].connector) ||
-            (elem->input[0].connector) && (std::find(selection.begin(), selection.end(), elem->input[0].connector) == selection.end()) ||
-            (elem->input[1].connector) && (std::find(selection.begin(), selection.end(), elem->input[1].connector) == selection.end()))
-        {
-            externalIO = 0;
-        }
-        else if ((!elem->output[0].connector && !elem->output[1].connector) ||
-            (elem->output[0].connector) && (std::find(selection.begin(), selection.end(), elem->output[0].connector) == selection.end()) ||
-            (elem->output[1].connector) && (std::find(selection.begin(), selection.end(), elem->output[1].connector) == selection.end()))
-        {
-            externalIO = 2;
-        }
-
-        printf("%p belongs in sector %i\n", elem, externalIO);
-
-        if ((currentIndex[externalIO]) < m_componentTransistorCount)
-        {
-            if (externalIO == 1) elem->Hide();
-
-            memcpy(m_componentTransistors + (currentIndex[externalIO]), elem, sizeof(Transistor));
-            m_componentTransistors[(currentIndex[externalIO])].Hide();
-
-            printf("Transistor [%i] of the component is now: %p\n", int(currentIndex[externalIO]), m_componentTransistors + (currentIndex[externalIO]));
-            elem->ClearReferences();
-            delete elem;
-            elem = nullptr;
-            currentIndex[externalIO]++;
-        }
-    }
-    for (size_t i = 0; i < m_componentTransistorCount; ++i)
-    {
-        printf("Transistor [%zu] confirmed to be %p.\n", i, m_componentTransistors + i);
-    }
 }
 
 Component::Component(const Component& src)
@@ -182,120 +49,67 @@ Component::Component(const Component& src)
     s_allComponents.push_back(this);
 
     m_caseShape = src.m_caseShape;
-    m_inputCount = src.m_inputCount;
-    m_internalCount = src.m_internalCount;
-    m_outputCount = src.m_outputCount;
-    m_componentTransistorCount = src.m_componentTransistorCount;
+    GetInputs().reserve(src.GetInputCount());
+    GetInternals().reserve(src.GetInternalCount());
+    GetOutputs().reserve(src.GetOutputCount());
 
-    m_componentTransistors = new Transistor[m_componentTransistorCount];
-    if (m_componentTransistors) memcpy(m_componentTransistors, src.m_componentTransistors, (sizeof(Transistor) * m_componentTransistorCount));
-}
+    std::vector<ID_t> srcIDs = src.GetTransistors();
+    std::vector<ID_t&> destIDs = GetTransistorRefs();
 
-Component::~Component()
-{
-    for (size_t i = 0; i < m_componentTransistorCount; ++i)
+    for (size_t i = 0; i < GetTotalCount(); ++i)
     {
-        m_componentTransistors[i].ClearReferences();
+        destIDs[i] = srcIDs[i];
     }
-    delete[] m_componentTransistors;
-    printf("Component containing %zu transistors deleted!\n", m_componentTransistorCount);
 }
 
-size_t Component::GetInputCount() const
-{
-    return m_inputCount;
-}
+size_t Component::GetInputCount() const { return m_componentTransistors[0].size(); }
 
-size_t Component::GetOutputCount() const
-{
-    return m_outputCount;
-}
+size_t Component::GetInternalCount() const { return m_componentTransistors[1].size(); }
 
-size_t Component::GetInternalCount() const
-{
-    return m_internalCount;
-}
+size_t Component::GetOutputCount() const { return m_componentTransistors[2].size(); }
 
-size_t Component::GetTotalCount() const
-{
-    return m_componentTransistorCount;
-}
+size_t Component::GetTotalCount() const { return GetInputCount() + GetInternalCount() + GetTotalCount(); }
 
-std::vector<Transistor*> Component::GetInputs()
-{
-    std::vector<Transistor*> arr;
-    arr.reserve(m_inputCount);
+std::vector<ID_t>& Component::GetInputs() { return m_componentTransistors[0]; }
 
-    for (size_t i = 0; i < m_inputCount; ++i)
-    {
-        arr.push_back(m_componentTransistors + i);
+std::vector<ID_t>& Component::GetInternals() { return m_componentTransistors[1]; }
+
+std::vector<ID_t>& Component::GetOutputs() { return m_componentTransistors[2]; }
+
+std::vector<ID_t> Component::GetTransistors() const
+{
+    std::vector<ID_t> arr;
+    arr.reserve(GetTotalCount());
+
+    for (const std::vector<ID_t>& _arr : m_componentTransistors) {
+        for (ID_t t : _arr) {
+            arr.push_back(t);
+        }
     }
 
     return arr;
 }
 
-void Component::ForEachInput(void(*func)(Transistor& elem, size_t index))
+std::vector<ID_t&> Component::GetTransistorRefs()
 {
-}
+    std::vector<ID_t&> arr;
+    arr.reserve(GetTotalCount());
 
-std::vector<Transistor*> Component::GetInternals()
-{
-    std::vector<Transistor*> arr;
-    arr.reserve(m_internalCount);
-
-    for (size_t i = m_inputCount; i < (m_inputCount + m_internalCount); ++i)
-    {
-        arr.push_back(m_componentTransistors + i);
+    for (std::vector<ID_t>& _arr : m_componentTransistors) {
+        for (ID_t& t : _arr) {
+            arr.push_back(t);
+        }
     }
 
     return arr;
 }
 
-void Component::ForEachInternal(void(*func)(Transistor& elem, size_t index))
+void Component::SelectTransistors(std::vector<ID_t>& selection)
 {
-}
+    selection.reserve(selection.size() + GetTotalCount());
 
-std::vector<Transistor*> Component::GetOutputs()
-{
-    std::vector<Transistor*> arr;
-    arr.reserve(m_outputCount);
-
-    for (size_t i = (m_componentTransistorCount - m_outputCount); i < m_componentTransistorCount; ++i)
-    {
-        arr.push_back(m_componentTransistors + i);
-    }
-
-    return arr;
-}
-
-void Component::ForEachOutput(void(*func)(Transistor& elem, size_t index))
-{
-}
-
-std::vector<Transistor*> Component::GetTransistors()
-{
-    std::vector<Transistor*> arr;
-    arr.reserve(m_outputCount);
-
-    for (size_t i = 0; i < m_componentTransistorCount; ++i)
-    {
-        arr.push_back(m_componentTransistors + i);
-    }
-
-    return arr;
-}
-
-void Component::ForEachTransistor(void(*func)(Transistor& elem, size_t index))
-{
-}
-
-void Component::SelectTransistors(std::vector<Transistor*>& selection)
-{
-    selection.reserve(selection.size() + m_componentTransistorCount);
-
-    for (size_t i = 0; i < m_componentTransistorCount; ++i)
-    {
-        selection.push_back(m_componentTransistors + i);
+    for (ID_t id : GetTransistors()) {
+        selection.push_back(id);
     }
 }
 
@@ -324,20 +138,24 @@ void Component::UpdateCasing()
     Int2 min = Int2(INT_MAX);
     Int2 max = Int2(INT_MIN);
     
-    auto updateCorners = [&](Transistor* elem) {
-        Int2 checkPos = elem->GetPos();
+    auto updateCorners = [&](ID_t elem) {
+        Int2 checkPos = Transistor::s_transistorMap.find(elem)->second->GetPos();
         min.x = Min(min.x, checkPos.x);
         min.y = Min(min.y, checkPos.y);
         max.x = Max(max.x, checkPos.x);
         max.y = Max(max.y, checkPos.y);
     };
 
-    for (size_t i = 0; i < m_componentTransistorCount; ++i) {
-        if (i == m_inputCount) {
-            i += m_internalCount - 1; // Skip internals
+    for (size_t i = 0; i < GetTotalCount(); ++i) {
+        if (i == GetInputCount()) {
+            i += GetInternalCount() - 1; // Skip internals
             continue;
         }
-        updateCorners(m_componentTransistors + i);
+        int bucket;
+        if (i > (GetInputCount() + GetInternalCount())) bucket = 2;
+        else if (i > GetInputCount()) bucket = 1;
+        else bucket = 0;
+        updateCorners(m_componentTransistors[bucket][i]);
     }
 
     m_caseShape.m_cornerMin = min;
@@ -361,11 +179,10 @@ void Component::Highlight(Color color)
     Icon(color);
 }
 
-void Component::ClearReferences()
+void Component::Destroy()
 {
-    for (size_t i = 0; i < m_componentTransistorCount; ++i)
-    {
-        m_componentTransistors[i].ClearReferences();
+    for (ID_t id : GetTransistors()) {
+        Transistor::Destroy(id);
     }
     Erase(s_allComponents, this);
 }

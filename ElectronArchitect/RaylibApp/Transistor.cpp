@@ -53,44 +53,60 @@ Int2 Transistor::JointPos(Int2 start, Int2 end, Connection::Shape direction)
     }
 }
 
-Validator<Transistor>* Transistor::Get(ID_t id)
+bool Transistor::ANY(std::vector<Transistor*>& in)
 {
-    if (IsIDValid(id))
-    {
-        auto it = s_transistorMap.find(id);
-        if (it != s_transistorMap.end() && it->second.IsValid()) return &it->second;
+    for (Transistor* elem : in) {
+        if (elem->GetEvaluation()) return true;
     }
-    return nullptr;
+    return false;
 }
 
-ID_t Transistor::Create(const Transistor& transistor)
+bool Transistor::NOR(std::vector<Transistor*>& in)
 {
-    auto it = s_transistorMap.find(s_validTransistorCount);
-    if (it != s_transistorMap.end())
-    {
-        printf("What the fuck is going on here?...\n");
-    }
-    else
-    {
-        std::pair<ID_t, Validator<Transistor>> insertion;
-        insertion.first = s_validTransistorCount;
-        insertion.second = Validator<Transistor>(transistor);
-        s_transistorMap.insert(insertion);
-    }
-    return s_validTransistorCount++;
+    return !ANY(in);
 }
 
-ID_t Transistor::Create()
+bool Transistor::AND(std::vector<Transistor*>& in)
 {
-    return Create(Transistor());
+    for (Transistor* elem : in) {
+        if (!elem->GetEvaluation()) return false;
+    }
+    return true;
+}
+
+bool Transistor::XOR(std::vector<Transistor*>& in)
+{
+    bool b;
+    for (Transistor* elem : in) {
+        if (elem->GetEvaluation()) {
+            if (!b) b = true;
+            else return false;
+        }
+    }
+    return b;
+}
+
+Transistor* Transistor::Get(ID_t id)
+{
+    auto it = s_transistorMap.find(id);
+    if (s_transistorMap.valid(it)) return it->second;
+    else return nullptr;
+}
+
+ID_t Transistor::Create(Int2 _pos = Int2(), Gate _type = Gate::Simple)
+{
+    Transistor* t = new Transistor(_pos, _type);
+    ID_t id = s_transistorMap.push(t);
+    t->myID = id;
+    return id;
 }
 
 void Transistor::Destroy(const ID_t id)
 {
     auto it = s_transistorMap.find(id);
-    if (it != s_transistorMap.end())
-    {
-        it->second.Invalidate();
+    if (s_transistorMap.valid(it)) {
+        delete it->second;
+        s_transistorMap.erase(id);
     }
 }
 
@@ -120,44 +136,48 @@ void Transistor::SetComponent(Component* component)
     containingComponent = component;
 }
 
-void Transistor::SetDrawnThisFrame(bool set)
+Transistor::Flag Transistor::operator|(Flag a, Flag b)
 {
-    if (set) flags |= DRAWN_TF; // Set true
-    else flags ^= (flags & DRAWN_TF); // Set false
+    return Flag((unsigned char)a | (unsigned char)b);
 }
 
-void Transistor::SetEvaluatedThisFrame(bool set)
+unsigned char Transistor::TestFlags(unsigned char flags) const
 {
-    if (set) flags |= EVALUATED_TF; // Set true
-    else flags ^= (flags & EVALUATED_TF); // Set false
+    return flags & flags;
+}
+unsigned char Transistor::TestFlags(Flag flags) const
+{
+    return TestFlags((unsigned char)flags);
+}
+void Transistor::SetFlags(unsigned char flags, unsigned char set)
+{
+    flags = ((flags & ~flags) | (set & flags));
 }
 
-void Transistor::SetBeingEvaluated(bool set)
+void Transistor::SetFlags(Flag flags, unsigned char set)
 {
-    if (set) flags |= BEING_EVALUATED; // Set true
-    else flags ^= (flags & BEING_EVALUATED); // Set false
+    SetFlags((unsigned char)flags, set);
 }
 
-void Transistor::SetCurrentEvaluation(bool set)
+void Transistor::SetFlags(unsigned char flags, bool set)
 {
-    if (set) flags |= EVALUATION; // Set true
-    else flags ^= (flags & EVALUATION); // Set false
+    SetFlags(flags, (set ? (unsigned char)0b11111111 : (unsigned char)0b00000000));
 }
 
-void Transistor::SetHidden(bool set)
+void Transistor::SetFlags(Flag flags, bool set)
 {
-    if (set) flags |= IS_HIDDEN; // Set true
-    else flags ^= (flags & IS_HIDDEN); // Set false
+    SetFlags((unsigned char)flags, set);
 }
+
 
 void Transistor::Hide()
 {
-    SetHidden(true);
+    SetFlags(Flag::IS_HIDDEN, true);
 }
 
 void Transistor::UnHide()
 {
-    SetHidden(false);
+    SetFlags(Flag::IS_HIDDEN, false);
 }
 
 void Transistor::DrawSnappedLine(Vector2 start, Vector2 end, Color color, Connection::Shape direction)
@@ -242,7 +262,7 @@ void Transistor::Icon(Color color, float size) const
 
 void Transistor::Draw()
 {
-    if (!IsHidden() && !IsDrawnThisFrame())
+    if (!TestFlags(Flag::IS_HIDDEN | Flag::DRAWN_TF))
     {
         bool b_startNode = (OutputOnly());
         bool b_endNode = (InputOnly());
@@ -253,38 +273,21 @@ void Transistor::Draw()
 
         DrawWires(); // TODO: Find a better place for this
 
-        if (type == Gate::Diode && CurrentEvaluation()) DrawCircleV((Vector2)pos, 8.0f, ColorAlpha(WHITE, 0.5)); // Diode glow
+        if (type == Gate::Diode && GetEvaluation()) DrawCircleV((Vector2)pos, 8.0f, ColorAlpha(WHITE, 0.5)); // Diode glow
         
-        Icon(color, (((pos.x == cursorPos.x || pos.y == cursorPos.y) && (IsMouseButtonDown(MOUSE_LEFT_BUTTON) || IsMouseButtonDown(MOUSE_MIDDLE_BUTTON))) ? (g_gridSize * 0.6f) : (g_gridSize * 0.5f)));
+        Icon(color,
+             (((pos.x == cursorPos.x || pos.y == cursorPos.y) && (IsMouseButtonDown(MOUSE_LEFT_BUTTON) || IsMouseButtonDown(MOUSE_MIDDLE_BUTTON))) ?
+              (g_gridSize * 0.6f) :
+              (g_gridSize * 0.5f))
+        );
         
-        SetDrawnThisFrame(true);
+        SetFlags(Flag::DRAWN_TF, true);
     }
 }
 
 void Transistor::Highlight(Color color, float size) const
 {
     Icon(color, size);
-}
-
-int Transistor::WhichInputSocketAmI(ID_t connector) const
-{
-    if (connector == input[0].connector) return 0;
-    else if (connector == input[1].connector) return 1;
-    else return -1;
-}
-
-int Transistor::WhichOutputSocketAmI(ID_t connector) const
-{
-    if (connector == output[0].connector) return 0;
-    else if (connector == output[1].connector) return 1;
-    else return -1;
-}
-
-bool Transistor::IsConnected(ID_t connector) const
-{
-    if ((connector == input[0].connector) || (connector == output[0].connector) ||
-        (connector == input[1].connector) || (connector == output[1].connector)) return true;
-    else return false;
 }
 
 Int2 Transistor::GetPos() const
@@ -304,26 +307,22 @@ void Transistor::ChangePos(Int2 amount)
 
 bool Transistor::SolderInput(ID_t connection, Connection::Shape direction)
 {
-    Connection* mine = AvailIn();
-    Connection* theirs = Get(connection)->GetPayload_Copy().AvailOut();
-    if (mine && theirs)
+    auto it = s_transistorMap.find(connection);
+    if (s_transistorMap.valid(it))
     {
-        mine->connector = connection;
-        theirs->connector = MyID();
-        theirs->shape = direction;
+        prev.emplace_back(Connection(connection, direction));
+        it->second->next.emplace_back(Connection(myID, direction));
         return true;
     }
     else return false;
 }
 bool Transistor::SolderOutput(ID_t connection, Connection::Shape direction)
 {
-    Connection* mine = AvailOut();
-    Connection* theirs = connection->AvailIn();
-    if (mine && theirs)
+    auto it = s_transistorMap.find(connection);
+    if (s_transistorMap.valid(it))
     {
-        mine->connector = connection;
-        theirs->connector = this;
-        mine->shape = direction;
+        next.emplace_back(Connection(connection, direction));
+        it->second->prev.emplace_back(Connection(myID, direction));
         return true;
     }
     else return false;
@@ -347,157 +346,126 @@ bool Transistor::DesolderOutput(ID_t what)
 
 bool Transistor::OutputOnly() const
 {
-    return (!input[0].connector && !input[1].connector);
+    return (prev.empty() && !next.empty());
 }
 
 bool Transistor::InputOnly() const
 {
-    return (!output[0].connector && !output[1].connector);
+    return (!prev.empty() && next.empty());
 }
 
 bool Transistor::ConnectsExternally() const
 {
-    return (input[0].connector || input[1].connector || output[0].connector || output[1].connector);
+    return (!prev.empty() || !next.empty());
 }
 
-bool Transistor::IsDrawnThisFrame() const
+bool Transistor::IsDisconnected() const
 {
-    return (flags & DRAWN_TF);
+    return (prev.empty() && next.empty());
 }
 
-bool Transistor::IsEvaluatedThisFrame() const
+std::vector<Transistor*> Transistor::Validate(std::vector<Connection>& arr)
 {
-    return (flags & EVALUATED_TF);
+    std::vector<Transistor*> valid;
+    valid.reserve(arr.size()); // We can be certain there will be at MOST prev.size() valid inputs
+
+    std::vector<unsigned int> invalidConnectors;
+    invalidConnectors.reserve(arr.size()); // We can be certain there will be at MOST prev.size() invalids
+
+    for (int i = 0; i < arr.size(); ++i) {
+        auto it = s_transistorMap.find(arr[i].connector);
+        if (s_transistorMap.valid(it)) valid.push_back(it->second);
+        else invalidConnectors.push_back(i);
+    }
+    EraseMulti(arr, invalidConnectors);
+
+    return valid;
 }
 
-bool Transistor::IsBeingEvaluated() const
+ID_t Transistor::GetID()
 {
-    return (flags & BEING_EVALUATED);
-}
-
-bool Transistor::CurrentEvaluation() const
-{
-    return (flags & EVALUATION);
-}
-
-bool Transistor::IsHidden() const
-{
-    return (flags & IS_HIDDEN);
+    return myID;
 }
 
 void Transistor::Evaluate()
 {
-    if (IsBeingEvaluated()) SetEvaluatedThisFrame(true); // Probably a loop. Just pass the existing evaluation.
-    if (IsEvaluatedThisFrame()) return; // Skip the whole function
+    if (TestFlags(Flag::BEING_EVALUATED)) SetFlags(Flag::EVALUATED_TF, true); // Probably a loop. Just pass the existing evaluation.
+    if (TestFlags(Flag::EVALUATED_TF)) return; // Skip the whole function
 
-    SetBeingEvaluated(true);
+    SetFlags(Flag::BEING_EVALUATED, true);
 
-    if (OutputOnly()) // 0 inputs
-    {
-        SetCurrentEvaluation(false);
+    std::vector<Transistor*> validInputs = Validate(prev);
+
+    if (OutputOnly()) { // 0 inputs
+        if (GetGateType() == Gate::Invert) SetFlags(Flag::EVALUATION, true);
+        else SetFlags(Flag::EVALUATION, false);
     }
-    else if (input[0].connector && input[1].connector) // 2 inputs
-    {
+    else { // Non-0 inputs
         switch (type)
         {
-        default: // OR/NOR
-            SetCurrentEvaluation((input[0].connector->GetEvaluation() || input[1].connector->GetEvaluation()));
+        default: // OR
+            SetFlags(Flag::EVALUATION, ANY(validInputs));
+            break;
+        case Gate::Invert: // NOR
+            SetFlags(Flag::EVALUATION, NOR(validInputs));
             break;
         case Gate::Combine: // AND
-            SetCurrentEvaluation((input[0].connector->GetEvaluation() && input[1].connector->GetEvaluation()));
+            SetFlags(Flag::EVALUATION, AND(validInputs));
             break;
         case Gate::Choose: // XOR
-            SetCurrentEvaluation(((input[0].connector->GetEvaluation()) ? (!input[1].connector->GetEvaluation()) : (input[1].connector->GetEvaluation())));
+            SetFlags(Flag::EVALUATION, XOR(validInputs));
             break;
         }
     }
-    else // 1 input
-    {
-        ID_t evalInput = (input[0].connector ? input[0].connector : input[1].connector);
-        SetCurrentEvaluation(evalInput->GetEvaluation());
-    }
-    if (type == Gate::Invert) SetCurrentEvaluation(!CurrentEvaluation());
 
-    SetEvaluatedThisFrame(true);
-    SetBeingEvaluated(false);
-}
-
-Transistor::Connection* Transistor::AvailIn()
-{
-    if (!input[0].connector) return &(input[0]);
-    else if (!input[1].connector) return &(input[1]);
-    else return nullptr;
-}
-
-Transistor::Connection* Transistor::AvailOut()
-{
-    if (!output[0].connector) return &(output[0]);
-    else if (!output[1].connector) return &(output[1]);
-    else return nullptr;
+    SetFlags(Flag::EVALUATED_TF | Flag::BEING_EVALUATED, Flag::EVALUATED_TF);
 }
 
 bool Transistor::GetEvaluation()
 {
-    Evaluate();
-    return CurrentEvaluation();
+    if (!Flag::EVALUATED_TF) Evaluate();
+    return TestFlags(Flag::EVALUATION);
 }
 
 void Transistor::DrawWires()
 {
-    Color color = WHITE;
-    float thickness = 0.5f;
-    if (GetEvaluation())
-    {
+    Color color;
+    float thickness;
+
+    if (GetEvaluation()) {
         color = RED;
         thickness = 1;
     }
-    if (output[0].connector && !output[0].connector->IsHidden()) DrawSnappedLine((Vector2)GetPos(), (Vector2)output[0].connector->GetPos(), color, output[0].shape);
-    if (output[1].connector && !output[1].connector->IsHidden()) DrawSnappedLine((Vector2)GetPos(), (Vector2)output[1].connector->GetPos(), color, output[1].shape);
+    else {
+        color = WHITE;
+        thickness = 0.5f;
+    }
+
+    Validate(next);
+
+    for (Connection wire : next)
+    {
+        Transistor* transistor = s_transistorMap.find(wire.connector)->second;
+
+        if (!transistor->TestFlags(Flag::IS_HIDDEN)) {
+            DrawSnappedLine( (Vector2)GetPos(), (Vector2)transistor->GetPos(), color, wire.shape );
+        }
+    }
 }
 
 // Called at the end of every frame
-void Transistor::FrameReset()
-{
-    SetDrawnThisFrame(false);
-    SetEvaluatedThisFrame(false);
-}
+void Transistor::FrameReset() { SetFlags(Flag::DRAWN_TF | Flag::EVALUATED_TF, false); }
 
-void Transistor::ClearReferences()
-{
-    // Replace references to myself with nullptrs
-    if (input[0].connector)
-    {
-        int myIndex = input[0].connector->GetOutputIndex(this);
-        if (myIndex != -1) input[0].connector->output[myIndex] = nullptr;
-    }
-    if (input[1].connector)
-    {
-        int myIndex = input[1].connector->GetOutputIndex(this);
-        if (myIndex != -1) input[1].connector->output[myIndex] = nullptr;
-    }
-    if (output[0].connector)
-    {
-        int myIndex = output[0].connector->GetInputIndex(this);
-        if (myIndex != -1) output[0].connector->input[myIndex] = nullptr;
-    }
-    if (output[1].connector)
-    {
-        int myIndex = output[1].connector->GetInputIndex(this);
-        if (myIndex != -1) output[1].connector->input[myIndex] = nullptr;
-    }
-    Erase(s_allTransistors, this); // Stop tryina draw the damn thing.
-}
+void Transistor::Connection::IncrementShape() { shape = (Shape)(((int)shape + 1) % (int)Shape::Size); }
 
-void Transistor::Connection::IncrementShape()
-{
-    shape = (Shape)(((int)shape + 1) % (int)Shape::Size);
-}
+Transistor::Connection::Shape Transistor::Connection::NextShape(Shape input) { return Shape((int)input + 1); }
 
-Transistor::Connection::Shape Transistor::Connection::NextShape(Shape input)
-{
-    return Shape((int)input + 1);
-}
+ID_t::operator uint32_t() { return id; }
+Transistor* ID_t::operator->() { return Transistor::s_transistorMap.find(*this)->second; }
+Transistor* ID_t::operator*() { return Transistor::s_transistorMap.find(*this)->second; }
+ID_t& ID_t::operator=(ID_t b) { id = b; return *this; }
+ID_t::operator bool() { return Transistor::s_transistorMap.valid(*this); }
 
-std::unordered_map<ID_t, Validator<Transistor>> g_TMap;
+bool ID_t::operator==(ID_t b) { return id == b.id; }
 
-std::unordered_map<ID_t, Validator<Transistor>> s_transistorMap;
+bool ID_t::operator!=(ID_t b) { return id != b.id; }
