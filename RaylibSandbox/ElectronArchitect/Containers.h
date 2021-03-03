@@ -143,32 +143,60 @@ private:
     KeyList_t invalids;
 };
 
+
 // A connection for routing signals between objects of different types. Specifically gates/units.
 struct ComponentID {
-    ComponentID() : tag(State_Null), gateID(IDMap_Gate::nPos) {};
-    ComponentID(GateID_t _gateID) : tag(State_GateID), gateID(_gateID) {};
-    ComponentID(UnitID_t _unitID) : tag(State_UnitID), unitID{ _unitID } {};
+    ComponentID()                 : tag(Comp_NullID), gateID(IDMap_Gate::nPos) {};
+    ComponentID(GateID_t _gateID) : tag(Comp_GateID), gateID(_gateID) {};
+    ComponentID(UnitID_t _unitID) : tag(Comp_UnitID), unitID{ _unitID } {};
 
     ComponentID& operator=(GateID_t _gateID) {
-        tag = State_GateID;
+        tag = Comp_GateID;
         gateID = _gateID;
     };
     ComponentID& operator=(UnitID_t _unitID) {
-        tag = State_UnitID;
+        tag = Comp_UnitID;
         unitID = _unitID;
     };
 
     enum Tag {
-        State_Null,   // Null
-        State_GateID, // Gate
-        State_UnitID, // Unit
+        Comp_NullID, // Null
+        Comp_GateID, // Gate
+        Comp_UnitID, // Unit
     } tag;
 
     union {
         GateID_t gateID; // Gate
         UnitID_t unitID; // Unit
     };
+
+    template<Tag tag> struct ComponentIDType {};
+    template<> struct ComponentIDType<Tag::Comp_NullID> {
+        using MapType       = nullptr_t;
+        using MapRefType    = nullptr_t;
+        using ValueType     = nullptr_t;
+        using KeyType       = nullptr_t;
+    };
+    template<> struct ComponentIDType<Tag::Comp_GateID> {
+        using MapType       = IDMap_Gate;
+        using MapRefType    = MapType&;
+        using ValueType     = typename MapType::Value_t;
+        using KeyType       = typename MapType::Key_t;
+    };
+    template<> struct ComponentIDType<Tag::Comp_UnitID> {
+        using MapType       = IDMap_Unit;
+        using MapRefType    = MapType&;
+        using ValueType     = typename MapType::Value_t;
+        using KeyType       = typename MapType::Key_t;
+    };
+
+    template<Tag what> typename ComponentIDType<what>::KeyType get();
+    template<> typename ComponentIDType<Tag::Comp_NullID>::KeyType get<Tag::Comp_NullID>() { return nullptr; }
+    template<> typename ComponentIDType<Tag::Comp_GateID>::KeyType get<Tag::Comp_GateID>() { return gateID;  }
+    template<> typename ComponentIDType<Tag::Comp_UnitID>::KeyType get<Tag::Comp_UnitID>() { return unitID;  }
 };
+
+
 
 struct VoxelArray {
 public:
@@ -207,38 +235,36 @@ public:
         return voxels[Index(pos)];
     }
 
-    template<ComponentID::Tag what>
-    Gate* Get(Int3 at) {
+#define WHAT_META typename ComponentID::ComponentIDType<what>
+#define TAG ComponentID::Tag
+
+    template<TAG what> WHAT_META::MapRefType GetMap();
+    template<> IDMap_Gate& GetMap<TAG::Comp_GateID>() { return gates; }
+    template<> IDMap_Unit& GetMap<TAG::Comp_UnitID>() { return units; }
+
+    template<TAG what>
+    WHAT_META::KeyType get(Int3 at) {
         if (InRange(at)) {
             const ComponentID& id = ID_At(at);
             if (id.tag == what)
-                return gates.find(id.gateID)->second;
+                return GetMap<what>().find(id.get<what>())->second;
         }
         return nullptr;
     }
 
-    Unit* UnitAt(Int3 pos) {
-        if (InRange(pos)) {
-            const ComponentID& id = ID_At(pos);
-            if (id.tag == ComponentID::State_UnitID)
-                return units.find(id.unitID)->second;
-        }
-        return nullptr;
+    template<TAG what>
+    WHAT_META::KeyType push(WHAT_META::ValueType component, Int3 at) {
+        GateID_t id = GetMap<what>().push(component);
+        ID_At(at) = ComponentID(id);
+        return id;
+    }
+    template<TAG what>
+    void erase(WHAT_META::KeyType _gateID) {
+        GetMap<what>().erase(_gateID);
     }
 
-    GateID_t push(IDMap_Gate::Value_t _gate, Int3 at) {
-        auto id = gates.push(_gate);
-        ComponentID(id)
-    }
-    UnitID_t push(IDMap_Unit::Value_t _unit, Int3 at) {
-        return units.push(_unit);
-    }
-    void erase(GateID_t _gateID) {
-        gates.erase(_gateID);
-    }
-    void erase(UnitID_t _unitID) {
-        units.erase(_unitID);
-    }
+#undef WHAT_META
+#undef TAG
 
 private:
     int xWidth;

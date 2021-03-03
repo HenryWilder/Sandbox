@@ -98,7 +98,7 @@ int main()
 			wireEnd = Vector2Snap(worldMousePos, 1.0f);
 		}
 		if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
-			world.push(new Gate());
+			world.push(Gate());
 		}
 
 		#pragma endregion
