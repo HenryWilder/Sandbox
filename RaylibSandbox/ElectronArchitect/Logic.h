@@ -3,6 +3,16 @@
 #include <variant>
 #include <array>
 
+enum class WireShape : char {
+	XFirst = 'x',
+	YFirst = 'y',
+
+	DiagFirst = 'd',
+	DiagLast = 'l',
+};
+WireShape operator++(WireShape shape);
+WireShape operator--(WireShape shape);
+
 struct Gate;
 struct Unit;
 struct Batt;

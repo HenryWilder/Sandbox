@@ -1,5 +1,22 @@
 #include "Logic.h"
 
+WireShape operator++(WireShape shape) {
+	switch (shape) {
+	case WireShape::XFirst:		return WireShape::YFirst;
+	case WireShape::YFirst:		return WireShape::DiagFirst;
+	case WireShape::DiagFirst:	return WireShape::DiagLast;
+	case WireShape::DiagLast:	return WireShape::XFirst;
+	}
+}
+WireShape operator-(WireShape shape) {
+	switch (shape) {
+	case WireShape::XFirst:		return WireShape::DiagLast;
+	case WireShape::YFirst:		return WireShape::XFirst;
+	case WireShape::DiagFirst:	return WireShape::YFirst;
+	case WireShape::DiagLast:	return WireShape::DiagFirst;
+	}
+}
+
 Gate::Mode operator++(Gate::Mode m) {
 	switch (m) {
 	case Gate::Mode::OR:  return Gate::Mode::AND;
