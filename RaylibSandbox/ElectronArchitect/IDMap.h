@@ -55,51 +55,6 @@ public:
     Map_Iter_t LongKey(KEY key) { return (NullIter() | reinterpret_cast<Map_Iter_t>(key)); }
     Map_Iter_t IntIter(Map_Iter_t it) { return reinterpret_cast<unsigned long long>(it); }
 
-    template<IDMap& map, bool foundBool = (sizeof(KEY) > (sizeof(Map_Iter_t) / 2))> struct ID_t {};
-
-    // This is the version which uses the deadspace in the space between the key and iterator types to determine which it is
-    template<IDMap& map> struct ID_t<IDMap& map, false> {
-    public:
-        ID_t() : it(NullIter()) {};
-        ID_t(KEY _key) : it(LongKey(_key)) {};
-        ID_t(Map_Iter_t _it) : it(_it) {};
-
-        operator bool() {
-            if (found()) {
-                return map.valid(key);
-            }
-        }
-
-    private:
-        bool found() { return (IntIter(it) >> sizeof(KEY)); }
-
-        union {
-            KEY key;
-            Map_Iter_t it;
-        };
-    };
-    // This is the version which uses a member boolean to determine whether the union is a key or an iterator (useful for when there is a negligable size difference between key and iter)
-    template<IDMap& map> struct ID_t<IDMap& map, true> {
-    public:
-        ID_t() : key(nPos), b_found(false) {};
-        ID_t(KEY _key) : key(_key), b_found(false) {};
-        ID_t(Map_Iter_t _it) : it(_it), b_found(true) {};
-
-        operator bool() {
-            return
-        }
-
-    private:
-        bool found() { return b_found; }
-
-        union {
-            KEY key;
-            Map_Iter_t it;
-        };
-        bool b_found;
-    };
-
-
 private:
     Map_t items;
     KeyList_t invalids;

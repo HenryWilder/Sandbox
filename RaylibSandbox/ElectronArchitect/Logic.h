@@ -2,6 +2,7 @@
 #include <vector>
 #include <variant>
 #include <array>
+#include <unordered_map>
 
 enum class WireShape : char {
 	XFirst = 'x',
@@ -17,24 +18,19 @@ struct Gate;
 struct Unit;
 struct Batt;
 
+// A connection for routing signals between objects of different types. Specifically gates/units.
 struct IOPort {
-	IOPort()
-		: tag(State_Gate), gate(nullptr) {
-		unitPort.port = 0;
-	};
+	IOPort() 
+		: tag(State_Gate), gate(nullptr) { unitPort.port = 0; };
 
-	IOPort(Gate* _gate)
-		: tag(State_Gate), gate(_gate) {
-		unitPort.port = 0;
-	};
+	IOPort(Gate* _gate) 
+		: tag(State_Gate), gate(_gate) { unitPort.port = 0; };
 
-	IOPort(Unit* _unit, int _port)
+	IOPort(Unit* _unit, int _port) 
 		: tag(State_UnitPort), unitPort{ _unit, _port } {};
 
-	IOPort(Batt* _batt)
-		: tag(State_Batt), batt(_batt) {
-		unitPort.port = 0;
-	};
+	IOPort(Batt* _batt) 
+		: tag(State_Batt), batt(_batt) { unitPort.port = 0; };
 
 	IOPort& operator=(Gate* _gate);
 	IOPort& operator=(std::pair<Unit*, int> _unitPort);
@@ -60,9 +56,11 @@ struct IOPort {
 		Batt* batt;								// Battery with 1 input and 1 output which a circuit must both come from and end at
 	};
 };
+// An IOPort with the ability to read the current state of the port
 struct IPort : public IOPort {
 	bool GetState();
 };
+// An IOPort
 struct OPort : public IOPort {
 
 };

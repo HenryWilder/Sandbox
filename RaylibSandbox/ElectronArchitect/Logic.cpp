@@ -218,22 +218,21 @@ void Unit::SetWidth(int _lanes, Mode _mode) {
 	if (!LanesOut()) lanes_out = _lanes;
 }
 
-IOPort& IOPort::operator=(Gate* _gate)
-{
+IOPort& IOPort::operator=(Gate* _gate) {
+	if (tag == State_UnitPort) unitPort.port = 0;
 	tag = State_Gate;
 	gate = _gate;
 	return *this;
 }
 
-IOPort& IOPort::operator=(std::pair<Unit*, int> _unitPort)
-{
+IOPort& IOPort::operator=(std::pair<Unit*, int> _unitPort) {
 	tag = State_UnitPort;
 	unitPort = { _unitPort.first, _unitPort.second };
 	return *this;
 }
 
-IOPort& IOPort::operator=(Batt* _batt)
-{
+IOPort& IOPort::operator=(Batt* _batt) {
+	if (tag == State_UnitPort) unitPort.port = 0;
 	tag = State_Batt;
 	batt = _batt;
 	return *this;

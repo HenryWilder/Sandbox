@@ -1,78 +1,14 @@
-#include <raylib.h>
-#include <raymath.h>
-#include "Logic.h"
 #include <bitset>
 #include <iostream>
 #include <string>
 
-int Log2(int val) {
-	int steps = 0;
-	while (val) {
-		val /= 2;
-		++steps;
-	}
-	return steps;
-}
+#include <raylib.h>
+#include <raymath.h>
 
-float Round(float f) {
-	if (f >= 0.0f)
-		return (float)((int)(f + 0.5f));
-	else
-		return (float)((int)(f - 0.5f));
-}
+#include "Logic.h"
 
-Vector2 Vector2Round(Vector2 vec) {
-	return Vector2{ Round(vec.x), Round(vec.y) };
-}
-
-Vector2 Vector2Snap(Vector2 vec, float to) {
-	return Vector2Scale(Vector2Round(Vector2Scale(vec, 1.0f / to)), to);
-}
-
-Color DepthColor(Color color, float z, float target, float zoom) {
-	return ColorAlpha(color, 1.0f - ((abs(target - z) * zoom)) / 32);
-};
-
-void DrawWire(Vector2 start, Vector2 end, WireShape shape, bool b_state, float depth, float targetDepth, float zoom) {
-	Color color = DepthColor((b_state ? RED : WHITE), depth, targetDepth, zoom);
-	float thick = (float)Log2(Round(targetDepth) - Round(depth));
-
-	float xLength = abs(end.x - start.x);
-	float yLength = abs(end.y - start.y);
-
-	float& shortLength = (xLength < yLength ? xLength : yLength);
-
-	Vector2 vectorToEnd = {
-		(start.x < end.x ? 1.0f : -1.0f),
-		(start.y < end.y ? 1.0f : -1.0f),
-	};
-
-	Vector2 joint;
-
-	switch (shape)
-	{
-	case WireShape::XFirst:
-		joint = { end.x, start.y };
-		break;
-	case WireShape::YFirst:
-		joint = { start.x, end.y };
-		break;
-
-	case WireShape::DiagFirst:
-		joint = Vector2Add(start, Vector2Scale(vectorToEnd, shortLength));
-		break;
-	case WireShape::DiagLast:
-		joint = Vector2Subtract(end, Vector2Scale(vectorToEnd, shortLength));
-		break;
-
-	default:
-		joint = start;
-		break;
-	}
-	DrawLineV(start, joint, color);
-	DrawLineV(joint, end, color);
-	
-}
+#include "Containers.h"
+#include "Main.h"
 
 int main()
 {
@@ -105,7 +41,6 @@ int main()
 		);
 	};
 
-
 	Vector2 mousePos{};
 	Vector2 worldMousePos{};
 	Vector2 mousePos_last{};
@@ -125,6 +60,8 @@ int main()
 		worldPixel.width = width.y;
 		worldPixel.height = width.y;
 	};
+
+	VoxelArray world;
 
 	while (!WindowShouldClose())
 	{
@@ -159,6 +96,9 @@ int main()
 		}
 		if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
 			wireEnd = Vector2Snap(worldMousePos, 1.0f);
+		}
+		if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
+			world.push(new Gate());
 		}
 
 		#pragma endregion
@@ -205,4 +145,68 @@ int main()
 
 	CloseWindow();
 }
-	
+
+int Log2(int val) {
+	int steps = 0;
+	while (val) {
+		val /= 2;
+		++steps;
+	}
+	return steps;
+}
+
+float Round(float f) {
+	if (f >= 0.0f)
+		return (float)((int)(f + 0.5f));
+	else
+		return (float)((int)(f - 0.5f));
+}
+
+Vector2 Vector2Round(Vector2 vec) {
+	return Vector2{ Round(vec.x), Round(vec.y) };
+}
+
+Vector2 Vector2Snap(Vector2 vec, float to) {
+	return Vector2Scale(Vector2Round(Vector2Scale(vec, 1.0f / to)), to);
+}
+
+Color DepthColor(Color color, float z, float target, float zoom) {
+	return ColorAlpha(color, 1.0f - ((abs(target - z) * zoom)) / 32);
+};
+
+void DrawWire(Vector2 start, Vector2 end, WireShape shape, bool b_state, float depth, float targetDepth, float zoom) {
+	Color color = DepthColor((b_state ? RED : WHITE), depth, targetDepth, zoom);
+	float thick = (float)Log2(Round(targetDepth) - Round(depth));
+
+	Vector2 joint;
+
+	if (shape == WireShape::DiagFirst || shape == WireShape::DiagLast)
+	{
+		float xLength = abs(end.x - start.x);
+		float yLength = abs(end.y - start.y);
+
+		float& shortLength = (xLength < yLength ? xLength : yLength);
+
+		Vector2 vectorToEnd = {
+			(start.x < end.x ? 1.0f : -1.0f),
+			(start.y < end.y ? 1.0f : -1.0f),
+		};
+
+		if (shape == WireShape::DiagFirst)
+			joint = Vector2Add(start, Vector2Scale(vectorToEnd, shortLength));
+		else if (shape == WireShape::DiagLast)
+			joint = Vector2Subtract(end, Vector2Scale(vectorToEnd, shortLength));
+	}
+	else if (shape == WireShape::XFirst || shape == WireShape::YFirst) 
+	{
+		if (shape == WireShape::XFirst)
+			joint = { end.x, start.y };
+		else if (shape == WireShape::YFirst)
+			joint = { start.x, end.y };
+	}
+	else joint = start;
+
+	DrawLineV(start, joint, color);
+	DrawLineV(joint, end, color);
+
+}
