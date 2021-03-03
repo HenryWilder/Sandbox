@@ -1,74 +1,138 @@
 #include <raylib.h>
+#include <raymath.h>
 #include "Logic.h"
 #include <bitset>
 #include <iostream>
 #include <string>
 
+float Round(float f) {
+	if (f >= 0.0f)
+		return (float)((int)(f + 0.5f));
+	else
+		return (float)((int)(f - 0.5f));
+}
+
+Vector2 Vector2Round(Vector2 vec) {
+	return Vector2{ Round(vec.x), Round(vec.y) };
+}
+
+Vector2 Vector2Snap(Vector2 vec, float to) {
+	return Vector2Scale(Vector2Round(Vector2Scale(vec, 1.0f / to)), to);
+}
+
 int main()
 {
+	int windowWidth = 1280;
+	int windowHeight = 720;
+	InitWindow(windowWidth, windowHeight,"Electron Architect");
+	SetTargetFPS(30);
 
-	0b0100111001101001011000110110010100100001;
+	Camera2D camera;
+	camera.offset = { };
+	camera.target = { };
+	camera.rotation = 0.0f;
+	camera.zoom = 8.0f;
 
-	return 0;
+	Vector2 cameraPos = { (float)windowWidth * 0.5f, (float)windowHeight * 0.5f };
 
-	enum class Token : uint64_t {
-		Apple = ('a' | ('p' << 010) | ('p' << 020) | ('l' << 030) | ('e' << 040)),
+	float depth = 0.0f;
+
+	auto DepthColor = [&](Color color, float z) {
+		return ColorAlpha(color, 1.0f - ((abs(depth - z) * camera.zoom)) / 32);
 	};
-	std::string input;
-	std::cin >> input;
-	uint64_t token = *reinterpret_cast<const uint64_t*>(input.c_str());
-	printf("\n%s\n", (char*)&token);
 
-	return 0;
+	Vector2 mousePos{};
+	Vector2 worldMousePos{};
+	Vector2 mousePos_last{};
+	Vector2 worldMousePos_last{};
 
-	auto BoolStr = [](bool b) {
-		return (b ? "True" : "False");
+	Rectangle worldPixel;
+	auto UpdateWorldPixel = [&] {
+		Vector2 pos = GetScreenToWorld2D({ 0, 0 }, camera);
+		Vector2 width = Vector2Subtract(GetScreenToWorld2D({ 0, 1 }, camera), GetScreenToWorld2D({ 0, 0 }, camera));
+
+		worldPixel.x = pos.x;
+		worldPixel.y = pos.y;
+		worldPixel.width = width.y;
+		worldPixel.height = width.y;
 	};
-	auto Evaluate = [&](Gate::Mode method, std::vector<bool> in) {
-		return BoolStr(Gate::Eval(method, in));
-	};
-	auto EvaluateEach = [&](std::vector<bool> in) {
-		printf("AND: %s\nOR:  %s\nNOR: %s\nXOR: %s\n", Evaluate(Gate::Mode::AND, in), Evaluate(Gate::Mode::OR, in), Evaluate(Gate::Mode::NOR, in), Evaluate(Gate::Mode::XOR, in));
-	};
-	auto PrintArray = [&](std::vector<bool> in) {
-		printf("{ ");
-		for (bool b : in) {
-			printf("%s, ", BoolStr(b));
+
+	while (!WindowShouldClose())
+	{
+		#pragma region Simulate
+
+		mousePos_last = mousePos;
+		mousePos = GetMousePosition();
+
+		worldMousePos_last = worldMousePos;
+		worldMousePos = GetScreenToWorld2D(mousePos, camera);
+		
+		if (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON))
+		{
+			Vector2 mouse_delta = Vector2Subtract(mousePos, mousePos_last);
+			Vector2 worldMouse_delta = Vector2Subtract(worldMousePos, worldMousePos_last);
+
+			cameraPos = Vector2Add(cameraPos, mouse_delta);
 		}
-		printf("}\n");
-	};
+		if (IsMouseButtonReleased(MOUSE_MIDDLE_BUTTON))
+		{
+			cameraPos = Vector2Snap(cameraPos, camera.zoom);
+		}
 
-	/*
-	std::vector<bool> in{0,0,0,0};
-	PrintArray(in);
-	EvaluateEach(in);
+		if (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) {
+			if (GetMouseWheelMove() > 0.0f) camera.zoom *= 2.0f;
+			if (GetMouseWheelMove() < 0.0f) camera.zoom *= 0.5f;
+		}
+		else depth += GetMouseWheelMove();
 
-	in = { 1,0,0,0 };
-	PrintArray(in);
-	EvaluateEach(in);
+#pragma endregion
 
-	in = { 1,1,1,1 };
-	PrintArray(in);
-	EvaluateEach(in);
+#pragma region Draw
 
-	in = { 0,1,0,0 };
-	PrintArray(in);
-	EvaluateEach(in);
-	*/
+		BeginDrawing(); {
 
-	//unsigned long long a = '\0a';
-	//unsigned long long ab = '\0ba';
-	//unsigned long long abc = '\0cba';
-	//printf("%s : %i\n", &a, a);
-	//std::cout << std::bitset<sizeof(unsigned long long) * 8>(a) << '\n';
-	//printf("%s : %i { %i, %i }\n", &ab, ab, ab >> 010, ab % 256);
-	//std::cout << std::bitset<sizeof(unsigned long long) * 8>(ab) << '\n';
-	//printf("%s : %i { %i, %i, %i }\n", &abc, abc, abc >> 020, (abc >> 010) % 256, abc % 256);
-	//std::cout << std::bitset<sizeof(unsigned long long) * 8>(abc) << '\n';
+			camera.offset = Vector2Snap(cameraPos, camera.zoom);
+			UpdateWorldPixel();
 
-	//Gate::Mode m = Gate::Mode::AND;
-	//for (int i = 0; i < 10; ++i) {
-	//	printf("%c%c%c\n", Char(m, 0), Char(m, 1), Char(m, 2));
-	//	m = ++m;
-	//}
+			ClearBackground(BLACK);
+
+			BeginMode2D(camera); {
+
+				{
+					float screenRight = worldPixel.x + (worldPixel.width * windowWidth);
+					float screenBottom = worldPixel.y + (worldPixel.height * windowHeight);
+
+					for (float y = worldPixel.y; y <= screenBottom; y += (worldPixel.height * camera.zoom))
+					{
+						DrawLineV({ worldPixel.x, y }, { screenRight, y }, DARKGRAY);
+					}
+					for (float x = worldPixel.x; x <= screenRight; x += (worldPixel.width * camera.zoom))
+					{
+						DrawLineV({ x, worldPixel.y }, { x, screenBottom }, DARKGRAY);
+					}
+				}
+
+				DrawLineV({ 0, 0 }, { 10, 0 }, DepthColor(RED, 0.0f));
+				DrawLineV({ 0, 0 }, { 0, -10 }, DepthColor(GREEN, 0.0f));
+
+				srand(0);
+				for (int i = 0; i < 256; ++i) {
+					DrawCircleV({ (float)(rand() % 128 - 64), (float)(rand() % 128 - 64) }, 1.0f, DepthColor(WHITE, (float)(rand() % 16 - 8)));
+				}
+
+			} EndMode2D();
+
+			//DrawLineV(mousePos_last, mousePos, WHITE);
+
+			DrawText(TextFormat("{ %f, %f, %f }", camera.offset.x, camera.offset.y, depth), mousePos.x, mousePos.y, 8, WHITE);
+			DrawText(TextFormat("{ %f, %f }", worldMousePos.x, worldMousePos.y), mousePos.x, mousePos.y + 10, 8, WHITE);
+			DrawText(TextFormat("%f", camera.zoom), mousePos.x, mousePos.y + 20, 8, WHITE);
+
+		} EndDrawing();
+
+		#pragma endregion
+	}
+
+	CloseWindow();
 }
+	
