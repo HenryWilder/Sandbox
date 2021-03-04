@@ -1,6 +1,7 @@
 #include <bitset>
 #include <iostream>
 #include <string>
+#include <thread>
 
 #include <raylib.h>
 #include <raymath.h>
@@ -30,12 +31,11 @@ int main()
 	auto DepthColorLambda = [&](Color color, float z) {
 		return DepthColor(color, z, depth, camera.zoom);
 	};
-	auto DrawWireLambda = [&](Vector2 start, Vector2 end, WireShape shape, bool state, float z) {
+	auto DrawWireLambda = [&](Int3 start, Int3 end, WireShape shape, bool state) {
 		DrawWire(start,
 				 end,
 				 shape,
 				 state,
-				 z,
 				 depth,
 				 camera.zoom
 		);
@@ -46,8 +46,8 @@ int main()
 	Vector2 mousePos_last{};
 	Vector2 worldMousePos_last{};
 
-	Vector2 wireStart{};
-	Vector2 wireEnd{};
+	Int3 wireStart;
+	Int3 wireEnd;
 	WireShape wireShape = WireShape::XFirst;
 
 	Rectangle worldPixel;
@@ -61,7 +61,36 @@ int main()
 		worldPixel.height = width.y;
 	};
 
-	VoxelArray world;
+	VoxelArray world; {
+		std::atomic_bool b_ready = false;
+		std::atomic<unsigned int> validVoxelCount(0);
+		auto load = [&world, &b_ready, &validVoxelCount] {
+			world.voxels.reserve(010000 * 010000 * 000020);
+			for (validVoxelCount = 0; validVoxelCount < (010000 * 010000 * 000020); ++validVoxelCount) {
+				world.voxels.push_back(ComponentID());
+			}
+			b_ready = true;
+		};
+		std::thread worker(load);
+
+		float midScreen = (float)windowHeight * 0.2f;
+		float loadRight = (float)windowWidth * 0.3f;
+
+		while (!b_ready) {
+			BeginDrawing(); {
+
+				ClearBackground(BLACK);
+
+				DrawText("Please wait, allocating memory...", 16, 16, 32, RAYWHITE);
+				float fill = (((float)validVoxelCount.load() / (float)(010000 * 010000 * 000020)) * loadRight);
+				DrawLineEx({ 0.0f, midScreen }, { loadRight, midScreen }, 10.0f, DARKGRAY);
+				DrawLineEx({ 0.0f, midScreen }, { fill, midScreen }, 10.0f, BLUE);
+
+			} EndDrawing();
+		}
+		worker.join();
+	}
+	
 
 	while (!WindowShouldClose())
 	{
@@ -92,13 +121,31 @@ int main()
 		else depth += GetMouseWheelMove();
 
 		if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
-			wireStart = Vector2Snap(worldMousePos, 1.0f);
+			wireStart = Int3(worldMousePos, depth);
 		}
 		if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
-			wireEnd = Vector2Snap(worldMousePos, 1.0f);
+			wireEnd = Int3(worldMousePos, depth);
 		}
 		if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
-			world.push(Gate());
+			wireEnd = Int3(worldMousePos, depth);
+			if (wireEnd != wireStart) {
+				// Start gate
+				if (world.IsPointFree(wireStart)) {
+					Gate temp;
+					world.PushGate(temp, wireStart);
+				}
+				else {
+					world.GateAt(wireStart);
+				}
+				// End gate
+				if (world.IsPointFree(wireEnd)) {
+					Gate temp;
+					world.PushGate(temp, wireEnd);
+				}
+				else {
+					world.GateAt(wireEnd);
+				}
+			}
 		}
 
 		#pragma endregion
@@ -127,7 +174,7 @@ int main()
 				}
 
 				if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
-					DrawWireLambda(wireStart, wireEnd, wireShape, false, depth);
+					DrawWireLambda(wireStart, wireEnd, wireShape, false);
 				}
 
 			} EndMode2D();
@@ -174,9 +221,9 @@ Color DepthColor(Color color, float z, float target, float zoom) {
 	return ColorAlpha(color, 1.0f - ((abs(target - z) * zoom)) / 32);
 };
 
-void DrawWire(Vector2 start, Vector2 end, WireShape shape, bool b_state, float depth, float targetDepth, float zoom) {
-	Color color = DepthColor((b_state ? RED : WHITE), depth, targetDepth, zoom);
-	float thick = (float)Log2(Round(targetDepth) - Round(depth));
+void DrawWire(Int3 start, Int3 end, WireShape shape, bool b_state, float targetDepth, float zoom) {
+	Color color = DepthColor((b_state ? RED : WHITE), start.z, targetDepth, zoom);
+	float thick = (float)Log2(Round(targetDepth) - Round(start.z));
 
 	Vector2 joint;
 
@@ -193,20 +240,20 @@ void DrawWire(Vector2 start, Vector2 end, WireShape shape, bool b_state, float d
 		};
 
 		if (shape == WireShape::DiagFirst)
-			joint = Vector2Add(start, Vector2Scale(vectorToEnd, shortLength));
+			joint = Vector2Add(start.xy(), Vector2Scale(vectorToEnd, shortLength));
 		else if (shape == WireShape::DiagLast)
-			joint = Vector2Subtract(end, Vector2Scale(vectorToEnd, shortLength));
+			joint = Vector2Subtract(end.xy(), Vector2Scale(vectorToEnd, shortLength));
 	}
 	else if (shape == WireShape::XFirst || shape == WireShape::YFirst) 
 	{
 		if (shape == WireShape::XFirst)
-			joint = { end.x, start.y };
+			joint = { (float)end.x, (float)start.y };
 		else if (shape == WireShape::YFirst)
-			joint = { start.x, end.y };
+			joint = { (float)start.x, (float)end.y };
 	}
-	else joint = start;
+	else joint = start.xy();
 
-	DrawLineV(start, joint, color);
-	DrawLineV(joint, end, color);
+	DrawLineV(start.xy(), joint, color);
+	DrawLineV(joint, end.xy(), color);
 
 }
