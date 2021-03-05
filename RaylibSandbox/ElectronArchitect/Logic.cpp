@@ -43,6 +43,32 @@ char Char(Gate::Mode m, int i) {
 	if (c <= 0) return ' ';
 	else return c;
 }
+
+int EvaluationDepth(Component* comp) {
+	if (!comp) return 0; // Skip nullptrs
+
+	std::vector<IPort> inputArr;
+	if (Gate* gate = (Gate*)comp) inputArr = gate->in;
+	else if (Unit* unit = (Unit*)comp) {
+		// Unit's inputs are in a stack array with 64 members.
+		// We only need the usable subset of that.
+		inputArr.reserve(unit->LanesIn());
+		for (int i = 0; i < unit->LanesIn(); ++i) {
+			for (int ab = 0; ab < 2; ++ab) {
+				inputArr.push_back(unit->in[ab][i]);
+			}
+		}
+	}
+	else return 0; // Skip Batteries
+
+	int maxDepth = 0;
+	for (IPort& port : inputArr) {
+		int portDepth = EvaluationDepth(port.component);
+		if (portDepth > maxDepth) maxDepth = portDepth;
+	}
+	return maxDepth;
+}
+
 char Char(Unit::Mode m, int i) {
 	char c = (char)(((int)m / i) % 256);
 	if (c <= 0) return ' ';
@@ -218,6 +244,10 @@ void Unit::SetWidth(int _lanes, Mode _mode) {
 	if (!LanesOut()) lanes_out = _lanes;
 }
 
+bool Unit::IsPolymorphic() {
+	return true;
+}
+
 IOPort& IOPort::operator=(Gate* _gate) {
 	if (tag == State_UnitPort) unitPort.port = 0;
 	tag = State_Gate;
@@ -258,6 +288,10 @@ bool Gate::Eval(Mode method, std::vector<bool> inputs)
 	return (method == Mode::NOR ? !out : out);
 }
 
+bool Gate::IsPolymorphic() {
+	return true;
+}
+
 // Returns the state of the port, whatever its tag may be.
 bool IPort::GetState() {
 	switch (tag) {
@@ -265,4 +299,15 @@ bool IPort::GetState() {
 	case IOPort::State_Gate: if (gate) { return gate->GetState(); }
 	case IOPort::State_Batt: default: return false;
 	}
+}
+
+bool Batt::IsPolymorphic() {
+	return true;
+}
+
+IOPort::operator Gate* () {
+	return dynamic_cast<Gate*>(component);
+}
+IOPort::operator Unit* () {
+	return dynamic_cast<Unit*>(component);
 }

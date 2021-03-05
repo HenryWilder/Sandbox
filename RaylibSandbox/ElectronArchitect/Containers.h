@@ -5,10 +5,11 @@
 #include <array>
 #include <thread>
 #include <atomic>
+#include <stack>
 #include "Main.h"
 
 struct Int3 {
-    constexpr Int3() : x(), y(), z() {};
+    Int3() : x(), y(), z() {};
     constexpr Int3(int _x, int _y, int _z) : x(_x), y(_y), z(_z) {};
 
     Int3(Vector3 pos);
@@ -17,139 +18,109 @@ struct Int3 {
 
     bool operator==(const Int3& b);
     bool operator!=(const Int3& b);
+
     Vector2 xy();
     Vector3 xyz();
 
 	int x, y, z;
 };
 
-// The list of actual gates. This is what the map values are pointing at.
-struct GateMemory {
-public:
-    using Type      = Gate;
-    using ListType  = std::list<Type>;
-    using Iter      = typename ListType::iterator;
+struct IntRect {
+    IntRect() : x1(), y1(), w(), h() {};
+    constexpr IntRect(int _x, int _y, int _w, int _h) : x1(_x), y1(_y), w(_w), h(_h) {};
 
-    Iter push(const Type& _gate);
-    Iter end();
-    void erase(GateMemory::Iter at);
+    IntRect(Rectangle rec);
 
-private:
-    ListType items;
+    operator Rectangle();
+
+    int x2(); // x + w
+    int y2(); // y + h
+
+    int x1, y1, w, h;
 };
+bool CheckInt3InsideIntRect(Int3 pt, IntRect rec);
 
-// The list of actual units. This is what the map values are pointing at.
-struct UnitMemory {
+class GameData {
 public:
-    using Type      = Unit;
-    using ListType  = std::list<Type>;
-    using Iter      = typename ListType::iterator;
 
-    Iter push(const Type& _gate);
-    Iter end();
-    void erase(Iter at);
+    using ID_t = uint32_t;
 
-private:
-    ListType items;
-};
+    class IDMap
+    {
+    public:
+        using Key_t     = GameData::ID_t;
+        using Value_t   = Component*;
 
-using GateID_t = uint32_t;
-struct Gate;
-class IDMap_Gate
-{
-public:
-    using Key_t         = GateID_t;
-    using Value_t       = GateMemory::Iter;
+        using Map_t         = std::unordered_map<Key_t, Value_t>;
+        using Map_Iter_t    = typename Map_t::iterator;
+        using Map_CIter_t   = typename Map_t::const_iterator;
+        using KeyList_t     = std::list<Key_t>;
 
-    using Map_t         = std::unordered_map<Key_t, Value_t>;
-    using Map_Iter_t    = typename Map_t::iterator;
-    using Map_CIter_t   = typename Map_t::const_iterator;
-    using KeyList_t     = std::list<Key_t>;
+        static constexpr Key_t null_key = (Key_t)(0);
 
-    static constexpr Key_t nPos = (Key_t)(0);
+        IDMap();
 
-    IDMap_Gate();
+        bool valid(Map_CIter_t elem);
+        bool valid(Key_t key);
 
-    bool valid(Map_CIter_t elem);
-    bool valid(Key_t key);
+        Map_Iter_t find(Key_t id);
 
-    Map_Iter_t find(Key_t id);
+        Key_t push(Value_t val);
+        void erase(Key_t id);
 
-    Key_t push(Value_t val);
+        auto begin();
+        auto end();
+        auto size();
 
-    void erase(Key_t id);
-
-    auto begin();
-    auto end();
-    auto size();
-
-private:
-    Map_t items;
-    KeyList_t invalids;
-};
-
-using UnitID_t = uint16_t;
-struct Unit;
-class IDMap_Unit
-{
-public:
-    using Key_t         = UnitID_t;
-    using Value_t       = UnitMemory::Iter;
-
-    using Map_t         = std::unordered_map<Key_t, Value_t>;
-    using Map_Iter_t    = typename Map_t::iterator;
-    using Map_CIter_t   = typename Map_t::const_iterator;
-    using KeyList_t     = std::list<Key_t>;
-
-    static constexpr Key_t nPos = (Key_t)(0);
-
-    IDMap_Unit();
-
-    bool valid(Map_CIter_t elem);
-    bool valid(Key_t key);
-
-    Map_Iter_t find(Key_t id);
-
-    Key_t push(Value_t val);
-
-    void erase(Key_t id);
-
-    auto begin();
-    auto end();
-    auto size();
-
-private:
-    Map_t items;
-    KeyList_t invalids;
-};
-
-struct ComponentID {
-    ComponentID();
-    ComponentID(GateID_t _gateID);
-    ComponentID(UnitID_t _unitID);
-
-    ComponentID& operator=(nullptr_t _null);
-    ComponentID& operator=(GateID_t _gateID);
-    ComponentID& operator=(UnitID_t _unitID);
-
-    enum {
-        Comp_NullID, // Null
-        Comp_GateID, // Gate
-        Comp_UnitID, // Unit
-    } tag;
-
-    union {
-        GateID_t gateID; // Gate
-        UnitID_t unitID; // Unit
+    private:
+        Map_t items;
+        KeyList_t invalids;
     };
-};
 
-struct VoxelArray {
+    class EvalOrder {
+    public:
+        struct DepthLayer {
+            std::vector<GameData::ID_t> componentIDs;
+        };
+
+        void EvaluateAll(GameData::IDMap& source);
+        void Organize();
+
+    private:
+        std::vector<DepthLayer> order;
+    };
+
+    class TreeNode {
+    public:
+        using ElementType = ID_t;
+
+        enum class Quad {
+            TL, TR,
+            BL, BR,
+        };
+
+        TreeNode() : coverage(), children{ nullptr, nullptr, nullptr, nullptr }, elements() {};
+        TreeNode(IntRect _coverage) : coverage(_coverage), children{ nullptr, nullptr, nullptr, nullptr }, elements() {};
+
+        int Navigate(int x, int y);
+
+        std::vector<ElementType>& GetElements();
+
+    private:
+        IntRect coverage;
+        std::array<TreeNode*, 4> children;
+        std::vector<ElementType> elements;
+    };
+
+private:
+    int xWidth, yHeight, zDepth;            // Size of the world (zDepth will usually be only a few layers)
+    IDMap m_idSystem;                       // ID handler for components (turns ID numbers into component pointers)
+    EvalOrder m_order;                      // Order of evaluation for components
+    std::vector<TreeNode*> m_worldLayers;   // Quad-Tree nodes for quickly locating components on the screen
+
 public:
-    VoxelArray();
-    VoxelArray(int _xWidth, int _yHeight, int _zDepth);
-
-    VoxelArray& operator=(const VoxelArray&);
+    GameData();
+    GameData(int _xWidth, int _yHeight, int _zDepth);
     
     int XWidth(); int YHeight(); int ZDepth();
                                    
@@ -173,19 +144,4 @@ public:
     UnitID_t PushUnit(const Unit& unit, Int3 at);
 
     void EraseAt(Int3 at);
-
-    size_t ResizedMemory();
-
-private:
-    std::atomic_int64_t validVoxelCount;
-
-    int xWidth, yHeight, zDepth;
-
-    GateMemory gate_mem;
-    UnitMemory unit_mem;
-
-    IDMap_Gate gates;
-    IDMap_Unit units;
-public:
-    std::vector<ComponentID> voxels;
 };

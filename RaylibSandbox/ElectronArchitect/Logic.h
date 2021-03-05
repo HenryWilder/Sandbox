@@ -14,47 +14,21 @@ enum class WireShape : char {
 WireShape operator++(WireShape shape);
 WireShape operator--(WireShape shape);
 
+struct Component {
+	virtual bool IsPolymorphic() = 0;
+};
+
 struct Gate;
 struct Unit;
 struct Batt;
 
 // A connection for routing signals between objects of different types. Specifically gates/units.
 struct IOPort {
-	IOPort() 
-		: tag(State_Gate), gate(nullptr) { unitPort.port = 0; };
+	explicit operator Gate* ();
+	explicit operator Unit* ();
 
-	IOPort(Gate* _gate) 
-		: tag(State_Gate), gate(_gate) { unitPort.port = 0; };
-
-	IOPort(Unit* _unit, int _port) 
-		: tag(State_UnitPort), unitPort{ _unit, _port } {};
-
-	IOPort(Batt* _batt) 
-		: tag(State_Batt), batt(_batt) { unitPort.port = 0; };
-
-	IOPort& operator=(Gate* _gate);
-	IOPort& operator=(std::pair<Unit*, int> _unitPort);
-	IOPort& operator=(Batt* _batt);
-
-	enum {
-		State_Gate,								// Use "gate"
-		State_UnitPort,							// Use "unit" and find the "port"th element in its inputs/outputs
-		State_Batt								// Use batt
-	} tag;
-
-	union {
-		// Gate
-		Gate* gate;								// Singular gate
-
-		// Unit
-		struct {
-			Unit* unit;							// Unit with multiple inputs/outputs
-			int port;							// Which port on the Unit
-		} unitPort;
-
-		// Battery
-		Batt* batt;								// Battery with 1 input and 1 output which a circuit must both come from and end at
-	};
+	Component* component;
+	Int3 pos;
 };
 // An IOPort with the ability to read the current state of the port
 struct IPort : public IOPort {
@@ -66,13 +40,15 @@ struct OPort : public IOPort {
 };
 
 // Battery/power supply. All circuits must both start & end at a battery.
-struct Batt {
+struct Batt : public Component {
 	OPort head;									// Start of a circuit
 	IPort tail;									// End of a circuit
+
+	bool IsPolymorphic() override;
 };
 
 // Effectively a transistor/junction. Variable inputs, logical evaluation, variable outputs.
-struct Gate {
+struct Gate : public Component {
 	// Logical eval method
 	enum class Mode : int {
 		OR   = '||',							// Any
@@ -86,10 +62,10 @@ struct Gate {
 	// Returns the evaluation of the inputs using the supplied evaluation method.
 	static bool Eval(Mode method, std::vector<bool> inputs);
 
-private:
+	bool IsPolymorphic() override;
+
 	Gate::Mode mode;							// How to handle evaluation
-	bool state : 1;								// The current state of the transistor
-	bool dirty : 1;								// Whether the gate needs to be re-evaluated
+	bool state;									// The current state of the transistor
 
 	std::vector<IPort> in;						// Vector of all inputs to this transistor
 	std::vector<OPort> out;						// Vector of all outputs this transistor leads to
@@ -99,7 +75,7 @@ Gate::Mode operator--(Gate::Mode m);			// Returns the "last" mode. Returns Mode(
 char Char(Gate::Mode m, int i);					// Returns the symbol at the supplied position i
 
 // Acts as an arithmatic unit or self-contained processor circuit. "Typed" inputs, bitwise/arithmatic evaluation, "Typed" outputs.
-struct Unit {
+struct Unit : public Component {
 	// Arithmatic/bitwise eval method
 	enum class Mode : int {
 		OR =  '|',								// Bitwise
@@ -142,16 +118,19 @@ struct Unit {
 	// Sets the number of lanes in the unit. Updates the mode in the process.
 	void SetWidth(int _lanes, Mode _mode = Mode('err'));
 
-private:
+	bool IsPolymorphic() override;
+
 	Unit::Mode mode;							// How to process the states
 	size_t state;								// The bits in the component
 
 	int lanes_in, lanes_out;					// How many (of the maximum 64) lanes are used for input/output
 
-	std::array<IPort, 64> in;					// Transistors to take the state from
-	std::array<OPort, 64> out;					// Transistors to send the state to
+	std::vector<IPort> in[2];					// Transistors to take the state from
+	std::vector<OPort> out;						// Transistors to send the state to
 };
 
 Unit::Mode operator++(Unit::Mode m);			// Returns the "next" mode. Returns Mode('err') on failure. NOTE: Will not modify passed var!
 Unit::Mode operator--(Unit::Mode m);			// Returns the "last" mode. Returns Mode('err') on failure. NOTE: Will not modify passed var!
 char Char(Unit::Mode m, int i);					// Returns the symbol at the supplied position i
+
+int EvaluationDepth(Component* comp);
