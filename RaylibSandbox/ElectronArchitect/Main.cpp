@@ -40,48 +40,8 @@ int Round(float f) {
 		return ((int)(f - 0.5f));
 }
 
-Vector2 Vector2Round(Vector2 vec) { return Vector2{ Round(vec.x), Round(vec.y) }; }
+Vector2 Vector2Round(Vector2 vec) { return Vector2{ (float)Round(vec.x), (float)Round(vec.y) }; }
 Vector2 Vector2Snap(Vector2 vec, float to) { return Vector2Scale(Vector2Round(Vector2Scale(vec, 1.0f / to)), to); }
-
-#pragma endregion
-#pragma region Drawing
-
-Color DepthColor(Color color, float z, float target, float zoom) { return ColorAlpha(color, 1.0f - ((abs(target - z) * zoom)) / 32); };
-void DrawWire(Int3 start, Int3 end, WireShape shape, bool b_state, float targetDepth, float zoom) {
-	Color color = DepthColor((b_state ? RED : WHITE), start.z, targetDepth, zoom);
-	float thick = (float)Log2(Round(targetDepth) - Round(start.z));
-
-	Vector2 joint;
-
-	if (shape == WireShape::DiagFirst || shape == WireShape::DiagLast)
-	{
-		float xLength = abs(end.x - start.x);
-		float yLength = abs(end.y - start.y);
-
-		float& shortLength = (xLength < yLength ? xLength : yLength);
-
-		Vector2 vectorToEnd = {
-			(start.x < end.x ? 1.0f : -1.0f),
-			(start.y < end.y ? 1.0f : -1.0f),
-		};
-
-		if (shape == WireShape::DiagFirst)
-			joint = Vector2Add(start.xy(), Vector2Scale(vectorToEnd, shortLength));
-		else if (shape == WireShape::DiagLast)
-			joint = Vector2Subtract(end.xy(), Vector2Scale(vectorToEnd, shortLength));
-	}
-	else if (shape == WireShape::XFirst || shape == WireShape::YFirst)
-	{
-		if (shape == WireShape::XFirst)
-			joint = { (float)end.x, (float)start.y };
-		else if (shape == WireShape::YFirst)
-			joint = { (float)start.x, (float)end.y };
-	}
-	else joint = start.xy();
-
-	DrawLineV(start.xy(), joint, color);
-	DrawLineV(joint, end.xy(), color);
-}
 
 #pragma endregion
 #pragma region Integer positions
@@ -100,7 +60,7 @@ struct Int3 {
 	bool operator==(const Int3& b) { return (x == b.x && y == b.y && z == b.z); }
 	bool operator!=(const Int3& b) { return (x != b.x || y != b.y || z != b.z); }
 
-	Vector2 xy()  { return Vector2{ (float)x, (float)y }; }
+	Vector2 xy() { return Vector2{ (float)x, (float)y }; }
 	Vector3 xyz() { return Vector3{ (float)x, (float)y, (float)z }; }
 
 	int x, y, z;
@@ -112,7 +72,7 @@ struct IntRect {
 
 	IntRect(Rectangle rec) : x1(Round(rec.x)), y1(Round(rec.y)), w(Round(rec.width)), h(Round(rec.height)) {};
 
-	operator Rectangle() { return Rectangle{ x1, y1, w, h }; }
+	operator Rectangle() { return Rectangle{ (float)x1, (float)y1, (float)w, (float)h }; }
 
 	// x + w
 	int x2() { return x1 + w; }
@@ -127,21 +87,7 @@ bool CheckInt3InsideIntRect(Int3 pt, IntRect rec) {
 }
 
 #pragma endregion
-#pragma endregion
-
-
-//   _____                                             _
-//  / ____|                                           | |
-// | |     ___  _ __ ___  _ __   ___  _ __   ___ _ __ | |_ ___ 
-// | |    / _ \| '_ ` _ \| '_ \ / _ \| '_ \ / _ \ '_ \| __/ __|
-// | |___| (_) | | | | | | |_) | (_) | | | |  __/ | | | |_\__ \
-//  \_____\___/|_| |_| |_| .__/ \___/|_| |_|\___|_| |_|\__|___/
-//                       | |
-//                       |_|
-
-
-#pragma region Components
-#pragma region Wires
+#pragma region Drawing
 
 enum class WireShape : char {
 	XFirst = 'x',
@@ -167,28 +113,76 @@ WireShape operator-(WireShape shape) {
 	}
 }
 
+Color DepthColor(Color color, float z, float target, float zoom) {
+	return ColorAlpha(color, 1.0f - ((abs(target - z) * zoom)) / 32);
+}
+Vector2 JointPos(Int3 start, Int3 end, WireShape shape) {
+	if (shape == WireShape::DiagFirst || shape == WireShape::DiagLast)
+	{
+		float xLength = abs(end.x - start.x);
+		float yLength = abs(end.y - start.y);
+
+		float& shortLength = (xLength < yLength ? xLength : yLength);
+
+		Vector2 vectorToEnd = {
+			(start.x < end.x ? 1.0f : -1.0f),
+			(start.y < end.y ? 1.0f : -1.0f),
+		};
+
+		if (shape == WireShape::DiagFirst)
+			return Vector2Add(start.xy(), Vector2Scale(vectorToEnd, shortLength));
+		else // (shape == WireShape::DiagLast)
+			return Vector2Subtract(end.xy(), Vector2Scale(vectorToEnd, shortLength));
+	}
+	else if (shape == WireShape::XFirst)
+		return Vector2{ (float)end.x, (float)start.y };
+	else if (shape == WireShape::YFirst)
+		return Vector2{ (float)start.x, (float)end.y };
+	else
+		return start.xy();
+}
+void DrawWire(Int3 start, Int3 end, WireShape shape, bool b_state, float targetDepth, float zoom) {
+	Color color = DepthColor((b_state ? RED : WHITE), start.z, targetDepth, zoom);
+
+	Vector2 joint = JointPos(start, end, shape);
+
+	DrawLineV(start.xy(), joint, color);
+	DrawLineV(joint, end.xy(), color);
+}
+
 #pragma endregion
+#pragma endregion
+
+
+//   _____                                             _
+//  / ____|                                           | |
+// | |     ___  _ __ ___  _ __   ___  _ __   ___ _ __ | |_ ___ 
+// | |    / _ \| '_ ` _ \| '_ \ / _ \| '_ \ / _ \ '_ \| __/ __|
+// | |___| (_) | | | | | | |_) | (_) | | | |  __/ | | | |_\__ \
+//  \_____\___/|_| |_| |_| .__/ \___/|_| |_|\___|_| |_|\__|___/
+//                       | |
+//                       |_|
+
+
+#pragma region Components
 #pragma region Polymorphism
 
 // Makes it possible to dynamic cast to any component type. Because it's easier than using std::variant. TRUST ME.
 struct Component {
+	Int3 pos;
 	// To apease the polymorphism god
 	virtual bool IsPolymorphic() = 0;
 };
 
+struct Gate;
+struct Unit;
+
 // A connection for routing signals between objects of different types. Specifically gates/units.
 struct IOPort {
-	explicit operator Gate*() {
-		if (Gate* gate = dynamic_cast<Gate*>(component)) return gate;
-		else return nullptr;
-	}
-	explicit operator Unit*() {
-		if (Unit* unit = dynamic_cast<Unit*>(component)) return unit;
-		else return nullptr;
-	}
+	explicit operator Gate* ();
+	explicit operator Unit* ();
 
 	Component* component;
-	Int3 pos;
 };
 // An IOPort with the ability to read the current state of the port
 struct IPort : public IOPort {
@@ -309,9 +303,8 @@ struct Unit : public Component {
 	}
 
 	// Returns the evaluation of a & b using the supplied evaluation method.
-	static size_t Eval(Mode method, size_t a, size_t b = 0) {
-		switch (method)
-		{
+	static size_t Eval(Mode method, size_t a, size_t b) {
+		switch (method) {
 		case Unit::Mode::OR:  return (a | b);
 		case Unit::Mode::AND: return (a & b);
 		case Unit::Mode::XOR: return (a ^ b);
@@ -455,31 +448,21 @@ Unit::Mode operator--(Unit::Mode m) {
 	}
 }
 
-int EvaluationDepth(Component* comp) {
-	if (!comp) return 0; // Skip nullptrs
+#pragma endregion
+#pragma region IO Ports
 
-	std::vector<IPort> inputArr;
-	if (Gate* gate = (Gate*)comp) inputArr = gate->in;
-	else if (Unit* unit = (Unit*)comp) {
-		// Unit's inputs are in a stack array with 64 members.
-		// We only need the usable subset of that.
-		inputArr.reserve(unit->LanesIn());
-		for (int i = 0; i < unit->LanesIn(); ++i) {
-			for (int ab = 0; ab < 2; ++ab) {
-				inputArr.push_back(unit->in[ab][i]);
-			}
-		}
-	}
-	else return 0; // Skip Batteries
-
-	int maxDepth = 0;
-	for (IPort& port : inputArr) {
-		int portDepth = EvaluationDepth(port.component);
-		if (portDepth > maxDepth) maxDepth = portDepth;
-	}
-	return maxDepth;
+IOPort::operator Gate*() {
+	if (Gate* gate = dynamic_cast<Gate*>(component)) return gate;
+	else return nullptr;
 }
-
+IOPort::operator Unit*() {
+	if (Unit* unit = dynamic_cast<Unit*>(component)) return unit;
+	else return nullptr;
+}
+bool IPort::GetState() {
+	if (Gate* gate = (Gate*)component) return gate->GetState();
+	if (Unit* unit = (Unit*)component) return unit->GetBit(0); // TODO: This is DEFINITELY wrong.
+}
 #pragma endregion
 #pragma endregion
 
@@ -490,12 +473,22 @@ int EvaluationDepth(Component* comp) {
 // | |    / _ \| '_ \| __/ _` | | '_ \ / _ \ '__/ __| 
 // | |___| (_) | | | | || (_| | | | | |  __/ |  \__ \ 
 //  \_____\___/|_| |_|\__\__,_|_|_| |_|\___|_|  |___/ 
-       
 
-#pragma region Containers
+
+#pragma region Game Data
 
 namespace GameData {
-	int g_xWidth, g_yHeight, g_zDepth; // Size of the world (g_zDepth will usually be only a few layers)
+	int g_xWidth  = 010000;
+	int g_yHeight = 010000;
+	int g_zDepth  = 000020;
+
+	int XWidth()  { return g_xWidth;  }
+	int YHeight() { return g_yHeight; }
+	int ZDepth()  { return g_zDepth;  }
+
+	int XMax() { return XWidth()  / 2; } int XMin() { return XMax() - XWidth();  }
+	int YMax() { return YHeight() / 2; } int YMin() { return YMax() - YHeight(); }
+	int ZMax() { return ZDepth()  / 2; } int ZMin() { return ZMax() - ZDepth();  }
 
 	// Handles IDs and component pointers
 	namespace IDMap {
@@ -508,8 +501,8 @@ namespace GameData {
 		using KeyList_t		= std::list<Key_t>;							KeyList_t invalids;
 
 		void Init() {
-			idMap[null_key] = null_val;
-			null_iter = idMap.find(null_key);
+			g_map[null_key] = null_val;
+			null_iter = g_map.find(null_key);
 		}
 
 		Iter_t begin() {
@@ -521,14 +514,7 @@ namespace GameData {
 		size_t size() {
 			return g_map.size();
 		}
-
-		bool valid(CIter_t iter) {
-			return !((iter == end()) || (iter == null_iter));
-		}
-		bool valid(Key_t key) {
-			return !((key == null_key) || (find(key) == null_iter));
-		}
-
+		
 		Iter_t find(Key_t id) {
 			auto it = g_map.find(id);
 			if (it != end())
@@ -536,6 +522,13 @@ namespace GameData {
 			else
 				return null_iter;
 		}
+		bool valid(CIter_t iter) {
+			return !((iter == null_iter) || (iter == end()));
+		}
+		bool valid(Key_t key) {
+			return !((key == null_key) || (find(key) == null_iter));
+		}
+
 		Key_t push(Value_t val) {
 			Key_t id;
 
@@ -565,7 +558,57 @@ namespace GameData {
 	// Stores IDs in buckets for the g_order in which they need to be evaluated
 	namespace EvalOrder {
 		using DepthLayer = std::vector<ID_t>;
-		std::vector<DepthLayer> g_order;
+		using Order = std::vector<DepthLayer>;
+		Order g_order;
+
+		int EvaluationDepth(Component* comp) {
+			if (!comp) return 0; // Skip nullptrs
+
+			std::vector<IPort> inputArr;
+			if (Gate* gate = (Gate*)comp) inputArr = gate->in;
+			else if (Unit* unit = (Unit*)comp) {
+				// Unit's inputs are in a stack array with 64 members.
+				// We only need the usable subset of that.
+				inputArr.reserve(unit->LanesIn());
+				for (int i = 0; i < unit->LanesIn(); ++i) {
+					inputArr.push_back(unit->in[i]);
+				}
+			}
+			else return 0; // Skip Batteries
+
+			int maxDepth = 0;
+			for (IPort& port : inputArr) {
+				int portDepth = EvaluationDepth(port.component);
+				if (portDepth > maxDepth) maxDepth = portDepth;
+			}
+			return maxDepth;
+		}
+		void Organize() {
+			Order updated;
+			for (DepthLayer& comp : g_order) {
+				for (ID_t id : comp) {
+					IDMap::Iter_t it = IDMap::find(id);
+					if (IDMap::valid(it)) {
+						int depth = EvaluationDepth(it->second);
+						while ((updated.size() - 1) < depth) {
+							updated.push_back(DepthLayer());
+						}
+						updated[depth].push_back(id);
+					}
+				}
+			}
+			g_order = updated;
+		}
+		void Push(ID_t id) {
+			auto it = IDMap::find(id);
+			if (IDMap::valid(it)) {
+				int depth = EvaluationDepth(it->second);
+				while ((g_order.size() - 1) < depth) {
+					g_order.push_back(DepthLayer());
+				}
+				g_order[depth].push_back(id);
+			}
+		}
 
 		void EvaluateAll() {
 			for (DepthLayer& layer : g_order) {
@@ -576,8 +619,7 @@ namespace GameData {
 
 					Component* component = it->second;
 
-					if (Gate* gate = dynamic_cast<Gate*>(component))
-					{
+					if (Gate* gate = (Gate*)component) {
 						std::vector<bool> inputs;
 						inputs.reserve(gate->in.size());
 
@@ -590,24 +632,20 @@ namespace GameData {
 						continue;
 					}
 
-					if (Unit* unit = dynamic_cast<Unit*>(component))
-					{
-						unit->state = Unit::Eval(unit->mode, unit->InputsAsNum()); // TODO: evaluation needs to be fixed
+					if (Unit* unit = (Unit*)component) {
+						// TODO: evaluation needs to be fixed
 
 						continue;
 					}
 				}
 			}
 		}
-		void Organize() {
-			// TODO
-		}		
 	}
 
 	// Stores IDs in a quad-tree for making mouse selection fast
 	class TreeNode {
 	public:
-		using Element_t		= IDMap::Key_t;
+		using Element_t		= ID_t;
 		using ElemSet_t		= std::vector<Element_t>;
 		using Child_t		= TreeNode*;
 		using ChildSet_t	= std::array<Child_t, 4>;
@@ -623,61 +661,74 @@ namespace GameData {
 			: coverage(_coverage), children{ nullptr, nullptr, nullptr, nullptr }, elements() {};
 
 		int Navigate(int x, int y) {
-			IntRect& child0rec = children[0]->coverage;
-			return
-				((int)(x > child0rec.x2())) |
-				((int)(y > child0rec.y2()) << 1);
+			if (children[0]) {
+				return
+					((int)(x > children[0]->coverage.x2())) |
+					((int)(y > children[0]->coverage.y2()) << 1);
+			}
+			else return -1;
+		}
+		Child_t NavigateChild(int x, int y) {
+			int nav = Navigate(x, y);
+			if (nav < 0) return nullptr;
+			else return children[nav];
 		}
 
 		ElemSet_t GetElements() {
 			return elements;
 		}
 
-		ID_t At(int x, int y) {
-			if (Child_t child = children[Navigate(x, y)]) {
+		Element_t At(int x, int y) {
+			if (Child_t child = NavigateChild(x, y)) {
 				return child->At(x,y);
 			}
 			else {
 				for (Element_t elem : elements) {
-					IDMap::Iter_t it = source.find(elem);
-					if (source.valid(it)); // TODO
-					Comp_t comp = it->second;
-					if (Gate* gate = (Gate*)comp) {
-						if (gate->) // TODO: Oh right, gates don't store position... Idk what I was expecting...
+					IDMap::Iter_t it = IDMap::find(elem);
+					if (IDMap::valid(it)) {
+						Comp_t comp = it->second;
+						if (comp->pos.x == x && comp->pos.y == y) return elem;
 					}
-					if (Unit* unit = (Unit*)comp);
+				}
+				return IDMap::null_key;
+			}
+		}
+
+		void Push_At(int x, int y, ID_t what) {
+			elements.push_back(what);
+			if (Child_t child = NavigateChild(x, y)) child->Push_At(x, y, what);
+		}
+
+		void Erase(int x, int y, ID_t what) {
+			for (int i = 0; i < elements.size(); ++i) {
+				if (elements[i] == what) {
+					elements.erase(elements.begin() + i);
+					children[Navigate(x, y)]->Erase(x, y, what);
+					break;
 				}
 			}
 		}
 
-	private:
 		IntRect coverage;
 		ChildSet_t children;
 		ElemSet_t elements;
 	};
 	std::vector<TreeNode*> m_worldLayers; // Quad-Tree nodes for quickly locating components on the screen
-	
-	
 
-public:
-	GameData() {
-		g_xWidth	= 0;
-		g_yHeight = 0;
-		g_zDepth	= 0;
-	}
-	GameData(int _xWidth, int _yHeight, int _zDepth) {
-		g_xWidth	= _xWidth;
-		g_yHeight = _yHeight;
-		g_zDepth	= _zDepth;
+	TreeNode* GetLayer(int depth) {
+		int get = depth + ZMax();
+		if (get >= 0 && get < m_worldLayers.size()) return m_worldLayers[get];
+		else return nullptr;
 	}
 
-	int XWidth () { return g_xWidth;  }
-	int YHeight() { return g_yHeight; }
-	int ZDepth () { return g_zDepth;  }
-
-	int XMax() { return XWidth () / 2; }	int XMin() { return XMax() - XWidth (); }
-	int YMax() { return YHeight() / 2; }	int YMin() { return YMax() - YHeight(); }
-	int ZMax() { return ZDepth () / 2; }	int ZMin() { return ZMax() - ZDepth (); }
+	void Init() {
+		m_worldLayers.resize(ZDepth());
+		IntRect worldSpace{ XMin(), YMin(), XWidth(), YHeight() };
+		for (TreeNode*& node : m_worldLayers) {
+			
+			node = new TreeNode();
+		}
+	}
 
 	size_t XYArea() { return (size_t)XWidth() * (size_t)YHeight(); }
 	size_t Volume() { return (size_t)XYArea() * (size_t)ZDepth (); }
@@ -687,48 +738,27 @@ public:
 				pos.y >= YMin() && pos.y <= YMax() &&
 				pos.z >= ZMin() && pos.z <= ZMax());
 	}
-	size_t Index(int x, int y) {
-		return (y * (size_t)XWidth()) + x; // TODO: Figure out the (-0.5..0.5)->(0..1) problem. 
-	}
 	ID_t ID_At(Int3 pos) {
-		return m_worldLayers[pos.z]->At(pos.x, pos.y);
-	}
-	bool IsPointFree(Int3 pos) {
-		ID_t id = ID_At(pos);
-		return !m_idSystem.valid(id);
+		return m_worldLayers[pos.z + (size_t)ZMax()]->At(pos.x, pos.y);
 	}
 
-	Comp_t ComponentAt(Int3 at) {
-		if (InRange(at)) {
-			const ComponentID& id = ID_At(at);
-			if (id.tag == ComponentID::Comp_UnitID)
-				return units.find(id.unitID)->second;
+	ID_t Push(IDMap::Value_t comp, Int3 at) {
+		TreeNode* layer = GetLayer(at.z);
+		if (layer) {
+			ID_t id = IDMap::push(comp); // Push to ID-handler
+			layer->Push_At(at.x, at.y, id); // Push to oct-tree
+			EvalOrder::Push(id); // Push to evaluator list
+			return id;
 		}
-		return unit_mem.end();
-	}
-
-	ID_t PushGate(const Gate& gate, Int3 at) {
-		ID_t id = gates.push(gate_mem.push(gate));
-		ID_At(at) = id;
-		return id;
-	}
-	ID_t PushUnit(const Unit& unit, Int3 at) {
-		ID_t id = units.push(unit_mem.push(unit));
-		ID_At(at) = ComponentID(id);
-		return id;
+		return IDMap::null_key;
 	}
 
 	void EraseAt(Int3 at) {
-		ComponentID& id = ID_At(at);
-		if (id.tag == ComponentID::Comp_GateID) {
-			gate_mem.erase(gates.find(id.gateID)->second);
-			gates.erase(id.gateID);
+		ID_t id = ID_At(at);
+		if (id) {
+			IDMap::erase(id);
+			m_worldLayers[at.z]->Erase(at.x, at.y, id);
 		}
-		else if (id.tag == ComponentID::Comp_UnitID) {
-			unit_mem.erase(units.find(id.unitID)->second);
-			units.erase(id.unitID);
-		}
-		id = nullptr;
 	}
 }
 
@@ -766,16 +796,12 @@ int main() {
 	float depth = 0.0f;
 
 	auto DrawWireLambda = [&](Int3 start, Int3 end, WireShape shape, bool state) {
-		DrawWire(start,
-				 end,
-				 shape,
-				 state,
-				 depth,
-				 camera.zoom
-		);
+		DrawWire(start, end, shape, state, depth, camera.zoom);
 	};
 
 	Vector2 mousePos, worldMousePos, mousePos_last, worldMousePos_last;
+	mousePos = {0,0};
+	worldMousePos = {0,0};
 
 	Int3 wireStart, wireEnd;
 	WireShape wireShape = WireShape::XFirst;
@@ -789,38 +815,9 @@ int main() {
 		worldPixel.y = pos.y;
 		worldPixel.width = width.y;
 		worldPixel.height = width.y;
-	};
+	};	
 
-	VoxelArray world; {
-		std::atomic_bool b_ready = false;
-		std::atomic<unsigned int> validVoxelCount(0);
-		auto load = [&world, &b_ready, &validVoxelCount] {
-			world.voxels.reserve(010000 * 010000 * 000020);
-			for (validVoxelCount = 0; validVoxelCount < (010000 * 010000 * 000020); ++validVoxelCount) {
-				world.voxels.push_back(ComponentID());
-			}
-			b_ready = true;
-		};
-		std::thread worker(load);
-
-		float midScreen = (float)windowHeight * 0.2f;
-		float loadRight = (float)windowWidth * 0.3f;
-
-		while (!b_ready) {
-			BeginDrawing(); {
-
-				ClearBackground(BLACK);
-
-				DrawText("Please wait, allocating memory...", 16, 16, 32, RAYWHITE);
-				float fill = (((float)validVoxelCount.load() / (float)(010000 * 010000 * 000020)) * loadRight);
-				DrawLineEx({ 0.0f, midScreen }, { loadRight, midScreen }, 10.0f, DARKGRAY);
-				DrawLineEx({ 0.0f, midScreen }, { fill, midScreen }, 10.0f, BLUE);
-
-			} EndDrawing();
-		}
-		worker.join();
-	}
-	
+	GameData::Init();
 
 	while (!WindowShouldClose())
 	{
@@ -860,20 +857,22 @@ int main() {
 			wireEnd = Int3(worldMousePos, depth);
 			if (wireEnd != wireStart) {
 				// Start gate
-				if (world.IsPointFree(wireStart)) {
-					Gate temp;
-					world.PushGate(temp, wireStart);
+				if (GameData::ID_t id = GameData::ID_At(wireStart)) { // Is position taken?
+					GameData::IDMap::find(id);
 				}
 				else {
-					world.GateAt(wireStart);
+					Component* temp = new Gate();
+					temp->pos = wireStart;
+					GameData::Push(temp, wireStart);
 				}
 				// End gate
-				if (world.IsPointFree(wireEnd)) {
-					Gate temp;
-					world.PushGate(temp, wireEnd);
+				if (GameData::ID_t id = GameData::ID_At(wireEnd)) { // Is position taken?
+					GameData::IDMap::find(id);
 				}
 				else {
-					world.GateAt(wireEnd);
+					Component* temp = new Gate();
+					temp->pos = wireEnd;
+					GameData::Push(temp, wireEnd);
 				}
 			}
 		}
@@ -891,7 +890,7 @@ int main() {
 
 			BeginMode2D(camera); {
 
-				{
+				{ // Draw the world grid
 					float screenRight = worldPixel.x + (worldPixel.width * windowWidth);
 					float screenBottom = worldPixel.y + (worldPixel.height * windowHeight);
 
@@ -903,6 +902,15 @@ int main() {
 					}
 				}
 
+				int i = 0;
+				for (GameData::EvalOrder::DepthLayer layer : GameData::EvalOrder::g_order) {
+					for (GameData::ID_t id : layer) {
+						Component* comp = GameData::IDMap::find(id)->second;
+						DrawCircleV(comp->pos.xy(), 1, BLUE);
+						DrawText(TextFormat("{ %i, %i, %i }", comp->pos.x, comp->pos.y, comp->pos.z), 0, i += 8, 8, WHITE);
+					}
+				}
+
 				if (IsMouseButtonDown(MOUSE_LEFT_BUTTON)) {
 					DrawWireLambda(wireStart, wireEnd, wireShape, false);
 				}
@@ -911,7 +919,7 @@ int main() {
 
 			//DrawLineV(mousePos_last, mousePos, WHITE);
 
-			DrawText(TextFormat("{ %i, %i, %i }", (int)Round(worldMousePos.x), (int)Round(worldMousePos.y), (int)Round(depth)), 0, 0, 8, WHITE);
+			DrawText(TextFormat("Mouse at: { %i, %i, %i }\nTotal components: %i", (int)Round(worldMousePos.x), (int)Round(worldMousePos.y), (int)Round(depth), GameData::IDMap::size()), 0, 0, 8, WHITE);
 			//DrawText(TextFormat("{ %f, %f }", worldMousePos.x, worldMousePos.y), mousePos.x, mousePos.y + 10, 8, WHITE);
 			//DrawText(TextFormat("%f", camera.zoom), mousePos.x, mousePos.y + 20, 8, WHITE);
 
