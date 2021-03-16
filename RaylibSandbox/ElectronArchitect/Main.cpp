@@ -775,7 +775,7 @@ namespace GameData {
 
 #pragma region Main
 
-int main() {
+int main1() {
 	int windowWidth = 1280;
 	int windowHeight = 720;
 
