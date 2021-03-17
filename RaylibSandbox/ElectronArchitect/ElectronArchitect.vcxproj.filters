@@ -19,4 +19,15 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
+  <ItemGroup>
+    <None Include="wire.frag">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="cable.frag">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="wire_active.frag">
+      <Filter>Resource Files</Filter>
+    </None>
+  </ItemGroup>
 </Project>

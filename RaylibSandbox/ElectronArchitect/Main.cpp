@@ -33,14 +33,14 @@ int Log2(int val) {
 	return steps;
 }
 
-int Round(float f) {
+int Roundf(float f) {
 	if (f >= 0.0f)
 		return ((int)(f + 0.5f));
 	else
 		return ((int)(f - 0.5f));
 }
 
-Vector2 Vector2Round(Vector2 vec) { return Vector2{ (float)Round(vec.x), (float)Round(vec.y) }; }
+Vector2 Vector2Round(Vector2 vec) { return Vector2{ (float)Roundf(vec.x), (float)Roundf(vec.y) }; }
 Vector2 Vector2Snap(Vector2 vec, float to) { return Vector2Scale(Vector2Round(Vector2Scale(vec, 1.0f / to)), to); }
 
 #pragma endregion
@@ -51,11 +51,11 @@ struct Int3 {
 	constexpr Int3(int _x, int _y, int _z) : x(_x), y(_y), z(_z) {};
 
 	Int3(Vector3 pos)
-		: x(Round(pos.x)), y(Round(pos.y)), z(Round(pos.z)) {};
+		: x(Roundf(pos.x)), y(Roundf(pos.y)), z(Roundf(pos.z)) {};
 	Int3(Vector2 pos, float layer)
-		: x(Round(pos.x)), y(Round(pos.y)), z(Round(layer)) {};
+		: x(Roundf(pos.x)), y(Roundf(pos.y)), z(Roundf(layer)) {};
 	Int3(Vector2 pos, int layer)
-		: x(Round(pos.x)), y(Round(pos.y)), z(layer) {};
+		: x(Roundf(pos.x)), y(Roundf(pos.y)), z(layer) {};
 
 	bool operator==(const Int3& b) { return (x == b.x && y == b.y && z == b.z); }
 	bool operator!=(const Int3& b) { return (x != b.x || y != b.y || z != b.z); }
@@ -70,7 +70,7 @@ struct IntRect {
 	IntRect() : x1(), y1(), w(), h() {};
 	constexpr IntRect(int _x, int _y, int _w, int _h) : x1(_x), y1(_y), w(_w), h(_h) {};
 
-	IntRect(Rectangle rec) : x1(Round(rec.x)), y1(Round(rec.y)), w(Round(rec.width)), h(Round(rec.height)) {};
+	IntRect(Rectangle rec) : x1(Roundf(rec.x)), y1(Roundf(rec.y)), w(Roundf(rec.width)), h(Roundf(rec.height)) {};
 
 	operator Rectangle() { return Rectangle{ (float)x1, (float)y1, (float)w, (float)h }; }
 
@@ -919,7 +919,7 @@ int main1() {
 
 			//DrawLineV(mousePos_last, mousePos, WHITE);
 
-			DrawText(TextFormat("Mouse at: { %i, %i, %i }\nTotal components: %i", (int)Round(worldMousePos.x), (int)Round(worldMousePos.y), (int)Round(depth), GameData::IDMap::size()), 0, 0, 8, WHITE);
+			DrawText(TextFormat("Mouse at: { %i, %i, %i }\nTotal components: %i", (int)Roundf(worldMousePos.x), (int)Roundf(worldMousePos.y), (int)Roundf(depth), GameData::IDMap::size()), 0, 0, 8, WHITE);
 			//DrawText(TextFormat("{ %f, %f }", worldMousePos.x, worldMousePos.y), mousePos.x, mousePos.y + 10, 8, WHITE);
 			//DrawText(TextFormat("%f", camera.zoom), mousePos.x, mousePos.y + 20, 8, WHITE);
 
