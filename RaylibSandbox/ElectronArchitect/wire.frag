@@ -15,15 +15,16 @@ out vec4 finalColor;
 uniform vec2 resolution = vec2(1280, 720);
 uniform vec2 cursorPos = vec2(0.0);
 uniform float b_active = 0.0;
+uniform float time = 0.0;
 
 void main(void)
 {
 	float x = 1 / resolution.x;
 	float y = 1 / resolution.y;
 
-	float value = 1.0 - (fragTexCoord.x);
-	value *= 0.5;
-	value += 0.5;
+	float value = (((1.0 - fragTexCoord.x) * 0.5) + 0.5) * b_active;
 
-	finalColor = vec4(value, vec2(value * b_active), 1.0);
+	value += (sin((mod((fragTexCoord.x) - mod(time, 1.0), 0.2) / 0.2) * radians(180.0))) * (1.0 - b_active);
+
+	finalColor = vec4(value, vec2(value * (b_active)), 1.0);
 }
