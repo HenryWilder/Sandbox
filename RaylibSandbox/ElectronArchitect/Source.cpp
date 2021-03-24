@@ -10,10 +10,377 @@
 #include <raylib.h>
 #include <raymath.h>
 
-#pragma region Objects
-#pragma region Wires
+#pragma region Composits
 
-class PortList; // Needs to be declared to friend it
+class Object;
+
+
+
+// Connects to one or more Objects
+__interface ConnectionDelegate
+{
+public:
+	virtual size_t Find(Object* what) = 0;			// Searches for the connection in the connector
+	virtual bool Valid(size_t index) = 0;			// Tells whether the index is a valid connection id
+
+	virtual Object* GetNode(size_t index) = 0;		// Returns a copy of the connection
+
+	virtual void _UnRef(size_t index) = 0;			// Remove the connection without reference cleaning
+	virtual void _UnRef(Object* what) = 0;			// Remove the connection without reference cleaning
+	virtual void Push(Object* what) = 0;			// Add a connection--erases existing connection if needed
+	virtual void Erase(Object* what) = 0;			// Remove the connection; cleans reference to self
+
+	virtual size_t Width() = 0;						// The throughput capacity of the connection
+	virtual size_t Size() = 0;						// How many throughpoints are currently valid
+};
+
+// Mono-width connector
+class Wire : public ConnectionDelegate
+{
+private:
+	Object* connection;
+
+public:
+	size_t Find(Object* what) override
+	{
+		if (connection == what)
+		{
+			return 0ull;
+		}
+	}
+	bool Valid(size_t index) override
+	{
+		return (index == 0);
+	}
+
+	Object* GetNode(size_t index) override
+	{
+		return connection;
+	}
+
+	void _UnRef(size_t index) override
+	{
+		if (index == 0)
+		{
+			connection = nullptr;
+		}
+	}
+	void _UnRef(Object* what) override
+	{
+		if (connection == what)
+		{
+			connection = nullptr;
+		}
+	}
+	void Push(Object* what) override
+	{
+		if (connection)
+		{
+			what->_UnRef(this); // TODO
+		}
+		connection = what;
+	}
+	void Erase(Object* what) override
+	{
+		if (connection == what)
+		{
+			what->_UnRef(this); // TODO
+			connection = nullptr;
+		}
+	}
+
+	size_t Width() override
+	{
+		return 1ull;
+	}
+	size_t Size() override
+	{
+		return (connection ? 1ull : 0ull);
+	}
+};
+
+// Variable-width connector
+class Cable : public ConnectionDelegate
+{
+private:
+	std::vector<Object*> connection;
+
+public:
+	size_t Find(Object* what) override
+	{
+		for (size_t i = 0ull; i < connection.size(); ++i)
+		{
+			if (connection[i] == what)
+			{
+				return i;
+			}
+		}
+		return connection.size();
+	}
+	bool Valid(size_t index) override
+	{
+		return (index < connection.size());
+	}
+
+	std::vector<Object*> Get() override
+	{
+		return connection;
+	}
+
+	void _UnRef(size_t index) override
+	{
+		connection.erase(connection.begin() + index);
+	}
+	void _UnRef(Object* what) override
+	{
+		_UnRef(Find(what));
+	}
+	void Push(Object* what) override
+	{
+		connection.push_back(what);
+	}
+	void Erase(Object* what) override
+	{
+		size_t at = Find(what);
+		if (Valid(at))
+		{
+			connection.erase(connection.begin() + at);
+		}
+	}
+
+	size_t Width() override
+	{
+		return connection.size();
+	}
+	size_t Size() override
+	{
+		return connection.size();
+	}
+};
+
+
+
+// Connects to one or more Objects by means of one or more ConnectionDelegate
+__interface IODelegate
+{
+public:
+	virtual std::vector<ConnectionDelegate*> GetConnector() = 0;
+
+	virtual void _UnRef(ConnectionDelegate* what) = 0;
+	virtual void Push(ConnectionDelegate* what) = 0;
+	virtual void Erase(ConnectionDelegate* what) = 0;
+
+	virtual size_t Size() = 0;
+	virtual size_t Capacity() = 0;
+};
+
+// Exactly 1 conection
+class IO_1 : public IODelegate
+{
+private:
+	ConnectionDelegate* io;
+
+public:
+	std::vector<ConnectionDelegate*> Get()
+	{
+		return { io };
+	}
+};
+
+// Exactly 2 connections of equal width
+class IO_2 : public IODelegate
+{
+private:
+	struct { ConnectionDelegate* a; ConnectionDelegate* b; } io;
+
+public:
+	std::vector<ConnectionDelegate*> Get()
+	{
+		return { io.a, io.b };
+	}
+};
+
+// Various connections of equal width
+class IO_n : public IODelegate
+{
+private:
+	std::vector<ConnectionDelegate*> io;
+
+public:
+	std::vector<ConnectionDelegate*> Get()
+	{
+		return io;
+	}
+};
+
+
+
+__interface EvaluationDelegate
+{
+public:
+	virtual void Evaluate() = 0;									// Updates the evaluation for this frame
+	virtual bool GetValue(size_t wire = 0, size_t bit = 0) = 0;		// Returns the value of the state at the index
+	virtual void EvalReset() = 0;									// End of frame reset so next frame's evaluations can be performed
+};
+class NonEvaluating : public EvaluationDelegate
+{
+private:
+	IODelegate* input;
+
+public:
+	NonEvaluating(IODelegate* _input) : input(_input) {}
+
+	void Evaluate() {}
+	bool GetValue(size_t wire = 0, size_t bit = 0)
+	{
+		input->Get()[wire]->Get()[wire]->GetValue(wire, bit);
+	}
+	void EvalReset() {}
+};
+class Logical : public EvaluationDelegate
+{
+
+};
+class Comparative : public EvaluationDelegate
+{
+
+};
+class Bitwise : public EvaluationDelegate
+{
+
+};
+class Arithmetic : public EvaluationDelegate
+{
+
+};
+
+// 
+class Object
+{
+private:
+	Vector2 pos;
+	IODelegate* i;
+	IODelegate* o;
+	EvaluationDelegate* e;
+
+public:
+	enum class Type
+	{
+		Node, // Repeater
+		Gate, // Logical
+		Comp, // Comparative
+		Bitw, // Bitwise
+		Math, // Arithmetic
+	};
+
+	void Init(Type as)
+	{
+		switch (as)
+		{
+		case Type::Node:
+			i = new IO_1();
+			o = new IO_n();
+			e = new NonEvaluating(i);
+			break;
+
+		case Type::Gate:
+			i = new IO_2();
+			o = new IO_1();
+			e = new Logical(i);
+			break;
+
+		case Type::Comp:
+			i = new IO_2();
+			o = new IO_1();
+			e = new Comparative(i);
+			break;
+
+		case Type::Bitw:
+			i = new IO_2();
+			o = new IO_1();
+			e = new Bitwise(i);
+			break;
+
+		case Type::Math:
+			i = new IO_2();
+			o = new IO_1();
+			e = new Arithmetic(i);
+			break;
+		}
+	}
+	void Free()
+	{
+		delete i;
+		delete o;
+		delete e;
+	}
+	void Make(Type into)
+	{
+		Free();
+		Init(into);
+	}
+
+	Object(Vector2 _pos, Type _type) : pos(_pos) { Init(_type); }
+	~Object() { Free(); }
+
+	// IODelegate
+
+	std::vector<ConnectionDelegate*> GetInputs()
+	{
+		return i->Get();
+	}
+	std::vector<ConnectionDelegate*> GetOutputs()
+	{
+		return o->Get();
+	}
+
+	// EvaluationDelegate
+
+	void Evaluate()
+	{
+		e->Evaluate();
+	}
+	bool GetValue(size_t wire = 0ull, size_t bit = 0ull)
+	{
+		return e->GetValue(bit);
+	}
+	void EvalReset()
+	{
+		e->EvalReset();
+	}
+};
+
+#pragma endregion
+
+#pragma region Objects
+/*******************************************
+* 
+*	~Hierarchy~
+* 
+*	Key:
+*	{} = polymorphs to
+*	() = number of connections
+*	-> = input->output
+*	n  = vector of things
+*	*  = pure virtual
+* 
+*	Port*
+*	{
+*		Gate         (    2 -> 1    )
+*		Node         (    1 -> n    )
+*		{
+*			FlayNode ( 1(n) -> 1    )
+*		}
+*		CPort*
+*		{
+*			CNode    ( 1(n) -> n(n) )
+*			Comp     ( 2(n) -> 1    )
+*			Unit     ( 2(n) -> 1(n) )
+*		}
+*	}
+* 
+*******************************************/
+#pragma region Pure virtuals
 
 // Base class connection point
 // (Node*)(Port*) does NOT do the same thing as dynamic_cast<Node*>(Port*) !!
@@ -78,6 +445,51 @@ public:
 	virtual std::vector<Port*> GetInputs() = 0;
 	virtual std::vector<Port*> GetOutputs() = 0;
 };
+
+// Structure containing either a cable, or a vector of ports
+// Calls the associated functions depending on which one it is
+struct Bundle {
+	Bundle(std::vector<Port*> _bundle) {
+		tag = MultiWire;
+		bundle = _bundle;
+	}
+	Bundle(CPort* _cable) {
+		tag = MonoCable;
+		bundle = {};
+		cable = _cable;
+	}
+
+	enum { MultiWire, MonoCable } tag;
+	union { nullptr_t null;  std::vector<Port*> bundle; CPort* cable; };
+
+	void Resize(size_t newSize) {
+		switch (tag) {
+		case MultiWire: bundle.resize(newSize); break;
+		case MonoCable: cable->Resize(newSize); break;
+		}
+	}
+	size_t Size() {
+		switch (tag) {
+		case MultiWire: return bundle.size();
+		case MonoCable: return cable->Size();
+		}
+	}
+};
+// Base class cable connection point
+class CPort : public Port {
+protected:
+	size_t width;
+
+public:
+	CPort(Vector2 _pos) : Port(_pos), width() {}
+	CPort(Vector2 _pos, size_t _width) : Port(_pos), width(_width) {}
+
+	virtual void Resize(size_t _width) = 0;
+	virtual size_t Size() = 0;
+};
+
+#pragma endregion
+#pragma region Nodes
 
 // Nodes can split, but not combine.
 // Nodes are more akin to repeaters and do not affect the signal.
@@ -164,6 +576,117 @@ public:
 	std::vector<Port*> GetInputs() override { return { i }; }
 	std::vector<Port*> GetOutputs() override { return o; }
 };
+
+class FlayNode : public Node {
+private:
+	size_t index;
+
+public:
+	FlayNode(Vector2 _pos, size_t _index) : Node(_pos), index(_index) {}
+
+	bool GetValue(int bit = 0) override { return i && i->GetValue(index); }
+};
+
+void Flay(Port* node) {
+	if (node = dynamic_cast<Node*>(node)) {
+		node = new 
+	}
+}
+
+// CableNodes can split, but not combine.
+// CableNodes are more akin to repeaters and do not affect the signal.
+// Unlike Nodes, CableNodes take in multiple inputs and convert them into a bundled signal.
+// Nodes should automatically become CableNodes when given additional inputs.
+// A CNode with 1 input or fewer should automatically become a regular Node again.
+class CNode : public CPort {
+protected:
+	Bundle i;
+	std::vector<Bundle> o;
+
+public:
+	friend PortList;
+
+	CNode(Vector2 _pos) : CPort(_pos), i(), o({}) {}
+	CNode(Vector2 _pos, int _width) : CPort(_pos), i(), o({}) {
+		i.Resize(_width);
+	}
+
+	PortType GetType() override { return PortType::Node; }
+
+	Port* Peephole() override { return (i ? i->Peephole() : nullptr); }
+
+	bool GetValue(int bit = 0) override {
+		Port* peek = Peephole(); // Find the first port who might actually affect the signal
+		return (peek ? peek->GetValue() : false); // Node is start of circuit
+	}
+
+	Port* Next(size_t path) override { return o[path]; }
+	Port* Prev(size_t path = 0) override { return i; }
+
+	Port* Push_I(Port* input) override {
+		Port* _i = i;
+		i = input;
+		if (_i) _i->Erase_O(this);
+		return _i;
+	}
+	Port* Push_O(Port* output) override {
+		o.push_back(output);
+		return nullptr;
+	}
+
+	void _DRef_I(Port* what) override {
+		if (i == what) i = nullptr;
+	}
+	void _DRef_O(Port* what) override {
+		size_t i = 0;
+		for (Port* port : o) {
+			if (port == what) {
+				o.erase(o.begin() + i);
+				break;
+			}
+			++i;
+		}
+	}
+
+	// Erase "what", if it is the input.
+	// Returns true if the erasure was successful or input is already free.
+	// Returns false if "what" was not the input.
+	bool Erase_I(Port* what) override {
+		if (i == what) {
+			i = nullptr;
+			what->_DRef_O(this);
+			return true;
+		}
+		return false;
+	}
+	// Erase "what", if it is an output.
+	// Returns true if the erasure was successful.
+	// Returns false if "what" was not an output.
+	bool Erase_O(Port* what) override {
+		size_t i = 0;
+		for (Port* port : o) {
+			if (port == what) {
+				o.erase(o.begin() + i);
+				what->_DRef_I(this);
+				return true;
+			}
+			++i;
+		}
+		return false;
+	}
+
+	size_t I_Size() override { return (i ? 1ull : 0ull); }
+	size_t O_Size() override { return o.size(); }
+
+	size_t I_Capacity() override { return 1ull; }
+	size_t O_Capacity() override { return SIZE_MAX; }
+
+	std::vector<Port*> GetInputs() override { return { i }; }
+	std::vector<Port*> GetOutputs() override { return o; }
+};
+
+#pragma endregion
+#pragma region Evaluators
 
 // Gates can combine (exactly 2), but not split.
 // Gates will almost certainly affect the signal
@@ -264,145 +787,7 @@ public:
 	std::vector<Port*> GetOutputs() override { return { o }; }
 };
 
-#pragma endregion
-#pragma region Cables
-
-// Base class cable connection point
-class CablePort : public Port {
-protected:
-	size_t width;
-
-public:
-	CablePort(Vector2 _pos) : Port(_pos), width() {}
-	CablePort(Vector2 _pos, size_t _width) : Port(_pos), width(_width) {}
-
-	virtual void Resize(size_t _width) = 0;
-	virtual size_t Size() = 0;
-};
-
-// Structure containing either a cable, or a vector of ports
-// Calls the associated functions depending on which one it is
-struct Bundle {
-	Bundle(std::vector<Port*> _bundle) {
-		tag = MultiWire;
-		bundle = _bundle;
-	}
-	Bundle(CablePort* _cable) {
-		tag = MonoCable;
-		bundle = {};
-		cable = _cable;
-	}
-
-	enum { MultiWire, MonoCable } tag;
-	union { nullptr_t null;  std::vector<Port*> bundle; CablePort* cable; };
-
-	void Resize(size_t newSize) {
-		switch (tag) {
-		case MultiWire: bundle.resize(newSize); break;
-		case MonoCable: cable->Resize(newSize); break;
-		}
-	}
-	size_t Size() {
-		switch (tag) {
-		case MultiWire: return bundle.size();
-		case MonoCable: return cable->Size();
-		}
-	}
-};
-
-// CableNodes can split, but not combine.
-// CableNodes are more akin to repeaters and do not affect the signal.
-// Unlike Nodes, CableNodes take in multiple inputs and convert them into a bundled signal.
-// Nodes should automatically become CableNodes when given additional inputs.
-// A CableNode with 1 input or fewer should automatically become a regular Node again.
-class CableNode : public CablePort {
-protected:
-	Bundle i;
-	std::vector<Bundle> o;
-
-public:
-	friend PortList;
-
-	CableNode(Vector2 _pos) : CablePort(_pos), i(), o({}) {}
-	CableNode(Vector2 _pos, int _width) : CablePort(_pos), i(), o({}) {
-		i.Resize(_width);
-	}
-
-	PortType GetType() override { return PortType::Node; }
-
-	Port* Peephole() override { return (i ? i->Peephole() : nullptr); }
-
-	bool GetValue(int bit = 0) override {
-		Port* peek = Peephole(); // Find the first port who might actually affect the signal
-		return (peek ? peek->GetValue() : false); // Node is start of circuit
-	}
-
-	Port* Next(size_t path) override { return o[path]; }
-	Port* Prev(size_t path = 0) override { return i; }
-
-	Port* Push_I(Port* input) override {
-		Port* _i = i;
-		i = input;
-		if (_i) _i->Erase_O(this);
-		return _i;
-	}
-	Port* Push_O(Port* output) override {
-		o.push_back(output);
-		return nullptr;
-	}
-
-	void _DRef_I(Port* what) override {
-		if (i == what) i = nullptr;
-	}
-	void _DRef_O(Port* what) override {
-		size_t i = 0;
-		for (Port* port : o) {
-			if (port == what) {
-				o.erase(o.begin() + i);
-				break;
-			}
-			++i;
-		}
-	}
-
-	// Erase "what", if it is the input.
-	// Returns true if the erasure was successful or input is already free.
-	// Returns false if "what" was not the input.
-	bool Erase_I(Port* what) override {
-		if (i == what) {
-			i = nullptr;
-			what->_DRef_O(this);
-			return true;
-		}
-		return false;
-	}
-	// Erase "what", if it is an output.
-	// Returns true if the erasure was successful.
-	// Returns false if "what" was not an output.
-	bool Erase_O(Port* what) override {
-		size_t i = 0;
-		for (Port* port : o) {
-			if (port == what) {
-				o.erase(o.begin() + i);
-				what->_DRef_I(this);
-				return true;
-			}
-			++i;
-		}
-		return false;
-	}
-
-	size_t I_Size() override { return (i ? 1ull : 0ull); }
-	size_t O_Size() override { return o.size(); }
-
-	size_t I_Capacity() override { return 1ull; }
-	size_t O_Capacity() override { return SIZE_MAX; }
-
-	std::vector<Port*> GetInputs() override { return { i }; }
-	std::vector<Port*> GetOutputs() override { return o; }
-};
-
-class Comp : public CablePort {
+class Comp : public CPort {
 public:
 	enum class Method : char { GreaterThan = '>', LessThan = '<', Equals = '=', Not = '!' };
 
@@ -411,7 +796,7 @@ private:
 	Port* o;
 };
 
-class Unit : public CablePort {
+class Unit : public CPort {
 public:
 	enum class Method : char {
 		B_OR = '|', B_FLIP = '~', B_AND = '&', B_XOR = '^', B_SLEFT = '<', B_SRIGHT = '>',
@@ -440,6 +825,7 @@ public:
 
 	Port* Get(size_t i) { return ports[i]; }
 
+#if 0
 	std::string ConstructTreeStr() {
 		g_namedPtrs[nullptr] = '-';
 		auto PortName = [](Port* ptr) {
@@ -493,6 +879,7 @@ public:
 		}
 		return (str.empty() ? " - " : str + "\n");
 	};
+#endif
 
 	// ONLY call this if it's certain "what" has no external references!!
 	// If "what" has the possibility of external references, please call Wipe() instead!
@@ -552,6 +939,7 @@ public:
 			return nullptr;
 		}
 	}
+#if 0
 #define NULLIFY_IF_FOUND(var) if (hitlist.find(var) != hitlist.end()) var = nullptr // If the passed variable has a value on the no-no list, euthanize it.
 	void Wipe(std::unordered_set<Port*>& hitlist) { // unordered_set has constant-time (very fast) find(), making it perfect for "is this a wanted guy?"
 		std::stack<size_t> srcs; // Stack of indices to the actual Port* objects in the vector (FIFO so that indices don't get invalidated while erasing)
@@ -625,6 +1013,7 @@ public:
 		}
 	}
 #undef REPLACE // Undefine so this name doesn't leak
+#endif
 };
 PortList g_allPorts;
 
