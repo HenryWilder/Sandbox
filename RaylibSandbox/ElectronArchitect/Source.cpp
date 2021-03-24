@@ -673,8 +673,12 @@ int main() {
 #pragma region Simulate
 
 		if (GetMouseWheelMove() != 0.0f) {
-			camera.zoom = Shift(camera.zoom, GetMouseWheelMove());
-
+			float zoom = Shift(camera.zoom, GetMouseWheelMove());
+			if (zoom >= 1.0f) {
+				if (zoom < 127.0f) camera.zoom = zoom;
+				else camera.zoom = 127.0f;
+			}
+			else camera.zoom = 1.0f;
 			cameraPos = Vector2Scale(Roundf(Vector2Scale(cameraPos, 1.0f / camera.zoom)), camera.zoom); // Update camera position now that zoom has been changed
 		}
 
