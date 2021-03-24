@@ -152,7 +152,12 @@
   <ItemGroup>
     <None Include="cable.frag" />
     <None Include="wire.frag" />
-    <None Include="wire_active.frag" />
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Gate_L-AND.png" />
+    <Image Include="Gate_L-NOT.png" />
+    <Image Include="Gate_L-OR.png" />
+    <Image Include="Gate_L-XOR.png" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

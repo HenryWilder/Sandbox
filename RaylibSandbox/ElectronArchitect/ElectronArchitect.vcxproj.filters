@@ -26,8 +26,19 @@
     <None Include="cable.frag">
       <Filter>Resource Files</Filter>
     </None>
-    <None Include="wire_active.frag">
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="Gate_L-AND.png">
       <Filter>Resource Files</Filter>
-    </None>
+    </Image>
+    <Image Include="Gate_L-NOT.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Gate_L-OR.png">
+      <Filter>Resource Files</Filter>
+    </Image>
+    <Image Include="Gate_L-XOR.png">
+      <Filter>Resource Files</Filter>
+    </Image>
   </ItemGroup>
 </Project>

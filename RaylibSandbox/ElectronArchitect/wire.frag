@@ -14,6 +14,7 @@ out vec4 finalColor;
 // Custom uniforms
 uniform vec2 resolution = vec2(1280, 720);
 uniform vec2 cursorPos = vec2(0.0);
+uniform float b_active = 0.0;
 
 void main(void)
 {
@@ -24,5 +25,5 @@ void main(void)
 	value *= 0.5;
 	value += 0.5;
 
-	finalColor = vec4(vec3(value), 1.0);
+	finalColor = vec4(value, vec2(value * b_active), 1.0);
 }
