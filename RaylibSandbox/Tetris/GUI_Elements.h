@@ -3,10 +3,10 @@
 
 #pragma region Base classes
 
-class Widget
+class Widget_Base
 {
 protected:
-	Widget(Rectangle _collision, Color _tint_up, Color _tint_hovered, Color _tint_down, Texture2D _texture) :
+	Widget_Base(Rectangle _collision, Color _tint_up, Color _tint_hovered, Color _tint_down, Texture2D _texture) :
 		collision(_collision),
 		tint_up(_tint_up),
 		tint_hovered(_tint_hovered),
@@ -60,11 +60,11 @@ protected:
 
 #pragma region Specializations
 
-class Button1 : public Widget
+class Button1 : public Widget_Base
 {
 public:
 
-	Button1(Vector2 _center, float _radius) : Widget(_center, _radius) {};
+	Button1(Vector2 _center, float _radius) : Widget_Base(_center, _radius) {};
 
 	void OnHover() override
 	{

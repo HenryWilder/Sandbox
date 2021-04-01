@@ -44,7 +44,7 @@ namespace cstm
     //}
 
     //template<typename T>
-    //T Round(const T val) {
+    //T Roundf(const T val) {
     //    auto set = SignAbs(val);
     //    set
     //    return (set.first);

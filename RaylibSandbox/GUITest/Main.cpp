@@ -57,21 +57,22 @@ void InitProgram(int windowWidth, int windowHeight, const char* windowName, int 
 	g_defaultTexture = LoadTextureFromImage(img);
 	UnloadImage(img);
 
-	std::vector<GUIButton> buttons{
-		GUIButton(Rectangle{ 0, 0, 128, 64 }, GUIMat(DARKBLUE), GUIMat(BLUE), GUIMat(SKYBLUE), GUIMat(GRAY)),
-		GUIButton(Rectangle{ 128, 0, 128, 64 }, GUIMat(DARKBLUE), GUIMat(BLUE), GUIMat(SKYBLUE), GUIMat(GRAY)),
-		GUIButton(Rectangle{ 256, 0, 128, 64 }, GUIMat(DARKBLUE), GUIMat(BLUE), GUIMat(SKYBLUE), GUIMat(GRAY)),
-	};
-
-	GameLoop(buttons);
-
-	for (GUIButton& button : buttons)
-	{
-		UnloadGUIMat(button.mat_default);
-		UnloadGUIMat(button.mat_disabled);
-		UnloadGUIMat(button.mat_hovered);
-		UnloadGUIMat(button.mat_pressed);
-	}
+	GameLoop({
+		GUIButton(Rectangle{ 0, 0, 128, 64 }, { {
+			{ GUIMatElement(GUIMat(DARKBLUE),	WHITE) },
+			//{ GUIMatElement(GUIMat(BLUE),		WHITE) },
+			//{ GUIMatElement(GUIMat(SKYBLUE),	WHITE) },
+			//{ GUIMatElement(GUIMat(GRAY),		WHITE) },
+			}, {
+			{ ButtonStateFlags::Up,			0 },
+			//{ ButtonStateFlags::Hovered,	1 },
+			//{ ButtonStateFlags::Down,		2 },
+			//{ ButtonStateFlags::Pressed,	2 },
+			//{ ButtonStateFlags::Released,	2 },
+			//{ ButtonStateFlags::Disabled,	3 },
+				} }),
+			 }
+	);
 
 	UnloadTexture(g_defaultTexture);
 
@@ -89,18 +90,6 @@ enum TestState {
 
 int main()
 {
-	MatStateMachine<TestState> states(
-		{ // Possible states
-			{ Dirty,		GUIMat(BROWN)	},
-			{ Clean,		GUIMat(SKYBLUE) },
-			{ Falling,		GUIMat(ORANGE)	},
-			{ Active,		GUIMat(YELLOW)	},
-			{ LowHealth,	GUIMat(RED)		},
-			{ TurningHead,	GUIMat(BLUE)	},
-		}, // Init state
-		Clean
-	);
-
 	InitProgram(1280, 720, "GUI Test", 60);
 	return 0;
 }

@@ -14,29 +14,30 @@ template<class T, int width, int height>
 class Array2D
 {
 public:
-	Array2D(const T (&in)[width * height])
-	{
-		for (int i = 0; i < GetArea(); ++i)
-		{
-			elements[i] = in[i];
-		}
-	}
-	Array2D(const T* in)
-	{
-		for (int i = 0; i < GetArea(); ++i)
-		{
-			elements[i] = in[i];
-		}
-	}
-
 	constexpr int GetWidth()  const { return width; }
-	constexpr int GetHeight() const { return height;  }
+	constexpr int GetHeight() const { return height; }
 	constexpr int GetArea()   const { return width * height; }
-	constexpr int size() const { return GetArea(); }
+	constexpr int size()	  const { return GetArea(); }
 
-	static int Index(Pos pt) { return (pt.y * width) + pt.x; }
+	Array2D(const std::array<T, GetArea()> in) {
+		for (int i = 0; i < GetArea(); ++i) {
+			elements[i] = in[i];
+		}
+	}
+	Array2D(const T (&in)[GetArea()]) {
+		for (int i = 0; i < GetArea(); ++i) {
+			elements[i] = in[i];
+		}
+	}
+	Array2D(const T* in) {
+		for (int i = 0; i < GetArea(); ++i) {
+			elements[i] = in[i];
+		}
+	}
 
-	T& operator[](Pos at) { return elements[Index(at)]; }
+	static int Index(int _x, int _y) { return (_y * width) + _x; }
+
+	T& operator[](int _x, int _y) { return elements[Index(_x, _y)]; }
 
 	struct Section {
 		Section() : x(0), y(0), w(width), h(height) {};

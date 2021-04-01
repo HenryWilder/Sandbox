@@ -69,27 +69,15 @@ ButtonStateFlags GetButtonState(GUIButton button)
     return flags;
 }
 
-GUIMat& GetButtonDrawMat(GUIButton button, ButtonStateFlags state)
+GUIMatElement* GetButtonDrawMat(GUIButton button, ButtonStateFlags state)
 {
-    if (button.b_disabled) {
-        return button.mat_disabled; // Disabled
-    }
-    else {
-        if (IsButtonStateHovered(state)) { // Hovering
-            if (IsButtonStateDown(state))
-                return button.mat_pressed; // Mouse down
-            else
-                return button.mat_hovered; // Mouse up
-        }
-        else {
-            return button.mat_default; // Not hovering
-        }
-    }
+    return GetStateMaterial(button.stateMaterials, state);
 }
 
 void DrawGUIButton(GUIButton button, ButtonStateFlags state)
 {
-    DrawGUIMat(GetButtonDrawMat(button, state), button.collision, { 0,0 }, 0.0f, button.tint);
+    const GUIMatElement* mat = GetButtonDrawMat(button, state);
+    if (mat) DrawGUIMat(mat->material, button.collision, { 0,0 }, 0.0f, mat->tint);
 }
 
 void nullfnc() {}
@@ -131,3 +119,6 @@ ButtonStateFlags operator&(ButtonStateFlags lval, ButtonStateFlags rval)
 {
     return ButtonStateFlags((unsigned char)lval & (unsigned char)rval);
 }
+
+template<class stateEnum>
+GUIMatElement MatStateMachine<stateEnum>::invalid(GUIMat(MAGENTA), WHITE);

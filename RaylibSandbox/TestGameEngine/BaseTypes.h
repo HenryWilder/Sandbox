@@ -5,30 +5,36 @@ struct Texture;
 typedef Texture Texture2D;
 Texture2D LoadTexture(const char*); // Because of this, raylib.h MUST be included before BaseTypes.h in all places where BaseTypes.h is included!
 
+// Wrapper for all classes - handles swapping between different types and memory management
+class Object
+{
+	Object() {}
+	~Object() {}
+};
+
+// A physical object in the game world - has position
 class Actor
 {
 public:
-	Actor() : b_hidden(false), texture(&LoadTexture("missing.png")), pos() {};
-	Actor(const Texture2D& _texture) : b_hidden(false), texture(&_texture), pos() {};
-	Actor(const Texture2D& _texture, Vector2 _pos) : b_hidden(false), texture(&_texture), pos(_pos) {};
+	Actor() : b_hidden(false), pos() {};
+	~Actor() {}
 
 	virtual void Draw() const = 0;
 
 protected:
 	bool b_hidden;
-	const Texture2D* texture;
 	Vector2 pos;
 };
-class StaticActor : public Actor
-{
-public:
-	void Draw() const;
-};
+
+// An actor with movement and interactivity
 class Entity : public Actor
 {
-public:
-	void Draw() const;
+	Entity() {}
+	~Entity() {}
+};
 
-protected:
-	float rot;
+// An entity with movement
+class Character : public Entity
+{
+
 };

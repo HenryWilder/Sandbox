@@ -184,7 +184,7 @@ int main()
 	// Just a blank canvas the size of the window so the UVs don't get messed up
 	RenderTexture2D target = LoadRenderTexture(windowWidth, windowHeight);
 
-	// Initialize the canvas to 0s
+	// InitializeSpriteset the canvas to 0s
 	BeginTextureMode(target); {
 
 		DrawRectangleRec(windowRec, BLACK);
@@ -197,7 +197,7 @@ int main()
 	Shader shader = LoadShaderCode(BuildVertShader(), BuildFragShader());
 	std::string codeInsert = "";
 	std::string fragCode = "";
-	bool b_changed = true;
+	bool b_dirty = true;
 	int frameToggle = 0;
 	int cursor = 0;
 	int framesBackspaceHeld = 30;
@@ -207,6 +207,24 @@ int main()
 	bool b_usesTime = false;
 	int shaderTimeLoc = 0;
 	bool dontClear = false;
+	//std::string disp;
+	unsigned int lineOffset = 0;
+
+	auto DrawCode = [&fragCode, cursorBlink, cursor, &lineOffset]() {
+		std::string disp = fragCode;
+
+		if (cursorBlink < 30)
+		{
+			int dispPos = disp.find('@') + (size_t)cursor + 2 + 4;
+
+			if (disp[dispPos] == '\n')
+				disp.insert(dispPos, 1, '_');
+			else
+				disp.replace(dispPos, 1, 1, '_');
+		}
+
+		DrawText(disp.c_str(), 5, 5 - (10 * lineOffset), 8, WHITE);
+	};
 
 	// Gameloop
 	// -------------------------
@@ -218,7 +236,7 @@ int main()
 		{
 			windowWidth = GetScreenWidth();
 			windowHeight = GetScreenHeight();
-			b_changed = true;
+			b_dirty = true;
 		}
 
 		cursorBlink = (cursorBlink + 1) % 60;
@@ -228,7 +246,15 @@ int main()
 		{
 			codeInsert.insert(cursor, 1, (char)typed);
 			cursor++;
-			b_changed = true;
+			b_dirty = true;
+		}
+
+		float wheel = GetMouseWheelMove();
+		if (wheel > 0 && lineOffset < disp.size()) {
+			lineOffset++;
+		}
+		else if (wheel < 0 && lineOffset > 0) {
+			lineOffset--;
 		}
 
 		if ((IsKeyPressed(KEY_BACKSPACE) || (IsKeyDown(KEY_BACKSPACE) && !framesBackspaceHeld && !frameToggle)) && !codeInsert.empty() && cursor > 0)
@@ -248,7 +274,7 @@ int main()
 				cursor--;
 				codeInsert.erase(codeInsert.begin() + cursor);
 			}
-			b_changed = true;
+			b_dirty = true;
 		}
 		
 		if ((IsKeyPressed(KEY_LEFT) || (IsKeyDown(KEY_LEFT) && !framesLeftHeld)) && cursor > 0) cursor--;
@@ -269,9 +295,9 @@ int main()
 			codeInsert.insert(cursor++, 1, ' ');
 			codeInsert.insert(cursor++, 1, ' ');
 			codeInsert.insert(cursor++, 1, ' ');
-			b_changed = true;
+			b_dirty = true;
 		}
-		if (b_changed)
+		if (b_dirty)
 		{
 			cursorBlink = 0;
 			UnloadShader(shader);
@@ -302,7 +328,7 @@ int main()
 			{
 				shader = GetShaderDefault();
 			}
-			b_changed = false;
+			b_dirty = false;
 		}
 
 		if (b_usesTime)
@@ -313,22 +339,6 @@ int main()
 
 		// Draw phase
 		// -------------------------
-
-		auto DrawCode = [&fragCode, cursorBlink, cursor]() {
-			std::string disp = fragCode;
-
-			if (cursorBlink < 30)
-			{
-				int dispPos = disp.find('@') + (size_t)cursor + 2 + 4;
-
-				if (disp[dispPos] == '\n')
-					disp.insert(dispPos, 1, '_');
-				else
-					disp.replace(dispPos, 1, 1, '_');
-			}
-
-			DrawText(disp.c_str(), 5, 5, 8, WHITE);
-		};
 
 		BeginDrawing(); {
 

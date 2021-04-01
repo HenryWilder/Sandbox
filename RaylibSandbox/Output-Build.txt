@@ -1,0 +1,38 @@
+﻿Build started...
+1>------ Build started: Project: TestGameEngine, Configuration: Release x64 ------
+2>------ Build started: Project: Chess3, Configuration: Release x64 ------
+3>------ Build started: Project: ShaderTest, Configuration: Release x64 ------
+1>Main.cpp
+2>Board.cpp
+1>D:\Repo\Sandbox\RaylibSandbox\TestGameEngine\BaseTypes.h(11): error C2102: '&' requires l-value
+1>D:\Repo\Sandbox\RaylibSandbox\TestGameEngine\Main.cpp(17,11): warning C4091: '': ignored on left of 'Texture' when no variable is declared
+1>D:\Repo\Sandbox\RaylibSandbox\TestGameEngine\Main.cpp(32,17): error C2660: 'DrawTextureEx': function does not take 0 arguments
+1>D:\Repo\Sandbox\RaylibSandbox\Library\raylib\include\raylib.h(1227,12): message : see declaration of 'DrawTextureEx'
+1>Done building project "TestGameEngine.vcxproj" -- FAILED.
+3>Main.cpp
+2>Linking Board.h
+3>D:\Repo\Sandbox\RaylibSandbox\ShaderTest\Main.cpp(131,21): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+3>D:\Repo\Sandbox\RaylibSandbox\ShaderTest\Main.cpp(132,22): warning C4244: '=': conversion from 'int' to 'float', possible loss of data
+3>D:\Repo\Sandbox\RaylibSandbox\ShaderTest\Main.cpp(135,25): warning C4305: 'initializing': truncation from 'double' to 'float'
+2>Linking Unit.h
+2>Compiling Board.cpp
+2>D:\Repo\Sandbox\RaylibSandbox\Chess3\Board.cpp(87,5): error C3861: 'DrawDebug': identifier not found
+2>Game.cpp
+2>Linking Unit.h
+3>D:\Repo\Sandbox\RaylibSandbox\ShaderTest\Main.cpp(258,22): warning C4838: conversion from 'int' to 'float' requires a narrowing conversion
+3>D:\Repo\Sandbox\RaylibSandbox\ShaderTest\Main.cpp(258,22): warning C4244: 'initializing': conversion from 'int' to 'float', possible loss of data
+3>D:\Repo\Sandbox\RaylibSandbox\ShaderTest\Main.cpp(258,35): warning C4838: conversion from 'int' to 'float' requires a narrowing conversion
+3>D:\Repo\Sandbox\RaylibSandbox\ShaderTest\Main.cpp(258,35): warning C4244: 'initializing': conversion from 'int' to 'float', possible loss of data
+3>D:\Repo\Sandbox\RaylibSandbox\ShaderTest\Main.cpp(283,1): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+2>Linking Board.h
+3>Generating code
+2>D:\Repo\Sandbox\RaylibSandbox\Chess3\Game.cpp(89,21): error C2039: 'DrawDebug': is not a member of 'QTNode'
+2>D:\Repo\Sandbox\RaylibSandbox\Chess3\Board.h(17): message : see declaration of 'QTNode'
+2>Done building project "Chess3.vcxproj" -- FAILED.
+3>3 of 110 functions ( 2.7%) were compiled, the rest were copied from previous compilation.
+3>  2 functions were new in current compilation
+3>  0 functions had inline decision re-evaluated but remain unchanged
+3>Finished generating code
+3>ShaderTest.vcxproj -> D:\Repo\Sandbox\RaylibSandbox\x64\Release\ShaderTest.exe
+3>Done building project "ShaderTest.vcxproj".
+========== Build: 1 succeeded, 2 failed, 3 up-to-date, 0 skipped ==========

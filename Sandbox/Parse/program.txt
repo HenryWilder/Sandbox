@@ -1,0 +1,2 @@
+int i = 0; // This is a comment
+string mystring = "This is a string"; // Hehehe!

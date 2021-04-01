@@ -1,6 +1,11 @@
 #include <raylib.h>
 #include "Templates.h"
 #include <tuple>
+#include <stack>
+
+struct Space {
+	bool visited;
+};
 
 int main()
 {
@@ -9,21 +14,22 @@ int main()
 	int windowHeight = 720;
 	InitWindow(windowWidth, windowHeight, "Pathfinder");
 
-	Array2D<char, 3, 3> test({
-		'a','b','c',
-		'd','e','f',
-		'g','h','i'}
-	);
-
-	printf("\nStarting test...\n");
-	for (char& c : test)
-	{
-		printf("%c", c);
-	}
-	printf("\nTest complete.\n");
+	Space spaces[8 * 8];
 
 	while (!WindowShouldClose())
 	{
+
+		BeginDrawing(); {
+
+			for (int y = 0; y < 8; ++y)
+			{
+				for (int x = 0; x < 8; ++x)
+				{
+					spaces[(y * 8) + x];
+				}
+			}
+
+		} EndDrawing();
 	}
 
 	CloseWindow();

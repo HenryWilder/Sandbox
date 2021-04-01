@@ -1,0 +1,4 @@
+<display>"Here's some text!"</display>
+<header>"aaaaaaaaa"</header>
+<body>"So basically this is supposed to be a fake site. Don't take it seriously."</body>
+<footer>"copyright never nobody"</footer>

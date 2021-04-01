@@ -7,828 +7,101 @@
 #include <stack>
 #include <bitset>
 #include <unordered_map>
+#include <fstream>
 #include <raylib.h>
 #include <raymath.h>
 
-#pragma region Composits
+#if 0
 
-class Object;
-
-
-
-// Connects to one or more Objects
-__interface ConnectionDelegate
+enum class EvalMethod : short
 {
-public:
-	virtual size_t Find(Object* what) = 0;			// Searches for the connection in the connector
-	virtual bool Valid(size_t index) = 0;			// Tells whether the index is a valid connection id
+	L_AND	= '&&',
+	L_NOR	= '!',
+	L_OR	= '||',
+	L_XOR	= '^^',
 
-	virtual Object* GetNode(size_t index) = 0;		// Returns a copy of the connection
+	B_MASK	= '&',
+	B_FLIP	= '~',
+	B_COMB	= '|',
+	B_SHFL	= '<<',
+	B_SHFR	= '>>',
+	B_BXOR	= '^',
 
-	virtual void _UnRef(size_t index) = 0;			// Remove the connection without reference cleaning
-	virtual void _UnRef(Object* what) = 0;			// Remove the connection without reference cleaning
-	virtual void Push(Object* what) = 0;			// Add a connection--erases existing connection if needed
-	virtual void Erase(Object* what) = 0;			// Remove the connection; cleans reference to self
+	A_ADD	= '+',
+	A_SUB	= '-',
+	A_MUL	= '*',
+	A_DIV	= '/',
+	A_MOD	= '%',
 
-	virtual size_t Width() = 0;						// The throughput capacity of the connection
-	virtual size_t Size() = 0;						// How many throughpoints are currently valid
+	C_MORE	= '>',
+	C_LESS	= '<',
+	C_EQUA	= '==',
+	C_NEQU	= '!=',
+	C_GTOE	= '>=',
+	C_LTOE	= '<=',
 };
-
-// Mono-width connector
-class Wire : public ConnectionDelegate
+std::istream& operator>>(std::istream& stream, EvalMethod& val)
 {
-private:
-	Object* connection;
-
-public:
-	size_t Find(Object* what) override
-	{
-		if (connection == what)
-		{
-			return 0ull;
-		}
-	}
-	bool Valid(size_t index) override
-	{
-		return (index == 0);
-	}
-
-	Object* GetNode(size_t index) override
-	{
-		return connection;
-	}
-
-	void _UnRef(size_t index) override
-	{
-		if (index == 0)
-		{
-			connection = nullptr;
-		}
-	}
-	void _UnRef(Object* what) override
-	{
-		if (connection == what)
-		{
-			connection = nullptr;
-		}
-	}
-	void Push(Object* what) override
-	{
-		if (connection)
-		{
-			what->_UnRef(this); // TODO
-		}
-		connection = what;
-	}
-	void Erase(Object* what) override
-	{
-		if (connection == what)
-		{
-			what->_UnRef(this); // TODO
-			connection = nullptr;
-		}
-	}
-
-	size_t Width() override
-	{
-		return 1ull;
-	}
-	size_t Size() override
-	{
-		return (connection ? 1ull : 0ull);
-	}
-};
-
-// Variable-width connector
-class Cable : public ConnectionDelegate
+	char _val[2];
+	stream >> _val;
+	val = (EvalMethod)*reinterpret_cast<short*>(_val);
+	return stream;
+}
+std::ostream& operator<<(std::ostream& stream, EvalMethod val)
 {
-private:
-	std::vector<Object*> connection;
-
-public:
-	size_t Find(Object* what) override
-	{
-		for (size_t i = 0ull; i < connection.size(); ++i)
-		{
-			if (connection[i] == what)
-			{
-				return i;
-			}
-		}
-		return connection.size();
-	}
-	bool Valid(size_t index) override
-	{
-		return (index < connection.size());
-	}
-
-	std::vector<Object*> Get() override
-	{
-		return connection;
-	}
-
-	void _UnRef(size_t index) override
-	{
-		connection.erase(connection.begin() + index);
-	}
-	void _UnRef(Object* what) override
-	{
-		_UnRef(Find(what));
-	}
-	void Push(Object* what) override
-	{
-		connection.push_back(what);
-	}
-	void Erase(Object* what) override
-	{
-		size_t at = Find(what);
-		if (Valid(at))
-		{
-			connection.erase(connection.begin() + at);
-		}
-	}
-
-	size_t Width() override
-	{
-		return connection.size();
-	}
-	size_t Size() override
-	{
-		return connection.size();
-	}
-};
-
-
-
-// Connects to one or more Objects by means of one or more ConnectionDelegate
-__interface IODelegate
+	char* _vall = reinterpret_cast<char*>(&val);
+	char _val[2]{ _vall[0], _vall[2] };
+	stream << _val;
+	return stream;
+}
+enum class Derivative : char
 {
-public:
-	virtual std::vector<ConnectionDelegate*> GetConnector() = 0;
-
-	virtual void _UnRef(ConnectionDelegate* what) = 0;
-	virtual void Push(ConnectionDelegate* what) = 0;
-	virtual void Erase(ConnectionDelegate* what) = 0;
-
-	virtual size_t Size() = 0;
-	virtual size_t Capacity() = 0;
+	Base = '0',
+	Node = 'n',
+	Gate = 'g',
+	Comp = 'c',
+	Unit = 'u',
 };
-
-// Exactly 1 conection
-class IO_1 : public IODelegate
+std::istream& operator>>(std::istream& stream, EvalMethod& val)
 {
-private:
-	ConnectionDelegate* io;
-
-public:
-	std::vector<ConnectionDelegate*> Get()
-	{
-		return { io };
-	}
-};
-
-// Exactly 2 connections of equal width
-class IO_2 : public IODelegate
+	char _val;
+	stream >> _val;
+	val = (EvalMethod)_val;
+	return stream;
+}
+std::ostream& operator<<(std::ostream& stream, EvalMethod val)
 {
-private:
-	struct { ConnectionDelegate* a; ConnectionDelegate* b; } io;
-
-public:
-	std::vector<ConnectionDelegate*> Get()
-	{
-		return { io.a, io.b };
-	}
-};
-
-// Various connections of equal width
-class IO_n : public IODelegate
-{
-private:
-	std::vector<ConnectionDelegate*> io;
-
-public:
-	std::vector<ConnectionDelegate*> Get()
-	{
-		return io;
-	}
-};
-
-
-
-__interface EvaluationDelegate
-{
-public:
-	virtual void Evaluate() = 0;									// Updates the evaluation for this frame
-	virtual bool GetValue(size_t wire = 0, size_t bit = 0) = 0;		// Returns the value of the state at the index
-	virtual void EvalReset() = 0;									// End of frame reset so next frame's evaluations can be performed
-};
-class NonEvaluating : public EvaluationDelegate
-{
-private:
-	IODelegate* input;
-
-public:
-	NonEvaluating(IODelegate* _input) : input(_input) {}
-
-	void Evaluate() {}
-	bool GetValue(size_t wire = 0, size_t bit = 0)
-	{
-		input->Get()[wire]->Get()[wire]->GetValue(wire, bit);
-	}
-	void EvalReset() {}
-};
-class Logical : public EvaluationDelegate
-{
-
-};
-class Comparative : public EvaluationDelegate
-{
-
-};
-class Bitwise : public EvaluationDelegate
-{
-
-};
-class Arithmetic : public EvaluationDelegate
-{
-
-};
-
-// 
-class Object
-{
-private:
-	Vector2 pos;
-	IODelegate* i;
-	IODelegate* o;
-	EvaluationDelegate* e;
-
-public:
-	enum class Type
-	{
-		Node, // Repeater
-		Gate, // Logical
-		Comp, // Comparative
-		Bitw, // Bitwise
-		Math, // Arithmetic
-	};
-
-	void Init(Type as)
-	{
-		switch (as)
-		{
-		case Type::Node:
-			i = new IO_1();
-			o = new IO_n();
-			e = new NonEvaluating(i);
-			break;
-
-		case Type::Gate:
-			i = new IO_2();
-			o = new IO_1();
-			e = new Logical(i);
-			break;
-
-		case Type::Comp:
-			i = new IO_2();
-			o = new IO_1();
-			e = new Comparative(i);
-			break;
-
-		case Type::Bitw:
-			i = new IO_2();
-			o = new IO_1();
-			e = new Bitwise(i);
-			break;
-
-		case Type::Math:
-			i = new IO_2();
-			o = new IO_1();
-			e = new Arithmetic(i);
-			break;
-		}
-	}
-	void Free()
-	{
-		delete i;
-		delete o;
-		delete e;
-	}
-	void Make(Type into)
-	{
-		Free();
-		Init(into);
-	}
-
-	Object(Vector2 _pos, Type _type) : pos(_pos) { Init(_type); }
-	~Object() { Free(); }
-
-	// IODelegate
-
-	std::vector<ConnectionDelegate*> GetInputs()
-	{
-		return i->Get();
-	}
-	std::vector<ConnectionDelegate*> GetOutputs()
-	{
-		return o->Get();
-	}
-
-	// EvaluationDelegate
-
-	void Evaluate()
-	{
-		e->Evaluate();
-	}
-	bool GetValue(size_t wire = 0ull, size_t bit = 0ull)
-	{
-		return e->GetValue(bit);
-	}
-	void EvalReset()
-	{
-		e->EvalReset();
-	}
-};
-
-#pragma endregion
-
-#pragma region Objects
-/*******************************************
-* 
-*	~Hierarchy~
-* 
-*	Key:
-*	{} = polymorphs to
-*	() = number of connections
-*	-> = input->output
-*	n  = vector of things
-*	*  = pure virtual
-* 
-*	Port*
-*	{
-*		Gate         (    2 -> 1    )
-*		Node         (    1 -> n    )
-*		{
-*			FlayNode ( 1(n) -> 1    )
-*		}
-*		CPort*
-*		{
-*			CNode    ( 1(n) -> n(n) )
-*			Comp     ( 2(n) -> 1    )
-*			Unit     ( 2(n) -> 1(n) )
-*		}
-*	}
-* 
-*******************************************/
-#pragma region Pure virtuals
-
-// Base class connection point
-// (Node*)(Port*) does NOT do the same thing as dynamic_cast<Node*>(Port*) !!
-class Port {
-protected:
-	// Worldspace location of the Port
-	Vector2 position;
-
-public:
-	// There is no default constructor. A world position is required.
-	Port(Vector2 _pos) : position(_pos) {}
-
-	// Enumeration of all Port child variants
-	enum class PortType {
-		Node, // One input, numerous outputs
-		Gate, // Two inputs, one output
-	};
-	// Returns what child class varient this is.
-	virtual PortType GetType() = 0;
-
-	// Finds the earliest Port* that might have affected the signal in the chain.
-	// Nodes do not affect signal, and can be effectively skipped over
-	virtual Port* Peephole() = 0;
-	// Returns the state of the given bit. (bit is only needed in Cable context)
-	virtual bool GetValue(int bit = 0) = 0;
-
-	// Returns the current world position of the Port
-	Vector2 GetLocation() { return position; }
-	// Sets the current world position of the Port to the provided value
-	void SetLocation(Vector2 location) { position = location; }
-
-	// Returns the next Port*.
-	virtual Port* Next(size_t path) = 0;
-	// Returns the previous Port*.
-	virtual Port* Prev(size_t path) = 0;
-
-	// Returns the Port* which got overwritten to make the push possible. Returns nullptr if push succeeded without overwrite
-	virtual Port* Push_I(Port* input) = 0;
-	// Returns the Port* which got overwritten to make the push possible. Returns nullptr if push succeeded without overwrite
-	virtual Port* Push_O(Port* output) = 0;
-
-	// Erase what from the input(s), if it is there. Does not remove self from their output list.
-	virtual void _DRef_I(Port* what) = 0;
-	// Erase what from the output(s), if it is there. Does not remove self from their input list.
-	virtual void _DRef_O(Port* what) = 0;
-
-	// Erase what from the input(s), if it is there. Returns true on success.
-	virtual bool Erase_I(Port* what) = 0;
-	// Erase what from the output(s), if it is there. Returns true on success.
-	virtual bool Erase_O(Port* what) = 0;
-
-	// Returns the number of inputs currently accessible
-	virtual size_t I_Size() = 0;
-	// Returns the number of outputs currently accessible
-	virtual size_t O_Size() = 0;
-
-	// Returns the number of inputs that could be used
-	virtual size_t I_Capacity() = 0;
-	// Returns the number of outputs that could be used
-	virtual size_t O_Capacity() = 0;
-
-	virtual std::vector<Port*> GetInputs() = 0;
-	virtual std::vector<Port*> GetOutputs() = 0;
-};
-
-// Structure containing either a cable, or a vector of ports
-// Calls the associated functions depending on which one it is
-struct Bundle {
-	Bundle(std::vector<Port*> _bundle) {
-		tag = MultiWire;
-		bundle = _bundle;
-	}
-	Bundle(CPort* _cable) {
-		tag = MonoCable;
-		bundle = {};
-		cable = _cable;
-	}
-
-	enum { MultiWire, MonoCable } tag;
-	union { nullptr_t null;  std::vector<Port*> bundle; CPort* cable; };
-
-	void Resize(size_t newSize) {
-		switch (tag) {
-		case MultiWire: bundle.resize(newSize); break;
-		case MonoCable: cable->Resize(newSize); break;
-		}
-	}
-	size_t Size() {
-		switch (tag) {
-		case MultiWire: return bundle.size();
-		case MonoCable: return cable->Size();
-		}
-	}
-};
-// Base class cable connection point
-class CPort : public Port {
-protected:
-	size_t width;
-
-public:
-	CPort(Vector2 _pos) : Port(_pos), width() {}
-	CPort(Vector2 _pos, size_t _width) : Port(_pos), width(_width) {}
-
-	virtual void Resize(size_t _width) = 0;
-	virtual size_t Size() = 0;
-};
-
-#pragma endregion
-#pragma region Nodes
-
-// Nodes can split, but not combine.
-// Nodes are more akin to repeaters and do not affect the signal.
-class Node : public Port {
-protected:
-	Port* i;
-	std::vector<Port*> o;
-
-public:
-	friend PortList;
-
-	Node(Vector2 _pos) : Port(_pos), i(nullptr), o({}) {}
-
-	PortType GetType() override { return PortType::Node; }
-
-	Port* Peephole() override { return (i ? i->Peephole() : nullptr); }
-
-	bool GetValue(int bit = 0) override {
-		Port* peek = Peephole(); // Find the first port who might actually affect the signal
-		return (peek ? peek->GetValue() : false); // Node is start of circuit
-	}
-
-	Port* Next(size_t path) override { return o[path]; }
-	Port* Prev(size_t path = 0) override { return i; }
-
-	Port* Push_I(Port* input) override {
-		Port* _i = i;
-		i = input;
-		if (_i) _i->Erase_O(this);
-		return _i;
-	}
-	Port* Push_O(Port* output) override {
-		o.push_back(output);
-		return nullptr;
-	}
-
-	void _DRef_I(Port* what) override {
-		if (i == what) i = nullptr;
-	}
-	void _DRef_O(Port* what) override {
-		size_t i = 0;
-		for (Port* port : o) {
-			if (port == what) {
-				o.erase(o.begin() + i);
-				break;
-			}
-			++i;
-		}
-	}
-
-	// Erase "what", if it is the input.
-	// Returns true if the erasure was successful or input is already free.
-	// Returns false if "what" was not the input.
-	bool Erase_I(Port* what) override {
-		if (i == what) {
-			i = nullptr;
-			what->_DRef_O(this);
-			return true;
-		}
-		return false;
-	}
-	// Erase "what", if it is an output.
-	// Returns true if the erasure was successful.
-	// Returns false if "what" was not an output.
-	bool Erase_O(Port* what) override {
-		size_t i = 0;
-		for (Port* port : o) {
-			if (port == what) {
-				o.erase(o.begin() + i);
-				what->_DRef_I(this);
-				return true;
-			}
-			++i;
-		}
-		return false;
-	}
-
-	size_t I_Size() override { return (i ? 1ull : 0ull); }
-	size_t O_Size() override { return o.size(); }
-
-	size_t I_Capacity() override { return 1ull; }
-	size_t O_Capacity() override { return SIZE_MAX; }
-
-	std::vector<Port*> GetInputs() override { return { i }; }
-	std::vector<Port*> GetOutputs() override { return o; }
-};
-
-class FlayNode : public Node {
-private:
-	size_t index;
-
-public:
-	FlayNode(Vector2 _pos, size_t _index) : Node(_pos), index(_index) {}
-
-	bool GetValue(int bit = 0) override { return i && i->GetValue(index); }
-};
-
-void Flay(Port* node) {
-	if (node = dynamic_cast<Node*>(node)) {
-		node = new 
-	}
+	return stream << (char)val;
 }
 
-// CableNodes can split, but not combine.
-// CableNodes are more akin to repeaters and do not affect the signal.
-// Unlike Nodes, CableNodes take in multiple inputs and convert them into a bundled signal.
-// Nodes should automatically become CableNodes when given additional inputs.
-// A CNode with 1 input or fewer should automatically become a regular Node again.
-class CNode : public CPort {
-protected:
-	Bundle i;
-	std::vector<Bundle> o;
+#include "Inheritance.h"
+//#include "Composition.h"
+//#include "Handler.h"
+#include "MethodInterface.h" // Creates names/macros/functions for interacting with an unknown methodology
 
-public:
-	friend PortList;
-
-	CNode(Vector2 _pos) : CPort(_pos), i(), o({}) {}
-	CNode(Vector2 _pos, int _width) : CPort(_pos), i(), o({}) {
-		i.Resize(_width);
-	}
-
-	PortType GetType() override { return PortType::Node; }
-
-	Port* Peephole() override { return (i ? i->Peephole() : nullptr); }
-
-	bool GetValue(int bit = 0) override {
-		Port* peek = Peephole(); // Find the first port who might actually affect the signal
-		return (peek ? peek->GetValue() : false); // Node is start of circuit
-	}
-
-	Port* Next(size_t path) override { return o[path]; }
-	Port* Prev(size_t path = 0) override { return i; }
-
-	Port* Push_I(Port* input) override {
-		Port* _i = i;
-		i = input;
-		if (_i) _i->Erase_O(this);
-		return _i;
-	}
-	Port* Push_O(Port* output) override {
-		o.push_back(output);
-		return nullptr;
-	}
-
-	void _DRef_I(Port* what) override {
-		if (i == what) i = nullptr;
-	}
-	void _DRef_O(Port* what) override {
-		size_t i = 0;
-		for (Port* port : o) {
-			if (port == what) {
-				o.erase(o.begin() + i);
-				break;
-			}
-			++i;
-		}
-	}
-
-	// Erase "what", if it is the input.
-	// Returns true if the erasure was successful or input is already free.
-	// Returns false if "what" was not the input.
-	bool Erase_I(Port* what) override {
-		if (i == what) {
-			i = nullptr;
-			what->_DRef_O(this);
-			return true;
-		}
-		return false;
-	}
-	// Erase "what", if it is an output.
-	// Returns true if the erasure was successful.
-	// Returns false if "what" was not an output.
-	bool Erase_O(Port* what) override {
-		size_t i = 0;
-		for (Port* port : o) {
-			if (port == what) {
-				o.erase(o.begin() + i);
-				what->_DRef_I(this);
-				return true;
-			}
-			++i;
-		}
-		return false;
-	}
-
-	size_t I_Size() override { return (i ? 1ull : 0ull); }
-	size_t O_Size() override { return o.size(); }
-
-	size_t I_Capacity() override { return 1ull; }
-	size_t O_Capacity() override { return SIZE_MAX; }
-
-	std::vector<Port*> GetInputs() override { return { i }; }
-	std::vector<Port*> GetOutputs() override { return o; }
-};
-
-#pragma endregion
-#pragma region Evaluators
-
-// Gates can combine (exactly 2), but not split.
-// Gates will almost certainly affect the signal
-class Gate : public Port {
-public:
-	enum class Method : char { OR = '|', NOT = '!', AND = '&', XOR = '^' };
-
-private:
-	struct { Port* a; Port* b; } i;
-	Port* o;
-	bool b_evaluated, b_state;
-	Method evm; // Evaluation Method
-
-public:
-	friend PortList;
-
-	Gate(Vector2 _pos) : Port(_pos), i({ nullptr, nullptr }), o(nullptr), b_evaluated(false), b_state(false), evm(Method::OR) {}
-
-	void SetMethod(Method evalMethod) { evm = evalMethod; }
-	Method GetMethod() { return evm; }
-
-	PortType GetType() override final { return PortType::Gate; }
-
-	bool Evaluate() {
-		bool a = (i.a ? i.a->GetValue() : false);
-		bool b = (i.b ? i.b->GetValue() : false);
-		switch (evm) {
-		default:
-		case Method::OR:  return (a || b);
-		case Method::AND: return (a && b);
-		case Method::NOT: return !(a || b);
-		case Method::XOR: return (a ? !b : b);
-		}
-	}
-
-	Port* Peephole() override { return this; }
-
-	bool GetValue(int bit) override final {
-		if (!b_evaluated) {
-			b_state = Evaluate();
-			b_evaluated = true;
-		}
-		return b_state;
-	}
-	void FrameEndReset() { b_evaluated = false; }
-
-	Port* Next(size_t path) override { return o; }
-	Port* Prev(size_t path) override { return (path ? i.b : i.a); }
-
-	Port* Push_I(Port* input) override {
-		if (i.a) {
-			Port* _b = i.b;
-			i.b = input;
-			if (_b) _b->Erase_O(this);
-			return _b;
-		}
-		else i.a = input;
-		return nullptr;
-	}
-	Port* Push_O(Port* output) override {
-		Port* _o = o;
-		o = output;
-		if (_o) _o->Erase_I(this);
-		return _o;
-	}
-
-	void _DRef_I(Port* what) override {
-		if (i.a == what) i.a = nullptr;
-		if (i.b == what) i.b = nullptr;
-	}
-	void _DRef_O(Port* what) override {
-		if (o == what) o = nullptr;
-	}
-
-	// Erase "what", if it is an input.
-	// Returns true if the erasure was successful.
-	// Returns false if "what" was not an input.
-	bool Erase_I(Port* what) override {
-		if (i.a == what) { i.a = nullptr; what->_DRef_O(this); return true; }
-		if (i.b == what) { i.b = nullptr; what->_DRef_O(this); return true; }
-		return false;
-	}
-	// Erase "what", if it is the output.
-	// Returns true if the erasure was successful or if output is already free.
-	// Returns false if "what" was not the output.
-	bool Erase_O(Port* what) override {
-		if (o == what) { o = nullptr; what->_DRef_I(this); return true; }
-		return false;
-	}
-
-	size_t I_Size() override { return ((i.a ? 1ull : 0ull) + (i.b ? 1ull : 0ull)); }
-	size_t O_Size() override { return (o ? 1ull : 0ull); }
-
-	size_t I_Capacity() override { return 2ull; }
-	size_t O_Capacity() override { return 1ull; }
-
-	std::vector<Port*> GetInputs() override { return { i.a, i.b }; }
-	std::vector<Port*> GetOutputs() override { return { o }; }
-};
-
-class Comp : public CPort {
-public:
-	enum class Method : char { GreaterThan = '>', LessThan = '<', Equals = '=', Not = '!' };
-
-private:
-	struct { Bundle a;  Bundle b; } i;
-	Port* o;
-};
-
-class Unit : public CPort {
-public:
-	enum class Method : char {
-		B_OR = '|', B_FLIP = '~', B_AND = '&', B_XOR = '^', B_SLEFT = '<', B_SRIGHT = '>',
-		A_ADD = '+', A_SUB = '-', A_MULT = '*', A_DIV = '/', A_MOD = '%'
-	};
-
-private:
-	struct { Bundle a;  Bundle b; } i;
-	Bundle o;
-};
-
-#pragma endregion
-#pragma endregion
+// 0 = none, 1 = show tree, 2 = show names by each vertex
+#define DEBUG_LEVEL 0
 
 #pragma region Containers
 
-std::unordered_map<Port*, char> g_namedPtrs;
+#if DEBUG_LEVEL >= 1
+std::unordered_map<Poly_t*, char> g_namedPtrs;
+#endif
 
 class PortList {
 private:
-	std::vector<Port*> ports;
+	std::vector<Poly_t*> bases;
 
 public:
-	auto begin() { return ports.begin(); }
-	auto end() { return ports.end(); }
+	auto begin() { return bases.begin(); }
+	auto end() { return bases.end(); }
 
-	Port* Get(size_t i) { return ports[i]; }
+	Poly_t* Get(size_t i) { return bases[i]; }
 
-#if 0
+#if DEBUG_LEVEL >= 1
 	std::string ConstructTreeStr() {
 		g_namedPtrs[nullptr] = '-';
-		auto PortName = [](Port* ptr) {
+		auto PortName = [](Poly_t* ptr) {
 			auto it = g_namedPtrs.find(ptr);
 			if (it == g_namedPtrs.end()) {
 				char name = (char)g_namedPtrs.size() - 1;
@@ -844,13 +117,13 @@ public:
 			return it->second;
 		};
 		std::string str;
-		for (Port* port : ports)
+		for (Poly_t* base : bases)
 		{
 			std::string str2;
-			switch (port->GetType())
+			switch (base->GetType())
 			{
 			case Port::PortType::Gate: {
-				Gate* gate = (Gate*)port;
+				Gate* gate = (Gate*)base;
 				str2 = TextFormat(R"(
 		(Gate)
 		InputA: %c,
@@ -859,10 +132,10 @@ public:
 
 			}	break;
 			case Port::PortType::Node: {
-				Node* node = (Node*)port;
+				Node* node = (Node*)base;
 
 				std::string str3;
-				for (Port* elem : node->o) {
+				for (Poly_t* elem : node->o) {
 					str3 += TextFormat(" %c,", PortName(elem));
 				}
 				if (str3.empty()) str3 = " - ";
@@ -875,7 +148,7 @@ public:
 			}	break;
 			}
 			
-			str += TextFormat("\n\t%c{%s\n\t}", PortName(port), (str2.empty() ? "\0" : str2.c_str()));
+			str += TextFormat("\n\t%c{%s\n\t}", PortName(base), (str2.empty() ? "\0" : str2.c_str()));
 		}
 		return (str.empty() ? " - " : str + "\n");
 	};
@@ -883,81 +156,79 @@ public:
 
 	// ONLY call this if it's certain "what" has no external references!!
 	// If "what" has the possibility of external references, please call Wipe() instead!
-	void Erase(size_t index) { ports.erase(ports.begin() + index); }
+	void Erase(size_t index)
+	{
+		bases.erase(bases.begin() + index);
+	}
 	// ONLY call this if it's certain "what" has no external references!!
 	// If "what" has the possibility of external references, please call Wipe() instead!
-	void Erase(Port* what) {
-		size_t i = 0;
-		for (; i < ports.size(); ++i) { if (ports[i] == what) break; }
-		Erase(i);
-	}
-
-	void Push(Port* port) { ports.push_back(port); }
-	void Reserve(size_t reservation) { if ((ports.size() + reservation) > ports.capacity()) ports.reserve(ports.size() + reservation); }
-
-	size_t Size() { return ports.size(); }
-
-	Port* FindAtPos(Vector2 at) {
-		for (Port* port : ports) {
-			if (port && Vector2Distance(at, port->GetLocation()) < 1.0f)
-				return port;
-		}
-		return nullptr;
-	}
-	Port* FindAtPos(Vector2 at, Port* avoid) {
-		for (Port* port : ports) {
-			if ((port) && (Vector2Distance(at, port->GetLocation()) < 1.0f) && (port != avoid))
-				return port;
-		}
-		return nullptr;
-	}
-	Port* FindAtPos(Vector2 at, std::unordered_set<Port*>& avoid) {
-		for (Port* port : ports) {
-			if ((port) && (Vector2Distance(at, port->GetLocation()) < 1.0f) && (avoid.find(port) == avoid.end()))
-				return port;
-		}
-		return nullptr;
-	}
-	Port* FindAtPos(Vector2 at, std::vector<Port*>& avoid) {
-		// If it would be computationally cheeper to do so, convert the vector to an unordered_set so we can have O(c) find() operations.
-		if ((avoid.size() > 10)) { // Must be trying to avoid more than 10 elements
-			std::unordered_set<Port*> avoidSet;
-			for (Port* port : avoid) { avoidSet.insert(port); }
-			return FindAtPos(at, avoidSet);
-		}
-		else {
-			auto VectorContains = [&avoid](Port* target) {
-				for (Port* port : avoid) {
-					if (port == target) return true;
-				}
-				return false;
-			};
-			for (Port* port : ports) {
-				if ((port) && (Vector2Distance(at, port->GetLocation()) < 0.5f) && (!VectorContains(port)))
-					return port;
+	void Erase(Poly_t* what)
+	{
+		for (size_t i = 0; i < bases.size(); ++i)
+		{
+			if (bases[i] == what)
+			{
+				Erase(i);
+				break;
 			}
-			return nullptr;
 		}
 	}
-#if 0
+
+	void Push(Poly_t* base)
+	{
+		bases.push_back(base);
+	}
+	void Reserve(size_t reservation)
+	{
+		if ((bases.size() + reservation) > bases.capacity())
+		{
+			bases.reserve(bases.size() + reservation);
+		}
+	}
+
+	size_t Size() { return bases.size(); }
+
+	Poly_t* FindAtPos(Vector2 at) {
+		for (Poly_t* base : bases) {
+			if (base && Vector2Distance(at, Location_Of(base)) < 1.0f)
+				return base;
+		}
+		return nullptr;
+	}
+	Poly_t* FindAtPos(Vector2 at, Poly_t* avoid) {
+		for (Poly_t* base : bases) {
+			if ((base) && (Vector2Distance(at, Location_Of(base)) < 1.0f) && (base != avoid))
+				return base;
+		}
+		return nullptr;
+	}
+	Poly_t* FindAtPos(Vector2 at, std::unordered_set<Poly_t*>& avoid) {
+		for (Poly_t* base : bases) {
+			if ((base) && (Vector2Distance(at, Location_Of(base)) < 1.0f) && (avoid.find(base) == avoid.end()))
+				return base;
+		}
+		return nullptr;
+	}
+
+#if 0 // Wipe is no longer useful.
 #define NULLIFY_IF_FOUND(var) if (hitlist.find(var) != hitlist.end()) var = nullptr // If the passed variable has a value on the no-no list, euthanize it.
-	void Wipe(std::unordered_set<Port*>& hitlist) { // unordered_set has constant-time (very fast) find(), making it perfect for "is this a wanted guy?"
-		std::stack<size_t> srcs; // Stack of indices to the actual Port* objects in the vector (FIFO so that indices don't get invalidated while erasing)
+	void Wipe(std::unordered_set<Poly_t*>& hitlist) { // unordered_set has constant-time (very fast) find(), making it perfect for "is this a wanted guy?"
+		std::stack<size_t> srcs; // Stack of indices to the actual Poly_t* objects in the vector (FIFO so that indices don't get invalidated while erasing)
 		size_t i = 0ull; // Stores index so we can do a range-based for loop :>
-		for (Port* port : ports) {
-			if (hitlist.find(port) != hitlist.end()) srcs.push(i); // That one right there, officer.
+		for (Poly_t* base : bases) {
+			if (hitlist.find(base) != hitlist.end()) srcs.push(i); // That one right there, officer.
 			else { // This guy's gonna be gone anyway. Don't bother wasting the operations.
-				switch (port->GetType()) // The different varients of Port* have to be handled differently
+				switch (base->GetType()) // The different varients of Poly_t* have to be handled differently
 				{
-				case Port::PortType::Gate: { // Port* is of the Gate class
-					Gate* gate = (Gate*)port; // We are safe not to dynamic_cast here as we have already confirmed the type
+				case Port::PortType::Gate: { // Poly_t* is of the Gate class
+					Gate* gate = (Gate*)base; // We are safe not to dynamic_cast here as we have already confirmed the type
 					NULLIFY_IF_FOUND(gate->i.a);
 					NULLIFY_IF_FOUND(gate->i.b);
 					NULLIFY_IF_FOUND(gate->o);
 				} break;
 
-				case Port::PortType::Node: { // Port* is of the Node class
-					Node* node = (Node*)port; // We are safe not to dynamic_cast here as we have already confirmed the type
+				case Port::PortType::Node: { // Poly_t* is of the Node class
+					Node* node = (Node*)base; // We are safe not to dynamic_cast here as we have already confirmed the type
 					NULLIFY_IF_FOUND(node->i);
 					std::stack<size_t> badOuts; // Stack of indices of outputs on the no-no list (FIFO so that indices don't get invalidated while erasing)
 					for (size_t o = 0; o < node->O_Size(); ++o) {
@@ -973,33 +244,33 @@ public:
 			++i; // Increment the index so it's up to date
 		}
 		while (!srcs.empty()) { // For as long as there are elements needing to be gone'd,
-			ports.erase(ports.begin() + srcs.top()); // Erase the index of the top source
+			bases.erase(bases.begin() + srcs.top()); // Erase the index of the top source
 			srcs.pop(); // Whatever is on the top of the srcs stack is no longer useful. Stop storing it.
 		}
 	}
 #undef NULLIFY_IF_FOUND // Undefine so this name doesn't leak
 
 #define REPLACE(var) if (var == target) var = with
-	void Replace(Port* target, Port* with) {
-		size_t targetIndex = ports.size();
+	void Replace(Poly_t* target, Poly_t* with) {
+		size_t targetIndex = bases.size();
 		size_t i = 0;
 		bool b_withAlreadyExists = false;
-		for (Port* port : ports) {
-			if (port == with) b_withAlreadyExists = true;
-			else if (port == target) targetIndex = i;
+		for (Poly_t* base : bases) {
+			if (base == with) b_withAlreadyExists = true;
+			else if (base == target) targetIndex = i;
 			else {
-				switch (port->GetType())
+				switch (base->GetType())
 				{
 				case Port::PortType::Gate: {
-					Gate* gate = (Gate*)port;
+					Gate* gate = (Gate*)base;
 					REPLACE(gate->i.a);
 					REPLACE(gate->i.b);
 					REPLACE(gate->o);
 				} break;
 				case Port::PortType::Node: {
-					Node* node = (Node*)port;
+					Node* node = (Node*)base;
 					REPLACE(node->i);
-					for (Port*& o : node->o) {
+					for (Poly_t*& o : node->o) {
 						REPLACE(o);
 					}
 				} break;
@@ -1007,84 +278,15 @@ public:
 			}
 			++i;
 		}
-		if (targetIndex < ports.size()) {
-			if (b_withAlreadyExists) ports[targetIndex] = with;
-			else ports.erase(ports.begin() + targetIndex);
+		if (targetIndex < bases.size()) {
+			if (b_withAlreadyExists) bases[targetIndex] = with;
+			else bases.erase(bases.begin() + targetIndex);
 		}
 	}
 #undef REPLACE // Undefine so this name doesn't leak
 #endif
 };
 PortList g_allPorts;
-
-// Creates a Node with the same information as the passed port (frees port internally!)
-Node* ToNode(Port* port)
-{
-	if (port->GetType() == Port::PortType::Node) return (Node*)port; // Already is node
-
-	Node* node = new Node(port->GetLocation());
-	std::vector<Port*> inputs  = port->GetInputs();
-	std::vector<Port*> outputs = port->GetOutputs();
-
-	switch (port->GetType())
-	{
-	case Port::PortType::Gate: { // Turning a Gate into a Node
-		// 2 inputs -> 1 input
-		if (inputs[0]) {
-			node->Push_I(inputs[0]);
-			inputs[0]->Erase_O(port);
-			inputs[0]->Push_O(node);
-		}
-		if (inputs[1]) inputs[1]->Erase_O(port); // Tell all the ex-input that they no longer have this port as an output
-
-		// 1 output -> 1 output(n)
-		if (outputs[0]) {
-			node->Push_O(outputs[0]);
-			outputs[0]->Erase_I(port);
-			outputs[0]->Push_I(node);
-		}
-	}	break;
-	}
-	g_allPorts.Erase(port);
-	delete port;
-	g_allPorts.Push(node);
-	return node;
-}
-// Creates a Gate with the same information as the passed port (frees port internally!)
-Gate* ToGate(Port* port)
-{
-	if (port->GetType() == Port::PortType::Gate) return (Gate*)port; // Already is gate
-
-	Gate* gate = new Gate(port->GetLocation());
-	std::vector<Port*> inputs  = port->GetInputs();
-	std::vector<Port*> outputs = port->GetOutputs();
-
-	switch (port->GetType())
-	{
-	case Port::PortType::Node: { // Turning a Node into a Gate
-		// 1 input -> 1 input
-		if (inputs[0]) {
-			gate->Push_I(inputs[0]);
-			inputs[0]->Erase_O(port);
-			inputs[0]->Push_O(gate);
-		}
-
-		// n outputs -> 1 output
-		if (!outputs.empty()) {
-			for (Port* out : outputs) {
-				out->Erase_I(port); // Tell all the ex-outputs that they no longer have this port as an input
-			}
-			gate->Push_O(outputs[0]);
-			outputs[0]->Push_I(gate);
-		}
-
-	}	break;
-	}
-	g_allPorts.Erase(port);
-	delete port;
-	g_allPorts.Push(gate);
-	return gate;
-}
 
 struct ColorScheme {
 	ColorScheme() : background(), grid(), selection(), icons() {}
@@ -1106,28 +308,19 @@ float Sign(float value) {
 	if (value < 0.0f) return -1.0f;
 	return 0.0f;
 }
-float Roundf(float value) { return (float)(int)(value + (0.5f * Sign(value))); }
-int Round(float value) { return (int)(value + (0.5f * Sign(value))); }
-Vector2 Roundf(Vector2 vec) { return { Roundf(vec.x), Roundf(vec.y) }; }
+Vector2 roundv2(Vector2 vec) { return { roundf(vec.x), roundf(vec.y) }; }
 
 float Shift(float value, int shift) {
-	if (shift == 0) return value;
-	if (value > 1.0f) {
-		if (shift > 0) return (float)(Round(value) <<  shift);
-		if (shift < 0) return (float)(Round(value) >> -shift);
-	}
-	else {
-		if (shift > 0) return (value * (1 << shift));
-		if (shift < 0) return (value / (1 << -shift));
-	}
+	if (shift > 0) return (value * (1 << shift));
+	if (shift < 0) return (value / (1 << -shift));
 	return value;
 }
-float Shift(float value, float shift) { return Shift(value, Round(shift)); }
+float Shift(float value, float shift) { return Shift(value, lroundf(shift)); }
 
 // Returns end but moved to the best place route I decided
 Vector2 QueenRules(Vector2 start, Vector2 end) {
-	start = Roundf(start);
-	end = Roundf(end);
+	start = roundv2(start);
+	end = roundv2(end);
 	Vector2 dist = Vector2Subtract(end, start);
 	float* shorter;
 	float* longer;
@@ -1185,7 +378,7 @@ void DrawCordEx(Vector2 start, Vector2 end, Color color, float thickness) {
 
 #pragma region Main
 
-int main() {
+int _main() {
 	int windowWidth = 1280;
 	int windowHeight = 720;
 
@@ -1214,24 +407,14 @@ int main() {
 		LoadTexture("Gate_L-XOR.png"),
 	};
 	// Draws the icon for a gate of the chosen evaluation method (AND, OR, NOT, XOR) centered at the position, scaled by world units
-	auto DrawGateIcon = [&gateIcons](Gate::Method m, Vector2 pt, float scale, Color tint) {
+	auto DrawGateIcon = [&gateIcons](EvalMethod m, Vector2 pt, float scale, Color tint) {
 		int iconIndex;
 		switch (m)
 		{
-		case Gate::Method::AND:
-			iconIndex = 0;
-			break;
-		case Gate::Method::NOT:
-			iconIndex = 1;
-			break;
-		case Gate::Method::OR:
-			iconIndex = 2;
-			break;
-		case Gate::Method::XOR:
-			iconIndex = 3;
-			break;
-		default:
-			break;
+		case EvalMethod::L_AND: iconIndex = 0; break;
+		case EvalMethod::L_NOR: iconIndex = 1; break;
+		case EvalMethod::L_OR:  iconIndex = 2; break;
+		case EvalMethod::L_XOR: iconIndex = 3; break;
 		}
 		Texture& tex = gateIcons[iconIndex];
 		float halfScale = scale * 0.5f;
@@ -1254,7 +437,7 @@ int main() {
 	mousePos = { 0,0 };
 	worldMousePos = { 0,0 };
 
-	Port* startPort = nullptr;	// The port which was hovered when drawing began (resets when m1 is released)
+	Poly_t* startPort = nullptr;	// The base which was hovered when drawing began (resets when m1 is released)
 	Vector2 startPos{};			// Where the mouse was when drawing was started
 	Vector2 endPos{};			// Where the mouse was when drawing was finished
 	Rectangle collision;		// For selection
@@ -1278,11 +461,11 @@ int main() {
 		worldScreen.height = width.y;
 	};
 
-	std::unordered_set<Port*> selection;
-	Port* hovered = nullptr;
+	std::unordered_set<Poly_t*> selection;
+	Poly_t* hovered = nullptr;
 
 	enum class InputMode { Draw, Select, Edit } mode = InputMode::Draw;
-	Port::PortType make = Port::PortType::Node;
+	Derivative make = Derivative::Node;
 
 	float time = 0.0f;
 
@@ -1299,7 +482,7 @@ int main() {
 				else camera.zoom = 127.0f;
 			}
 			else camera.zoom = 1.0f;
-			cameraPos = Vector2Scale(Roundf(Vector2Scale(cameraPos, 1.0f / camera.zoom)), camera.zoom); // Update camera position now that zoom has been changed
+			cameraPos = Vector2Scale(roundv2(Vector2Scale(cameraPos, 1.0f / camera.zoom)), camera.zoom); // Update camera position now that zoom has been changed
 		}
 
 		mousePos_last = mousePos;
@@ -1320,19 +503,19 @@ int main() {
 				Vector2 mouse_delta = Vector2Subtract(mousePos, mousePos_last);
 				Vector2 worldMouse_delta = Vector2Subtract(worldMousePos, worldMousePos_last);
 
-				cameraPos = Vector2Scale(Roundf(Vector2Scale(Vector2Add(cameraPos, mouse_delta), 1.0f / camera.zoom)), camera.zoom);
+				cameraPos = Vector2Scale(roundv2(Vector2Scale(Vector2Add(cameraPos, mouse_delta), 1.0f / camera.zoom)), camera.zoom);
 			}
 			// M1 Press
 			// Start wire
 			if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) {
 				startPort = hovered;
-				if (startPort) startPos = startPort->GetLocation();
-				else startPos = Roundf(worldMousePos);
+				if (startPort) startPos = Location_Of(startPort);
+				else startPos = roundv2(worldMousePos);
 			}
 			// M1 Dragging
 			// Update endpoint position
 			if (IsMouseButtonDown(MOUSE_LEFT_BUTTON) || IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) {
-				endPos = Roundf(QueenRules(startPos, worldMousePos));
+				endPos = roundv2(QueenRules(startPos, worldMousePos));
 			}
 			// M1 Release
 			// Connect wire
@@ -1345,15 +528,15 @@ int main() {
 
 					std::bitset<2> neededAllocs;
 
-					Port* start = (neededAllocs.set(BIT_START, !startPort), (neededAllocs.test(BIT_START) ? new Node(startPos) : startPort));
-					Port* end = (neededAllocs.set(BIT_END, !hovered), (neededAllocs.test(BIT_END) ? new Node(endPos) : hovered));
+					Poly_t* start = (neededAllocs.set(BIT_START, !startPort), (neededAllocs.test(BIT_START) ? new Node(startPos) : startPort));
+					Poly_t* end = (neededAllocs.set(BIT_END, !hovered), (neededAllocs.test(BIT_END) ? new Node(endPos) : hovered));
 
 					g_allPorts.Reserve(neededAllocs.count());
 					if (neededAllocs.test(BIT_START)) g_allPorts.Push(start);
 					if (neededAllocs.test(BIT_END))   g_allPorts.Push(end);
 
-					start->Push_O(end); // Push end as an output of start
-					end->Push_I(start); // Push start as an input of end
+					Push_Output(start, end); // Push end as an output of start
+					Push_Input(end, start); // Push start as an input of end
 
 			#undef BIT_START
 			#undef BIT_END
@@ -1390,12 +573,12 @@ int main() {
 					collision.height = worldMousePos.y - startPos.y;
 				}
 
-				for (Port* port : g_allPorts) {
-					if (CheckCollisionPointRec(port->GetLocation(), collision)) {
-						selection.insert(port);
+				for (Poly_t* base : g_allPorts) {
+					if (CheckCollisionPointRec(Location_Of(base), collision)) {
+						selection.insert(base);
 					}
 					else {
-						if (selection.find(port) != selection.end()) selection.erase(port);
+						if (selection.find(base) != selection.end()) selection.erase(base);
 					}
 				}
 			}
@@ -1415,11 +598,11 @@ int main() {
 			// Middle release
 			// Stop dragging
 			if (IsMouseButtonReleased(MOUSE_MIDDLE_BUTTON)) {
-				for (Port* port : selection) {
-					if (Port* existing = g_allPorts.FindAtPos(worldMousePos, selection)) {
-						g_allPorts.Erase(existing); // First we remove the port from the world, so its source doesn't get overwritten
-						g_allPorts.Replace(existing, port); // Then we overwrite every reference to it
-						port->Push_I(existing->Prev(0)); // Replace port's input with existing's input
+				for (Poly_t* base : selection) {
+					if (Poly_t* existing = g_allPorts.FindAtPos(worldMousePos, selection)) {
+						g_allPorts.Erase(existing); // First we remove the base from the world, so its source doesn't get overwritten
+						g_allPorts.Replace(existing, base); // Then we overwrite every reference to it
+						base->Push_I(existing->Prev(0)); // Replace base's input with existing's input
 						delete existing; // And finally free it
 					}
 				}
@@ -1431,12 +614,12 @@ int main() {
 				Vector2 mouse_delta = Vector2Subtract(mousePos, mousePos_last);
 				Vector2 worldMouse_delta = Vector2Subtract(worldMousePos, worldMousePos_last);
 
-				for (Port* port : selection) {
-					port->SetLocation(Roundf(Vector2Add(port->GetLocation(), worldMouse_delta)));
+				for (Poly_t* base : selection) {
+					base->SetLocation(Roundf(Vector2Add(base->Location_Of(), worldMouse_delta)));
 				}
 			}
 			// Delete/backspace
-			// Delete selected Port*s
+			// Delete selected Poly_t*s
 			if (IsKeyPressed(KEY_DELETE) || IsKeyPressed(KEY_BACKSPACE)) {
 				g_allPorts.Wipe(selection);
 				selection.clear();
@@ -1446,19 +629,19 @@ int main() {
 			// Key
 			{
 				// Number
-				// Change type of ports selected
+				// Change type of bases selected
 				int pressed = GetCharPressed();
 				if (pressed == '1' || pressed == '2') {
 					Vector2 pos = Roundf(worldMousePos);
-					std::unordered_set<Port*> updatedSelection;
-					for (Port* port : selection) {
+					std::unordered_set<Poly_t*> updatedSelection;
+					for (Poly_t* base : selection) {
 						switch (pressed)
 						{
 						case '1': // Set selected to nodes
-							updatedSelection.insert(ToNode(port));
+							updatedSelection.insert(ToNode(base));
 							break;
 						case '2': // Set selected to gates
-							updatedSelection.insert(ToGate(port));
+							updatedSelection.insert(ToGate(base));
 							break;
 						default:
 							break;
@@ -1469,8 +652,8 @@ int main() {
 				// Letter
 				// Change type of gate
 				if (((IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) && (pressed == '|' || pressed == '&' || pressed == '!')) || pressed == '^') {
-					for (Port* port : selection) {
-						if (Gate* gate = dynamic_cast<Gate*>(port)) {
+					for (Poly_t* base : selection) {
+						if (Gate* gate = dynamic_cast<Gate*>(base)) {
 							switch (pressed)
 							{
 							case '|': // Set selected to nodes
@@ -1500,11 +683,11 @@ int main() {
 		}
 
 		// Evaluate
-		std::unordered_set<Port*> nullbodies; // Ports with no inputs nor outputs
+		std::unordered_set<Poly_t*> nullbodies; // Ports with no inputs nor outputs
 		// Draw wires
-		for (Port* port : g_allPorts) {
-			if (port->I_Size() || port->O_Size()) port->GetValue(); // Evaluate
-			else nullbodies.insert(port); // Eliminate
+		for (Poly_t* base : g_allPorts) {
+			if (base->I_Size() || base->O_Size()) base->GetValue(); // Evaluate
+			else nullbodies.insert(base); // Eliminate
 		}
 		g_allPorts.Wipe(nullbodies);
 
@@ -1563,23 +746,23 @@ int main() {
 						std::queue<std::pair<Vector2, Vector2>> inactiveWires;
 
 						// Fill out active/inactive wire queues
-						for (Port* port : g_allPorts) {
-							if (port) {
-								Vector2 pt = port->GetLocation();
-								float state = (port->GetValue() ? 0.0f : 1.0f);
+						for (Poly_t* base : g_allPorts) {
+							if (base) {
+								Vector2 pt = base->Location_Of();
+								float state = (base->GetValue() ? 0.0f : 1.0f);
 
-								switch (port->GetType())
+								switch (base->GetType())
 								{
 								case Port::PortType::Gate:
-									if (Port* next = port->Next(0)) { // next must not be nullptr
-										std::pair<Vector2, Vector2> wire = { pt, next->GetLocation() };
+									if (Poly_t* next = base->Next(0)) { // next must not be nullptr
+										std::pair<Vector2, Vector2> wire = { pt, next->Location_Of() };
 										if (state) activeWires.push(wire);
 										else inactiveWires.push(wire);
 									}
 									break;
 								case Port::PortType::Node:
-									for (Port* next : port->GetOutputs()) {
-										std::pair<Vector2, Vector2> wire = { pt, next->GetLocation() };
+									for (Poly_t* next : base->GetOutputs()) {
+										std::pair<Vector2, Vector2> wire = { pt, next->Location_Of() };
 										if (state) activeWires.push(wire);
 										else inactiveWires.push(wire);
 									}
@@ -1610,22 +793,22 @@ int main() {
 					}
 					else
 					{
-						for (Port* port : g_allPorts) {
-							if (port) {
-								Vector2 pt = port->GetLocation();
-								bool state = port->GetValue();
+						for (Poly_t* base : g_allPorts) {
+							if (base) {
+								Vector2 pt = base->Location_Of();
+								bool state = base->GetValue();
 								Color stateColor = (state ? Color{ 255, 0, 0, 255 } : WHITE);
 
-								switch (port->GetType())
+								switch (base->GetType())
 								{
 								case Port::PortType::Gate:
-									if (Port* next = port->Next(0)) { // next must not be nullptr
-										DrawCord(pt, next->GetLocation(), stateColor);
+									if (Poly_t* next = base->Next(0)) { // next must not be nullptr
+										DrawCord(pt, next->Location_Of(), stateColor);
 									}
 									break;
 								case Port::PortType::Node:
-									for (Port* next : port->GetOutputs()) {
-										DrawCord(pt, next->GetLocation(), stateColor);
+									for (Poly_t* next : base->GetOutputs()) {
+										DrawCord(pt, next->Location_Of(), stateColor);
 									}
 									break;
 								}
@@ -1635,7 +818,7 @@ int main() {
 				}
 
 				if (hovered) {
-					Vector2 pt = hovered->GetLocation();
+					Vector2 pt = hovered->Location_Of();
 					switch (hovered->GetType())
 					{
 					case Port::PortType::Gate:
@@ -1651,13 +834,13 @@ int main() {
 					}
 				}
 				// Highlight selection
-				for (Port* port : selection) {
-					if (port) {
-						Vector2 pt = port->GetLocation();
-						switch (port->GetType())
+				for (Poly_t* base : selection) {
+					if (base) {
+						Vector2 pt = base->Location_Of();
+						switch (base->GetType())
 						{
 						case Port::PortType::Gate:
-							DrawGateIcon(((Gate*)port)->GetMethod(), pt, 3.0f, YELLOW);
+							DrawGateIcon(((Gate*)base)->GetMethod(), pt, 3.0f, YELLOW);
 							break;
 
 						case Port::PortType::Node:
@@ -1669,14 +852,14 @@ int main() {
 						}
 					}
 				}
-				// Draw ports
-				for (Port* port : g_allPorts) {
-					if (port) {
-						Vector2 pt = port->GetLocation();
-						switch (port->GetType())
+				// Draw bases
+				for (Poly_t* base : g_allPorts) {
+					if (base) {
+						Vector2 pt = base->Location_Of();
+						switch (base->GetType())
 						{
 						case Port::PortType::Gate: {
-							DrawGateIcon(((Gate*)port)->GetMethod(), pt, 2.0f, BLUE);
+							DrawGateIcon(((Gate*)base)->GetMethod(), pt, 2.0f, BLUE);
 						}	break;
 						case Port::PortType::Node:
 							DrawCircleV(pt, .1f, BLUE);
@@ -1695,7 +878,7 @@ int main() {
 
 			} EndMode2D();
 
-#if _DEBUG
+#if DEBUG >= 1
 			DrawText(TextFormat("Mouse at: { %#1.1f, %#1.1f }\nTotal components: %i", worldMousePos.x, worldMousePos.y, g_allPorts.Size()), 0, 0, 8, WHITE);
 
 			DrawText(TextFormat("Root{%s}", g_allPorts.ConstructTreeStr().c_str()), 0, 48, 8, WHITE);
@@ -1703,22 +886,22 @@ int main() {
 			if (it != g_namedPtrs.end())
 				DrawText(TextFormat("Hovering %c", it->second), 86, 48, 8, WHITE);
 #endif
-			for (Port* port : g_allPorts) {
-#if _DEBUG
-				auto it = g_namedPtrs.find(port);
+			for (Poly_t* base : g_allPorts) {
+#if DEBUG >= 2
+				auto it = g_namedPtrs.find(base);
 				if (it != g_namedPtrs.end()) {
-					Vector2 pt = GetWorldToScreen2D(port->GetLocation(), camera);
+					Vector2 pt = GetWorldToScreen2D(base->Location_Of(), camera);
 					DrawText(TextFormat("%c", it->second), (int)pt.x + 1, (int)pt.y + 1, 8, MAGENTA);
 				}
 #endif
-				if (Gate* gate = dynamic_cast<Gate*>(port)) gate->FrameEndReset();
+				if (Gate* gate = dynamic_cast<Gate*>(base)) gate->FrameEndReset();
 			}
 	} EndDrawing();
 
 #pragma endregion
 	}
 
-	for (Port* port : g_allPorts) { if (port) delete port; }
+	for (Poly_t* base : g_allPorts) { if (base) Free_Poly(base); }
 
 	UnloadShader(g_shader_wire);
 	UnloadShader(g_shader_cable);
@@ -1732,3 +915,4 @@ int main() {
 }
 
 #pragma endregion
+#endif

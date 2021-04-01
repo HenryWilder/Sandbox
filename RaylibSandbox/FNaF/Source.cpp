@@ -1,5 +1,6 @@
 #include <raylib.h>
 #include <stdlib.h>
+#include <unordered_map>
 #include "random.h"
 #include "Animatronics.h"
 
@@ -20,12 +21,12 @@ const char* GetCamName(Cam cam)
 	case Cam::Cam1C: return "1C";
 	case Cam::Cam2A: return "2A";
 	case Cam::Cam2B: return "2B";
-	case Cam::Cam3: return "3";
+	case Cam::Cam3:	 return "3";
 	case Cam::Cam4A: return "4A";
 	case Cam::Cam4B: return "4B";
-	case Cam::Cam5: return "5";
-	case Cam::Cam6: return "6";
-	case Cam::Cam7: return "7";
+	case Cam::Cam5:  return "5";
+	case Cam::Cam6:  return "6";
+	case Cam::Cam7:  return "7";
 	}
 }
 bool IsHovered(CamButton& button)
@@ -45,6 +46,7 @@ int main()
 	int windowWidth = 1920;
 	int windowHeight = 1080;
 	InitWindow(windowWidth, windowHeight, "Five Nights at Freddy's");
+	ToggleFullscreen();
 	SetTargetFPS(60);
 
 	int power = 100;
@@ -52,6 +54,40 @@ int main()
 	bool b_watchingCams = false;
 	float officeRot = 0.0f;
 	bool hoveringMonitorFlipperButtonRectangleUhhThingyWhateverIDKYouKnowWhatIMeanYeahYouKnow = false;
+
+	enum {
+		Animatronic_Bonnie,
+		Animatronic_Chica,
+		Animatronic_Foxy,
+		Animatronic_Freddy,
+
+		Animatronic_Total,
+	};
+
+	int cooldown_max[Animatronic_Total];
+	cooldown_max[Animatronic_Bonnie ] = 200;
+	cooldown_max[Animatronic_Chica	] = 300;
+	cooldown_max[Animatronic_Foxy   ] = 700;
+	cooldown_max[Animatronic_Freddy ] = 400;
+	
+	int cooldown[Animatronic_Total];
+	for (int i = 0; i < Animatronic_Total; ++i) {
+		cooldown[i] = cooldown_max[i];
+	}
+
+	std::map<Place, Texture2D> renders[Animatronic_Total];
+	renders[Animatronic_Bonnie] = {
+		{Place::ShowStage, LoadTexture(/* TODO */)},
+	};
+	renders[Animatronic_Chica ] = {
+		{},
+	};
+	renders[Animatronic_Foxy  ] = {
+		{},
+	};
+	renders[Animatronic_Freddy] = {
+		{},
+	};
 
 	Bonnie bonnie;
 	Chica chica;

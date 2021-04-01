@@ -18,6 +18,9 @@
     <ClCompile Include="Source.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Paraphrase.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="wire.frag">
@@ -40,5 +43,19 @@
     <Image Include="Gate_L-XOR.png">
       <Filter>Resource Files</Filter>
     </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Inheritance.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Composition.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Handler.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="MethodInterface.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

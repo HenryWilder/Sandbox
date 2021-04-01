@@ -19,7 +19,7 @@ struct GUIMat
 	GUIMat(const char* vertexShaderCode, const char* fragmentShaderCode) : type(MatType::Mat_Material), data(), src({ 0,0,0,0 }) {
 		data.m.maps = nullptr;
 		data.m.params = nullptr;
-		data.m.shader = LoadShaderCode();
+		data.m.shader = LoadShaderCode(vertexShaderCode, fragmentShaderCode);
 	};
 
 	enum class MatType
@@ -44,9 +44,8 @@ void DrawGUIMat(GUIMat mat, Rectangle dest, Vector2 origin, float rotation = 0.0
 
 struct GUIMatElement
 {
-	GUIMatElement(Rectangle _drawSpace, GUIMat _material, Color _tint = WHITE) : drawSpace(_drawSpace), material(_material), tint(_tint) {};
+	GUIMatElement(GUIMat _material, Color _tint = WHITE) : material(_material), tint(_tint) {};
 
-	Rectangle drawSpace;
 	GUIMat material;
 	Color tint;
 };
@@ -54,15 +53,22 @@ struct GUIMatElement
 template<class stateEnum>
 struct MatStateMachine
 {
-	MatStateMachine(std::map<stateEnum, GUIMatElement> _mat)
-		: mat(_mat) {};
+	MatStateMachine(std::vector<GUIMatElement> _srcMats, std::map<stateEnum,int> _mat)
+		: srcMats(_srcMats), mat(_mat) {};
 
-	std::map<stateEnum, GUIMatElement> mat;
+	std::vector<GUIMatElement> srcMats;
+	std::map<stateEnum,int> mat;
+	static GUIMatElement invalid;
 };
 template<class stateEnum>
-GUIMatElement GetStateMaterial(MatStateMachine<stateEnum> stateMachine, stateEnum state)
+extern GUIMatElement invalid;
+
+template<class stateEnum>
+GUIMatElement* GetStateMaterial(MatStateMachine<stateEnum> stateMachine, stateEnum state)
 {
-	return stateMachine.mat.find(state)->second;
+	auto it = stateMachine.mat.find(state);
+	if (it != stateMachine.mat.end()) return &(stateMachine.srcMats[it->second]);
+	else return &MatStateMachine<stateEnum>::invalid;
 }
 
 
@@ -73,6 +79,7 @@ enum class ButtonStateFlags : unsigned char {
 	Pressed = 0b11,
 
 	Hovered = 0b100,
+	Disabled = 0b1000,
 };
 ButtonStateFlags operator|(ButtonStateFlags lval, ButtonStateFlags rval);
 ButtonStateFlags& operator|=(ButtonStateFlags& lval, ButtonStateFlags rval);
@@ -87,29 +94,21 @@ bool IsButtonStateHovered(ButtonStateFlags state);
 struct GUIButton
 {
 	GUIButton(Rectangle _collision,
-			  GUIMat defaultMat,
-			  GUIMat hoveredMat,
-			  GUIMat pressedMat,
-			  GUIMat disabledMaterial,
-			  bool startDisabled = false,
-			  Color tint = WHITE) :
+			  MatStateMachine<ButtonStateFlags> _stateMaterials,
+			  bool startDisabled = false) :
 		collision(_collision),
 		state(ButtonStateFlags::Up),
-		mat_default(defaultMat),
-		mat_hovered(hoveredMat),
-		mat_pressed(pressedMat),
-		mat_disabled(disabledMaterial),
-		tint(tint),
+		stateMaterials(_stateMaterials),
 		b_disabled(startDisabled) {};
 
 	Rectangle collision;
 	ButtonStateFlags state;
 	bool b_disabled;
-	MatStateMachine stateMaterials;
+	MatStateMachine<ButtonStateFlags> stateMaterials;
 };
 ButtonStateFlags GetButtonState(GUIButton button);
 
-GUIMat& GetButtonDrawMat(GUIButton button, ButtonStateFlags state);
+GUIMatElement* GetButtonDrawMat(GUIButton button, ButtonStateFlags state);
 void DrawGUIButton(GUIButton button, ButtonStateFlags state);
 
 struct GUISlider

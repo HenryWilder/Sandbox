@@ -13,6 +13,9 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Header Files\Macros">
+      <UniqueIdentifier>{f78c608d-22a9-4dd4-aacc-4ca2433969ad}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp">
@@ -22,6 +25,30 @@
   <ItemGroup>
     <ClInclude Include="BaseTypes.h">
       <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Sprites.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Physics.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Movement.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="EnemyAI.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="InputMacros.h">
+      <Filter>Header Files\Macros</Filter>
+    </ClInclude>
+    <ClInclude Include="InputUndef.h">
+      <Filter>Header Files\Macros</Filter>
+    </ClInclude>
+    <ClInclude Include="UserTypes.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="TypingMacros.h">
+      <Filter>Header Files\Macros</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
