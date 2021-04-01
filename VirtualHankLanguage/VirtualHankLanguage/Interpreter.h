@@ -15,8 +15,8 @@ typedef void* FunctionPointer; // Do not fear me... I give an alias to the void
 struct Symbol : public std::string
 {
 	Symbol() : std::string() {};
-	Symbol(std::string const& token) : std::string{ token } {};
-	Symbol(const char* const& token) : std::string{ token } {};
+	Symbol(std::string const& token) : std::string(token) {}
+	Symbol(const char* const& token) : std::string(token) {}
 
 	operator std::string() const { return (*(std::string*)(this)); }
 	operator const char* () const { return this->c_str(); }
@@ -24,9 +24,9 @@ struct Symbol : public std::string
 
 struct StringLiteral : public std::string
 {
-	StringLiteral() : std::string() {};
-	StringLiteral(std::string const& token) : std::string{ token } {};
-	StringLiteral(const char* const& token) : std::string{ token } {};
+	StringLiteral() : std::string() {}
+	StringLiteral(std::string const& token) : std::string(token) {}
+	StringLiteral(const char* const& token) : std::string(token) {}
 
 	operator std::string() const { return (*(std::string*)(this)); }
 	operator const char* () const { return this->c_str(); }
@@ -40,21 +40,21 @@ private:
 	int m_paramCount;
 
 public:
-	FuncBase() : m_function{ nullptr } {};
-	FuncBase(FunctionPointer funcPtr, int params) : m_function{ funcPtr }, m_paramCount{ params } {};
+	FuncBase() : m_function(nullptr), m_paramCount() {}
+	FuncBase(FunctionPointer funcPtr, int params) : m_function(funcPtr), m_paramCount(params) {}
 
 	void Execute() const
 	{
-
+		funcPtr();
 	}
 };
 
 // @SPAGHETTI: I feel like this could possibly be done cleaner with templates? Maybe? or a base type could work too.
 struct FunctionSymbol : public std::string
 {
-	FunctionSymbol() : std::string{ "" } {};
-	FunctionSymbol(std::string const& token) : std::string{ token } {};
-	FunctionSymbol(const char* const& token) : std::string{ token } {};
+	FunctionSymbol() : std::string("") {};
+	FunctionSymbol(std::string const& token) : std::string(token) {}
+	FunctionSymbol(const char* const& token) : std::string(token) {}
 
 	operator std::string() const { return (*(std::string*)(this)); }
 	operator const char* () const { return this->c_str(); }
@@ -70,8 +70,8 @@ bool ValidFunction(const char*);
 struct KeywordSymbol : public std::string
 {
 	KeywordSymbol() : std::string() {};
-	KeywordSymbol(std::string const& token) : std::string{ token } {};
-	KeywordSymbol(const char* const& token) : std::string{ token } {};
+	KeywordSymbol(std::string const& token) : std::string(token) {}
+	KeywordSymbol(const char* const& token) : std::string(token) {}
 
 	operator std::string() const { return (*(std::string*)(this)); }
 	operator const char* () const { return this->c_str(); }
@@ -86,11 +86,11 @@ bool ValidKeyword(const char*);
 struct CtrlSymbol : public std::string
 {
 	CtrlSymbol() : std::string() {};
-	CtrlSymbol(std::string const& token) : std::string{ token } {};
-	CtrlSymbol(const char* const& token) : std::string{ token } {};
+	CtrlSymbol(std::string const& token) : std::string(token) {}
+	CtrlSymbol(const char* const& token) : std::string(token) {}
 
 	operator std::string() const { return (*(std::string*)(this)); }
-	operator const char*() const { return this->c_str(); }
+	operator const char* () const { return this->c_str(); }
 };
 extern const CtrlSymbol g_CtrlStatements[];
 enum class CtrlToken : char;
@@ -107,11 +107,11 @@ bool IsNumber(const std::string input);
 struct VariableSymbol : public std::string
 {
 	VariableSymbol() : std::string() {};
-	VariableSymbol(std::string const& token) : std::string{ token } {};
-	VariableSymbol(const char* const& token) : std::string{ token } {};
+	VariableSymbol(std::string const& token) : std::string(token) {}
+	VariableSymbol(const char* const& token) : std::string(token) {}
 
 	operator std::string() const { return (*(std::string*)(this)); }
-	operator const char*() const { return this->c_str(); }
+	operator const char* () const { return this->c_str(); }
 
 private:
 	// HACK: Dynamic_cast<>() requires at least one virtual function to work... so here it is I guess?...
@@ -122,11 +122,11 @@ template<typename Type = int>
 class VariableSymbolSpec : public VariableSymbol
 {
 public:
-	VariableSymbolSpec() : VariableSymbol(), m_value{} {};
-	VariableSymbolSpec(std::string const& token) : VariableSymbol{ token }, m_value{} {};
-	VariableSymbolSpec(VariableSymbol const& token) : VariableSymbol{ token }, m_value{} {};
-	VariableSymbolSpec(std::string const& token, Type value) : VariableSymbol{ token }, m_value{ value } {};
-	VariableSymbolSpec(VariableSymbol const& token, Type value) : VariableSymbol{ token }, m_value{ value } {};
+	VariableSymbolSpec() : VariableSymbol(), m_value() {}
+	VariableSymbolSpec(std::string const& token) : VariableSymbol( token ), m_value() {}
+	VariableSymbolSpec(VariableSymbol const& token) : VariableSymbol( token ), m_value() {}
+	VariableSymbolSpec(std::string const& token, Type value) : VariableSymbol( token ), m_value( value ) {}
+	VariableSymbolSpec(VariableSymbol const& token, Type value) : VariableSymbol( token ), m_value( value ) {}
 private:
 	Type m_value;
 	// HACK: See VariableSymbol
@@ -147,7 +147,10 @@ private:
 public:
 	~CustomVars()
 	{
-		for (VariableSymbol*& var : m_vars) { delete var; }
+		for (VariableSymbol*& var : m_vars)
+		{
+			delete var;
+		}
 		if (m_vars.size()) m_vars.clear();
 	}
 

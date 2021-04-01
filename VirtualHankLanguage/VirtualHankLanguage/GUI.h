@@ -1,7 +1,9 @@
 #pragma once
 #include <string>
+#include <sstream>
 #include <cstdarg>
 #include <stdio.h>
+#include <fstream>
 
 char DensityRamp(const double);
 char DensityRamp(const float);
@@ -42,12 +44,57 @@ enum class Color8Bit
 	Bright_Offset = 60,
 	BG_Offset = 10,
 };
-std::string ColorEsc(const Color8Bit, const bool, const bool); // Produces an escape code for the desired color which can be inserted into a string
+Color8Bit operator+(Color8Bit l, Color8Bit r);
+std::string ColorEsc(Color8Bit, bool, bool); // Produces an escape code for the desired color which can be inserted into a string
 
-void InsertEscColor(std::string&, const Color8Bit, const size_t);
+void InsertEscColor(std::string&, Color8Bit, size_t);
+
+void SetPrintColorRGB(unsigned char r, unsigned char g, unsigned char b);
+void SetPrintColor8Bit(Color8Bit color);
+void ResetPrintColor();
+void SetPrintPos(int x, int y);
+
+extern const std::string g_overlay;
+
+// Symbol used for positioning ancoring in overlay
+enum class PosSymbol : char
+{
+	Comm = '>',
+	Debug = '~',
+	Pretty = '$',
+};
+struct LineData
+{
+	size_t pos, width;
+	int x();
+	int y();
+};
+LineData FindPositionInOverlay(PosSymbol symbol, int index);
+void PrepareLine(LineData line);
 
 void DrawOverlay();
 
-void SayDebug(const std::string&, const Color8Bit = Color8Bit::Yellow);
-void SayComm(const std::string&, const Color8Bit = Color8Bit::Yellow);
-void SayPretty(const std::string&, const Color8Bit = Color8Bit::Yellow);
+enum class DebugColor
+{
+	Msg,
+	Warning,
+	Critical,
+};
+struct DebugLine
+{
+	std::string m_str;
+	DebugColor m_color = DebugColor::Msg;
+};
+extern DebugLine g_debugLines[];
+extern std::string g_commLines[];
+
+void PushDebug(const std::string& line, DebugColor color);
+void DrawDebug();
+void SayDebug(const std::string& str, DebugColor color = DebugColor::Msg);
+
+void ClearComm();
+void PushComm(std::string);
+void DrawComm();
+void SayComm(const std::string&);
+
+void SayPretty(const std::string, Color8Bit = Color8Bit::Yellow);

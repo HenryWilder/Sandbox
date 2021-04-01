@@ -55,5 +55,8 @@
     <Text Include="0.vhvf">
       <Filter>Resource Files</Filter>
     </Text>
+    <Text Include="log.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
   </ItemGroup>
 </Project>

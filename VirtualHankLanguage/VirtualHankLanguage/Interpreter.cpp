@@ -1,19 +1,20 @@
 #include "Interpreter.h"
+#include <unordered_map>
 
 int g_version = 0;
 
 std::ifstream file;
 
-const FunctionSymbol g_FunctionSymbolList[] =
-{
-	"\\*%#$__FUNCTION_TYPE_ERROR__",
-	"Print",
-	"Wait",
-	"MouseTo",
-	"Click",
-	"Keypress",
-	"Open",
+// Todo: fill with function pointers to functions
+const std::unordered_map<FunctionSymbol, FunctionPointer> g_FunctionSymbolList{
+	{ "Print",		FunctionPointer{} },
+	{ "Wait",		FunctionPointer{} },
+	{ "MouseTo",	FunctionPointer{} },
+	{ "Click",		FunctionPointer{} },
+	{ "Keypress",	FunctionPointer{} },
+	{ "Open",		FunctionPointer{} },
 };
+
 const FuncBase g_FunctionClassList[] =
 {
 	FuncBase(), // ERR
