@@ -1,20 +1,23 @@
-Session No. 23 | Thu Apr  1 20:39:34 2021
+Session No. 39 | Fri Apr  2 12:47:07 2021
 
 Info: Program started.
 Info: Executing Virtual Hank Instruction Document Test.vhid using version number 0.
-Info: Moved to next line.
+Info: Now evaluating line 1
+Info: var x 123
 Info: Read the line-starting symbol "var"
 Info: Read variable symbol x which has not yet been declared
 Info: Declaring the variable x
 Info: Declared & initialized x to 123.000000
 Info: Returned var x (123.000000)
-Info: Moved to next line.
+Info: Now evaluating line 2
+Info: var y 456
 Info: Read the line-starting symbol "var"
 Info: Read variable symbol y which has not yet been declared
 Info: Declaring the variable y
 Info: Declared & initialized y to 456.000000
 Info: Returned var y (456.000000)
-Info: Moved to next line.
+Info: Now evaluating line 3
+Info: var z y
 Info: Read the line-starting symbol "var"
 Info: Read variable symbol z which has not yet been declared
 Info: Declaring the variable z
@@ -23,17 +26,9 @@ Info: Read variable symbol y which has a value of 456.000000
 Info: Returned var y (456.000000)
 Info: Declared & initialized z to 456.000000
 Info: Returned var z (456.000000)
-Info: Moved to next line.
+Info: Now evaluating line 4
+Info: Print "Apple"
 Info: Read the line-starting symbol "Print"
-Critical: Invalid function name!
-Info: Moved to next line.
-Info: Read the line-starting symbol "Wait"
-Critical: Invalid function name!
-Info: Moved to next line.
-Info: Read the line-starting symbol "x"
-Info: Read variable symbol 234 which has not yet been declared
-Info: Declaring the variable 234
-Info: Declared & initialized 234 to inf
-Info: Returned var 234 (inf)
-Info: Moved to next line.
-Info: Read the line-starting symbol "end"
+Info: Calling function
+Info:  
+Info: Reached end of document.

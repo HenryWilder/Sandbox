@@ -75,6 +75,7 @@ enum class KeywordToken : char
 const std::unordered_map<std::string, KeywordToken> g_Keywords
 {
 	{ "var",	KeywordToken::var,		},
+	{ "set",	KeywordToken::var,		},
 	{ "lit",	KeywordToken::lit,		},
 	{ "func",	KeywordToken::func,		},
 	{ "ctrl",	KeywordToken::ctrl,		},
@@ -102,33 +103,7 @@ CustomVars g_vars;
 
 void FuncCall(FuncToken func)
 {
-	switch (func)
-	{
-	case FuncToken::Print:
-		{
-			std::string line;
-			std::getline(file, line);
-			SayComm(line);
-		}
-		break;
-
-	case FuncToken::Wait:
-		{
-			int time;
-			file >> time;
-			Sleep(time);
-		}
-		break;
-
-	case FuncToken::MouseTo:
-		break;
-	case FuncToken::Click:
-		break;
-	case FuncToken::Keypress:
-		break;
-	case FuncToken::Open:
-		break;
-	}
+	
 }
 
 enum class SymbolType
@@ -373,148 +348,70 @@ using namespace DEBUGMSGNS;
 #define DebugMessageHLT(...)
 
 // If "get" == true, do not assume we are setting the variable unless it is undeclared.
-float Variable(bool get)
+float Variable(std::stringstream& stream, bool get)
 {
 	std::string symbol;
-	file >> symbol;
+	stream >> symbol;
 	if (g_vars.IsVar(symbol))
+	{
 		SayDebug("Read variable symbol " + symbol + " which has a value of " + std::to_string(g_vars.GetVar(symbol)));
+	}
 	else
 	{
 		SayDebug("Read variable symbol " + symbol + " which has not yet been declared");
 		SayDebug("Declaring the variable " + symbol);
 	}
 
-	if (!(get && g_vars.IsVar(symbol))) // If the variable already exists, and we do not want to set it, skip this section.
+	if (!get)
 	{
-		std::streampos goBack = file.tellg();
-		std::string symbol1;
-		file >> symbol1;
-		file.seekg(goBack);
-		DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "Read the symbol %s, ", symbol1.c_str());
-		// Determine value to set the var to
-		float value = INFINITY;
-		switch (FindSymbolType(symbol1))
+		float value = Param(stream);
+		if (g_vars.IsVar(symbol)) // If the variable already exists, and we do not want to set it, skip this section.
 		{
-		case SymbolType::Variable: // Initialize variable with another variable
-			{
-				DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "which is a variable");
-				value = Variable();
-
-				DebugMessage(MSGTYPE::MSG_DEBUG, "Used the variable ");
-				DebugMessageHLT(MSGTYPE::MSG_DEBUG, HLT::HLT_VAR, "%s", symbol1.c_str());
-				DebugMessage(MSGTYPE::MSG_DEBUG, " (currently ");
-				DebugMessageHLT(MSGTYPE::MSG_DEBUG, HLT::HLT_LIT, "%f", value);
-				DebugMessage(MSGTYPE::MSG_DEBUG, ") as the value for variable ");
-				DebugMessageHLT(MSGTYPE::MSG_DEBUG, HLT::HLT_VAR, "%s", symbol.c_str());
-				DebugMessage(MSGTYPE::MSG_DEBUG, ".\n");
-			}
-			break;
-
-		case SymbolType::Function: // Initialize variable with function return
-			DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "for Function.\n");
-			DebugMessage(MSGTYPE::MSG_WARNING, "WARNING: Initializing a variable with a function is not yet supported");
-			// TODO: Set g_vars with functions
-			break;
-
-		case SymbolType::ValueLiteral: // Initialize variable with literal
-			file >> value;
-			DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "for the literal value %f.\n", value);
-			DebugMessage(MSGTYPE::MSG_DEBUG, "Used the literal ");
-			DebugMessageHLT(MSGTYPE::MSG_DEBUG, HLT::HLT_LIT, "%f", value);
-			DebugMessage(MSGTYPE::MSG_DEBUG, " as the value for variable ");
-			DebugMessageHLT(MSGTYPE::MSG_DEBUG, HLT::HLT_VAR, "%s", symbol.c_str());
-			DebugMessage(MSGTYPE::MSG_DEBUG, ".\n");
-			break;
-
-		default: // No keyword for initialization
-			DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "for an error to occur.\n");
-			DebugMessage(MSGTYPE::MSG_WARNING, "WARNING: INVALID SYNTAX FOR DECLARING A VAR! Expected 'lit', 'var', or 'func'. Read '%s' instead.\n", symbol1.c_str());
-			break;
-		}
-
-		if (g_vars.IsVar(symbol)) // Variable exists
-		{
-			DebugMessage(MSGTYPE::MSG_DEBUG_PRODUCT, "Set the variable %s with new value %f (Previously %f).\n", symbol.c_str(), value, g_vars.GetVar(symbol));
 			g_vars.SetVar(symbol, value);
 		}
-		else // Variable does not exist, initialize
+		else
 		{
 			g_vars.DeclareVar(symbol, value);
-			DebugMessage(MSGTYPE::MSG_DEBUG_PRODUCT, "Declared new variable %s with init value %f.\n", symbol.c_str(), value);
 		}
+		return value;
 	}
-	DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "Returning the value of %s (currently %f).\n", symbol.c_str(), g_vars.GetVar(symbol));
-	return g_vars.GetVar(symbol);
+	else
+	{
+		return g_vars.GetVar(symbol);
+	}
 }
 
-float Param()
+float Param(std::stringstream& stream)
 {
-	std::streampos goBack = file.tellg();
 	std::string symbol;
-	file >> symbol;
+	stream >> symbol;
 	SayDebug("Read the parameter keyword \"" + symbol + "\"");
-	float value = INFINITY;
+	float value;
 	switch (FindSymbolType(symbol)) {
 	case SymbolType::ValueLiteral:
-		file.seekg(goBack);
-		file >> value;
+		value = std::stof(symbol);
 		SayDebug("Used the literal value " + std::to_string(value) + " as a parameter");
 		break;
 	case SymbolType::Variable:
-		value = Variable();
+		value = Variable(stream);
+		SayDebug("Used the variable value " + std::to_string(value) + " as a parameter");
 		break;
 	case SymbolType::Keyword: // TODO: Handle declaration of new var as a param
-		SayDebug("Tried declaring a new variable in a parameter for a function", DebugColor::Critical);
+		throw "Tried declaring a new variable in a parameter for a function";
 		break;
 	default:
 	case SymbolType::Function: // TODO: Functions as parameters for other functions
-		SayDebug("Tried using a function as a parameter for another function", DebugColor::Critical);
+		throw "Tried using a function as a parameter for another function";
 		break;
 	}
 	return value;
 }
 
-float Function()
-{
-	std::string symbol;
-	file >> symbol;
-
-	FuncToken token = g_FunctionSymbolList.find(symbol)->second;
-
-	switch (token)
-	{
-	case FuncToken::Wait: // Wait
-		{
-			int time = (int)Param();
-			SayDebug("Waiting " + std::to_string(time) + " ms...");
-			Sleep(time);
-			SayDebug("Finished wait.");
-		}
-		break;
-
-	case FuncToken::Print: // Print
-		{
-			std::string str;
-			file >> str;
-			SayComm(str);
-			SayDebug("Printed the string \"" + str + "\"");
-		}
-		break;
-
-	// TODO: Add more functions
-	default:
-		SayDebug("Undefined function", DebugColor::Warning);
-		break;
-	}
-	return 0;
-}
-
 // TODO: Implement control statments
-int Control()
+int Control(std::stringstream& stream)
 {
 	std::string symbol;
-	file >> symbol;
+	stream >> symbol;
 	CtrlToken ctrlSymbol = g_CtrlStatements.find(symbol.c_str())->second;
 	switch (ctrlSymbol)
 	{
@@ -527,7 +424,7 @@ int Control()
 		*	{ :[code to execute] };
 		*
 		**********************************/
-		Param();
+		Param(stream);
 		break;
 	case CtrlToken::ctrl_for: // For
 		/*********************************
@@ -539,14 +436,14 @@ int Control()
 		*	
 		* 
 		**********************************/
-		Variable(false); // Variable
-		Param(); // End value
-		Param(); // Increment amount
+		Variable(stream, false); // Variable
+		Param(stream); // End value
+		Param(stream); // Increment amount
 		break;
 	case CtrlToken::ctrl_while: // While
 		break;
 	case CtrlToken::ctrl_break: // Break
-		file.ignore(256, ';');
+		stream.ignore(256, ';');
 		break;
 	default:
 		DebugMessage(MSGTYPE::MSG_ERROR, "ERROR: CONTROL KEYWORD USED WITHOUT VALID CONTROL SYMBOL.\n");
@@ -674,13 +571,17 @@ int InterpretFile(const char* filename)
 
 	while (!file.eof()) // For each line
 	{
-		file.ignore(256, ':');
+		file.ignore(256, '\n');
 		++line; // I want the lines to be { 1, 2, 3, ... } instead of { 0, 1, 2, ... }
-		SayDebug("Moved to next line.");
+		SayDebug("Now evaluating line " + std::to_string(line));
 		//PrintLine();
+		std::string _line;
+		std::getline(file, _line, ';');
+		std::stringstream line(_line);
+		SayDebug(_line);
 
 		std::string startingSymbol;
-		file >> startingSymbol;
+		line >> startingSymbol;
 
 		SayDebug("Read the line-starting symbol \"" + startingSymbol + "\"");
 
@@ -690,19 +591,58 @@ int InterpretFile(const char* filename)
 		{
 		case SymbolType::Function:
 			{
+				SayDebug("Calling function");
 				DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "a function.\n");
-				std::string name;
-				file >> name;
-				auto it = g_FunctionSymbolList.find(name);
-				if (it != g_FunctionSymbolList.end()) FuncCall(it->second);
-				else SayDebug("Invalid function name!", DebugColor::Critical);
+				auto it = g_FunctionSymbolList.find(startingSymbol);
+				if (it != g_FunctionSymbolList.end())
+				{
+					switch (it->second)
+					{
+					case FuncToken::Print:
+					{
+						file.ignore(64, '\"');
+						std::string str;
+						std::getline(line, str, '\"');
+						SayComm(str);
+						SayDebug(str);
+					}
+					break;
+
+					case FuncToken::Wait:
+					{
+						try
+						{
+							float time_ms = Param(line);
+							Sleep((DWORD)time_ms);
+						}
+						catch (const char* msg)
+						{
+							SayDebug(msg, DebugColor::Critical);
+						}
+					}
+					break;
+
+					case FuncToken::MouseTo:
+						break;
+					case FuncToken::Click:
+						break;
+					case FuncToken::Keypress:
+						break;
+					case FuncToken::Open:
+						break;
+					}
+				}
+				else
+				{
+					SayDebug("Function name not found in function list!", DebugColor::Critical);
+				}
 			}
 			break;
 
 		case SymbolType::Variable:
 			{
 				DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "an existing variable.\n");
-				Variable(false); // We are almost certainly reassigning the variable if its name is at the start of a line
+				Variable(line, false); // We are almost certainly reassigning the variable if its name is at the start of a line
 			}
 			break;
 
@@ -716,7 +656,7 @@ int InterpretFile(const char* filename)
 
 				case KeywordToken::var:
 					DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "for declaring a new var.\n");
-					Variable();
+					Variable(line);
 					break;
 				}
 			}
@@ -725,7 +665,7 @@ int InterpretFile(const char* filename)
 		case SymbolType::Control:
 			{
 				DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "a control keyword.\n");
-				Control();
+				Control(line);
 			}
 			break;
 
@@ -742,6 +682,7 @@ int InterpretFile(const char* filename)
 END:
 
 	DebugMessage(MSGTYPE::MSG_DEBUG, "End of document.\n");
+	SayDebug("Reached end of document.");
 
 	file.close();
 

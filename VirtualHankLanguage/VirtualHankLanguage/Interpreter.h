@@ -201,8 +201,8 @@ namespace DEBUGMSGNS
 	bool PrintLine(bool returnToStart = true);
 }
 
-float Variable(bool get = true);
-float Param();
-float Function();
+float Variable(std::stringstream& stream);
+float Param(std::stringstream& stream);
+float Function(std::stringstream& stream);
 
 int InterpretFile(const char*);
