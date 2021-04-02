@@ -3,9 +3,10 @@
 #include "GUI.h"
 #include "Interpreter.h"
 
-int g_version = 0;
+#define DebugMessage(...)
+#define DebugMessageHLT(...)
 
-std::ifstream file;
+int g_version = 0;
 
 bool IsNumber(char first)
 {
@@ -13,36 +14,6 @@ bool IsNumber(char first)
 }
 bool IsNumber(const char* input) { return IsNumber(input[0]); }
 bool IsNumber(const std::string& input) { return IsNumber(input[0]); }
-
-bool CustomVars::IsVar(const std::string& symbol) const
-{
-	return this->m_vars.find(symbol) != this->m_vars.end();
-}
-void CustomVars::DeclareVar(const std::string& symbol)
-{
-	this->m_vars.insert({ symbol, float() });
-	SayDebug("Declared var " + symbol);
-}
-void CustomVars::DeclareVar(const std::string& symbol, float value)
-{
-	this->m_vars.insert({ symbol, value });
-	SayDebug("Declared & initialized " + symbol + " to " + std::to_string(value));
-}
-float CustomVars::GetVar(const std::string& symbol) const
-{
-	auto var = this->m_vars.find(symbol);
-	float value = NAN;
-	if (var != this->m_vars.end()) value = var->second;
-	SayDebug("Returned var " + symbol + " (" + std::to_string(value) + ")");
-	return value;
-}
-void CustomVars::SetVar(const std::string& symbol, float value)
-{
-	auto var = this->m_vars.find(symbol);
-	SayDebug("Setting " + symbol + "to " + std::to_string(value));
-	if (var != this->m_vars.end()) var->second = value;
-	else SayDebug("Could not set var!", DebugColor::Critical);
-}
 
 enum class FuncToken : char
 {
@@ -66,21 +37,10 @@ const std::unordered_map<std::string, FuncToken> g_FunctionSymbolList
 enum class KeywordToken : char
 {
 	var,
-	lit,
-	func,
-	ctrl,
-	end,
-	namspc,
 };
 const std::unordered_map<std::string, KeywordToken> g_Keywords
 {
 	{ "var",	KeywordToken::var,		},
-	{ "set",	KeywordToken::var,		},
-	{ "lit",	KeywordToken::lit,		},
-	{ "func",	KeywordToken::func,		},
-	{ "ctrl",	KeywordToken::ctrl,		},
-	{ "end",	KeywordToken::end,		},
-	{ "namspc",	KeywordToken::namspc,	},
 };
 
 enum class CtrlToken : char
@@ -98,36 +58,24 @@ const std::unordered_map<std::string, CtrlToken> g_CtrlStatements
 	{ "break",	CtrlToken::ctrl_break	},
 };
 
-CustomVars g_vars;
+std::unordered_map<std::string, float> g_vars;
 
-
-void FuncCall(FuncToken func)
+float var(const std::string& symbol, float value)
 {
-	
+	g_vars[symbol] = value;
+	SayDebug("The value of " + symbol + " is " + std::to_string(value));
+	return value;
+}
+float var(const std::string& symbol)
+{
+	float val = g_vars[symbol];
+	SayDebug("The value of " + symbol + " is " + std::to_string(val));
+	return val;
 }
 
 enum class SymbolType
 {
-	/**********************************
-	*
-	*	Explaination for order
-	*	======================
-	*	0)	ERR: null, so that errors will always return *false*
-	*	1)	String literal: Extremely easy to test. Just check if the
-	*		first char is a quotemark.
-	*	2)	Value literal: Almost as quick to test: just check if the
-	*		first char is '-', '0', '1', '2', '3', '4', '5', '6', '7', '8', or '9'.
-	*	3)	Keyword: Keywords are extremely important, and are more likely to be
-	*		put before any other type of symbol.
-	*	4)	Control: There is a very short list of control statements.
-	*	5)	Function: The list of functions is predetermined
-	*		before the program ever runs.
-	*	6)	Variable: Vars are last, because they are user-defined names and
-	*		could be anything. They also reside in a dynamic array.
-	*
-	**********************************/
-
-	ERR = NULL,		// Anything not fitting into the following lists
+	ERR,			// Anything not fitting into the following lists
 	StringLiteral,	// Uses quotemarks
 	ValueLiteral,	// Starts with a number
 	Keyword,		// In list of keywords
@@ -137,271 +85,75 @@ enum class SymbolType
 };
 SymbolType FindSymbolType(const std::string& symbol)
 {
+#define CONTAINS(container, element) container.find(element) != container.end()
+
 	if (!symbol.empty())
 	{
-		if (symbol[0] == '\"')
-			return SymbolType::StringLiteral;
-		else if (IsNumber(symbol))
-			return SymbolType::ValueLiteral;
-		else if (g_Keywords.find(symbol) != g_Keywords.end())
-			return SymbolType::Keyword;
-		else if (g_CtrlStatements.find(symbol) != g_CtrlStatements.end())
-			return SymbolType::Control;
-		else if (g_FunctionSymbolList.find(symbol) != g_FunctionSymbolList.end())
-			return SymbolType::Function;
-		else if (g_vars.IsVar(symbol))
-			return SymbolType::Variable;
-		else
-			return SymbolType::ERR;
+		if (symbol[0] == '\"')								return SymbolType::StringLiteral;
+		else if (IsNumber(symbol))							return SymbolType::ValueLiteral;
+		else if (CONTAINS(g_Keywords, symbol))				return SymbolType::Keyword;
+		else if (CONTAINS(g_CtrlStatements, symbol))		return SymbolType::Control;
+		else if (CONTAINS(g_FunctionSymbolList, symbol))	return SymbolType::Function;
+		else if (CONTAINS(g_vars, symbol))					return SymbolType::Variable;
+		else return SymbolType::ERR;
 	}
+
 }
 
-namespace DEBUGMSGNS
+float Param(std::stringstream& stream);
+
+// We already have the name of the var
+float Variable(std::stringstream& stream, const std::string& symbol)
 {
-	HANDLE hConsole = GetStdHandle(STD_OUTPUT_HANDLE);
-	
-	enum class MSGTYPE // Messages
+	SayDebug("Read the variable symbol \"" + symbol + "\"");
+	try
 	{
-		MSG_DEFAULT = 7,
-		MSG_DEBUG_EXTRA = 8,
-		MSG_DEBUG = 1,
-		MSG_DEBUG_PRODUCT = 3,
-		MSG_DEBUG_LINEINDIC = 11,
-		MSG_WARNING = 14,
-		MSG_WARNING_MINOR = 6,
-		MSG_ERROR = 4,
-	};
-	enum class HLT // Highlighting
-	{
-		HLT_NONE = 7,
-		HLT_VAR = 11,	// Variable
-		HLT_KEYW = 1,	// Keyword
-		HLT_CTRL = 4,	// Control
-		HLT_LIT = 2,	// Literal
-		HLT_FUNC = 6,	// Function
-		HLT_STR = 13,	// String
-	};
-
-	const bool hideExtranious = false;
-	const bool majorOnly = false;
-
-	// @HACK: The debug message functions complain about being "ambiguous" sometimes due to their variadic nature.
-	// Usually when that happens I just [ctrl + x] cut the function name from the definition and paste it back in when the squiggly underline goes away.
-	// IDK if that's the best way to do it, but that usually seems to fix the issue.
-	void DebugMessageHLT(MSGTYPE type, HLT color, const char* message, ...)
-	{
-#ifdef _RELEASE
-		if (color == MSGTYPE::MSG_ERROR)
-#endif
-		{
-			if (!(hideExtranious && type == MSGTYPE::MSG_DEBUG_EXTRA) && !(majorOnly && type == MSGTYPE::MSG_DEBUG))
-			{
-				char buffer[1024] = {};
-				va_list args;
-				va_start(args, message);
-				vsprintf_s(buffer, message, args);
-				va_end(args);
-
-				SetConsoleTextAttribute(hConsole, (int)color);
-				printf(buffer);
-				SetConsoleTextAttribute(hConsole, (int)MSGTYPE::MSG_DEFAULT);
-			}
-		}
+		float value = Param(stream);
+		return var(symbol, value);
 	}
-
-	void DebugMessage(MSGTYPE color, const char* message, ...)
+	catch (const char* msg)
 	{
-#ifdef _RELEASE
-		if (color == MSGTYPE::MSG_ERROR)
-#endif
-		{
-			if (!(hideExtranious && color == MSGTYPE::MSG_DEBUG_EXTRA) && !(majorOnly && color == MSGTYPE::MSG_DEBUG))
-			{
-				char buffer[1024] = {};
-				va_list args;
-				va_start(args, message);
-				vsprintf_s(buffer, message, args);
-				va_end(args);
-
-				SetConsoleTextAttribute(hConsole, (int)color);
-				printf(buffer);
-				if (color == MSGTYPE::MSG_ERROR) printf("Program exiting with failure.\n");
-				SetConsoleTextAttribute(hConsole, (int)MSGTYPE::MSG_DEFAULT);
-			}
-		}
-	}
-
-	// BROKEN: Was gonna make a more reasonable way of doing debug messages than with variadic templates, but uh...
-	/*
-	void DebugMessage(MSGTYPE color, const std::string message, const DebugDataBundle& data)
-	{
-		int i = 0;
-		size_t sectionOffset = 0;
-		size_t sectionLength = 0;
-		SetConsoleTextAttribute(hConsole, color);
-		while (sectionOffset + sectionLength < message.rfind('%'))
-		{
-			sectionLength = message.find('%', sectionOffset) - sectionOffset;
-			printf("%s", message.substr(sectionOffset, sectionLength).c_str());
-			sectionOffset += sectionLength;
-			data.m_dataChunks.at(i++)->PrintData();
-			SetConsoleTextAttribute(hConsole, color);
-		}
-		printf("%s", message.substr(sectionOffset, message.length() - sectionOffset).c_str());
-		SetConsoleTextAttribute(hConsole, MSGTYPE::MSG_DEFAULT);
-	}
-	*/
-
-	bool PrintLine(bool returnToStart)
-	{
-		std::streampos pos = file.tellg();
-		bool endOfDoc = false;
-		while (true)
-		{
-			char next = file.peek();
-			if (next == ':') break; // Stop printing at start of next line
-
-			// Consume whitespace
-			while (isspace(next))
-			{
-				file >> std::ws;
-				next = file.peek();
-				printf(" ");
-			}
-
-			if (next == ':') break; // Stop printing at start of next line
-
-			if (next == '#')
-			{
-				if (!returnToStart) // TODO: Can we figure out why this needs to be inverted?
-				{
-					printf(" "); // TODO: I would love if the number of tabs in the document matched the number of tabs in the output.
-					SetConsoleTextAttribute(hConsole, 8);
-					while (true) // TODO: Maybe this would be better as a function?
-					{
-						next = file.peek();
-						if (next == ':') break; // Stop printing at start of next line
-
-						// Consume whitespace
-						while (isspace(next))
-						{
-							file >> std::ws;
-							next = file.peek();
-							printf(" ");
-						}
-
-						if (next == ':') break; // Stop printing at start of next line
-						std::string comment;
-						file >> comment;
-						printf("%s", comment.c_str());
-					}
-				}
-				break;
-			}
-
-			// Get next symbol
-			std::string symbol;
-			file >> symbol;
-			
-			// End of document will have no newline, so we need to exit the loop when we reach it
-			if (StringEquals(symbol.c_str(), "end"))
-			{
-				DebugMessageHLT(MSGTYPE::MSG_DEBUG_LINEINDIC, HLT::HLT_FUNC, "end");
-				endOfDoc = true;
-				break;
-			}
-			else
-			{
-				HLT highlight = HLT::HLT_NONE;
-				switch (FindSymbolType(symbol))
-				{
-				case SymbolType::Keyword:
-					if (g_Keywords.find(symbol.c_str())->second == KeywordToken::var)
-					{
-						std::streampos preVar = file.tellg();
-						std::string varName;
-						file >> varName;
-						if (!g_vars.IsVar(varName)) g_vars.DeclareVar(varName);
-						file.seekg(preVar);
-					}							highlight = HLT::HLT_KEYW;	break;
-				case SymbolType::Function:		highlight = HLT::HLT_FUNC;	break;
-				case SymbolType::ValueLiteral:	highlight = HLT::HLT_LIT;	break;
-				case SymbolType::Control:		highlight = HLT::HLT_CTRL;	break;
-				case SymbolType::StringLiteral: highlight = HLT::HLT_STR;	break;
-				case SymbolType::Variable:		highlight = HLT::HLT_VAR;	break;
-				}
-
-				// Print symbol
-				DebugMessageHLT(MSGTYPE::MSG_DEBUG_LINEINDIC, highlight, "%s", symbol.c_str());
-			}
-		}
-
-		if (returnToStart) file.seekg(pos, std::ios_base::beg);
-		DebugMessage(MSGTYPE::MSG_DEBUG_LINEINDIC, "\n");
-		return endOfDoc;
+		if (msg == "eof") return var(symbol);
 	}
 }
-
-using namespace DEBUGMSGNS;
-
-#define DebugMessage(...)
-#define DebugMessageHLT(...)
-
-// If "get" == true, do not assume we are setting the variable unless it is undeclared.
-float Variable(std::stringstream& stream, bool get)
+// "var" was read
+float Variable(std::stringstream& stream)
 {
 	std::string symbol;
 	stream >> symbol;
-	if (g_vars.IsVar(symbol))
-	{
-		SayDebug("Read variable symbol " + symbol + " which has a value of " + std::to_string(g_vars.GetVar(symbol)));
-	}
-	else
-	{
-		SayDebug("Read variable symbol " + symbol + " which has not yet been declared");
-		SayDebug("Declaring the variable " + symbol);
-	}
-
-	if (!get)
-	{
-		float value = Param(stream);
-		if (g_vars.IsVar(symbol)) // If the variable already exists, and we do not want to set it, skip this section.
-		{
-			g_vars.SetVar(symbol, value);
-		}
-		else
-		{
-			g_vars.DeclareVar(symbol, value);
-		}
-		return value;
-	}
-	else
-	{
-		return g_vars.GetVar(symbol);
-	}
+	return Variable(stream, symbol);
 }
 
 float Param(std::stringstream& stream)
 {
+	if (stream.eof()) throw "eof";
 	std::string symbol;
 	stream >> symbol;
-	SayDebug("Read the parameter keyword \"" + symbol + "\"");
+	SayDebug("Read the parameter \"" + symbol + "\"");
 	float value;
-	switch (FindSymbolType(symbol)) {
+	switch (FindSymbolType(symbol))
+	{
 	case SymbolType::ValueLiteral:
 		value = std::stof(symbol);
 		SayDebug("Used the literal value " + std::to_string(value) + " as a parameter");
 		break;
+	case SymbolType::Keyword:
+		if (symbol == "var")
+		{
+			value = Variable(stream);
+			SayDebug("Created a new variable as a parameter");
+		}
+		else throw "Tried using a keyword as a value";
+		break;
 	case SymbolType::Variable:
-		value = Variable(stream);
+		value = Variable(stream, symbol);
 		SayDebug("Used the variable value " + std::to_string(value) + " as a parameter");
 		break;
-	case SymbolType::Keyword: // TODO: Handle declaration of new var as a param
-		throw "Tried declaring a new variable in a parameter for a function";
-		break;
-	default:
 	case SymbolType::Function: // TODO: Functions as parameters for other functions
 		throw "Tried using a function as a parameter for another function";
+		break;
+	default:
+		throw "Could not deduce symbol type!";
 		break;
 	}
 	return value;
@@ -410,45 +162,7 @@ float Param(std::stringstream& stream)
 // TODO: Implement control statments
 int Control(std::stringstream& stream)
 {
-	std::string symbol;
-	stream >> symbol;
-	CtrlToken ctrlSymbol = g_CtrlStatements.find(symbol.c_str())->second;
-	switch (ctrlSymbol)
-	{
-	case CtrlToken::ctrl_if: // If
-		/*********************************
-		*
-		*	If statement syntax:
-		*
-		*	:c i <value> [0 = false, anything = true]
-		*	{ :[code to execute] };
-		*
-		**********************************/
-		Param(stream);
-		break;
-	case CtrlToken::ctrl_for: // For
-		/*********************************
-		* 
-		*	For loop syntax:
-		* 
-		*	:c f v [loop var] <value> [starting value] <value> [end value] <value> [amount to increment by each loop]
-		*	{ :[code to repeat] };
-		*	
-		* 
-		**********************************/
-		Variable(stream, false); // Variable
-		Param(stream); // End value
-		Param(stream); // Increment amount
-		break;
-	case CtrlToken::ctrl_while: // While
-		break;
-	case CtrlToken::ctrl_break: // Break
-		stream.ignore(256, ';');
-		break;
-	default:
-		DebugMessage(MSGTYPE::MSG_ERROR, "ERROR: CONTROL KEYWORD USED WITHOUT VALID CONTROL SYMBOL.\n");
-		break;
-	}
+	// TODO
 	return 0;
 }
 
@@ -462,7 +176,7 @@ int InterpretFile(const char* filename)
 	* 
 	*   Keywords
 	*   ========
-	*   ':' Start of function - Referred to as a "line" in debug
+	*   ':' Start of function - Referred to as a "lineStream" in debug
 	*
 	*   "lit" Literal	 - read as an integer value
 	*
@@ -498,7 +212,7 @@ int InterpretFile(const char* filename)
 	*		1 param (const char* string)
 	*		NOTE: String params have 2 options:
 	*			a) "small" Print only the next string (string must have underscores in place of spaces, and "\_" to insert an underscore)
-	*			b) "multi" Keep printing each line one at a time until the terminating string "\endPrt" is reached. Spaces are allowed.
+	*			b) "multi" Keep printing each lineStream one at a time until the terminating string "\endPrt" is reached. Spaces are allowed.
 	*				First whitespace is skipped.
 	*	"Open"
 	*		Open the specified file/program.
@@ -531,68 +245,39 @@ int InterpretFile(const char* filename)
 	*
 	***************************************************************************/
 
-	file = std::ifstream(filename); // Set the file
-
-	// Print whole document
-	/*
-	{
-		printf("%s\n", filename);
-		int line = 1;
-		while (true)
-		{
-			bool end = PrintLine(false);
-			file.ignore(256, ':');
-			if (end) break;
-			else printf("[ %i ] :", line++);
-		}
-		printf("\n");
-		// Cleanup
-		g_vars.ClearAll();
-		file.seekg(0);
-	}
-	*/
+	std::ifstream file(filename); // Open the file
 
 	file.ignore(256,' ');
 	int versionNumber;
 	file >> versionNumber;
-	std::string str = "Executing Virtual Hank Instruction Document ";
-	str += filename;
-	str += " using version number ";
-	str += std::to_string(versionNumber);
-	str += ".";
-	SayDebug(str.c_str());
+	SayDebug("Executing Virtual Hank Instruction Document " + std::string(filename) + " using version number " + std::to_string(versionNumber));
 
 	if (versionNumber < g_version)
 	{
-		UpdateFile(filename, versionNumber);
+		UpdateFile(filename, versionNumber); // TODO
 	}
 
-	int line = 0;
+	int lineNumber = 0;
 
-	while (!file.eof()) // For each line
+	file.ignore(256, '\n');
+	std::string _line;
+	while (std::getline(file, _line, ';')) // For each lineStream
 	{
-		file.ignore(256, '\n');
-		++line; // I want the lines to be { 1, 2, 3, ... } instead of { 0, 1, 2, ... }
-		SayDebug("Now evaluating line " + std::to_string(line));
-		//PrintLine();
-		std::string _line;
-		std::getline(file, _line, ';');
-		std::stringstream line(_line);
-		SayDebug(_line);
+		++lineNumber; // I want the lines to be { 1, 2, 3, ... } instead of { 0, 1, 2, ... }
+		SayDebug("Now evaluating line " + std::to_string(lineNumber));
+		std::stringstream lineStream(_line);
+		{
+			size_t start = _line.find_first_not_of(" \n\t");
+			SayDebug("<[code]( " + _line.substr(start) + " )>");
+		}
 
 		std::string startingSymbol;
-		line >> startingSymbol;
-
-		SayDebug("Read the line-starting symbol \"" + startingSymbol + "\"");
-
-		DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "Read the line-starting symbol \"%s\" which is ", startingSymbol.c_str());
+		lineStream >> startingSymbol;
 
 		switch (SymbolType type = FindSymbolType(startingSymbol))
 		{
 		case SymbolType::Function:
 			{
-				SayDebug("Calling function");
-				DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "a function.\n");
 				auto it = g_FunctionSymbolList.find(startingSymbol);
 				if (it != g_FunctionSymbolList.end())
 				{
@@ -600,9 +285,10 @@ int InterpretFile(const char* filename)
 					{
 					case FuncToken::Print:
 					{
-						file.ignore(64, '\"');
-						std::string str;
-						std::getline(line, str, '\"');
+						size_t start = _line.find('\"');
+						start++;
+						size_t length = _line.find('\"', start) - start;
+						std::string str = _line.substr(start, length);
 						SayComm(str);
 						SayDebug(str);
 					}
@@ -612,7 +298,7 @@ int InterpretFile(const char* filename)
 					{
 						try
 						{
-							float time_ms = Param(line);
+							float time_ms = Param(lineStream);
 							Sleep((DWORD)time_ms);
 						}
 						catch (const char* msg)
@@ -623,12 +309,16 @@ int InterpretFile(const char* filename)
 					break;
 
 					case FuncToken::MouseTo:
+						// TODO
 						break;
 					case FuncToken::Click:
+						// TODO
 						break;
 					case FuncToken::Keypress:
+						// TODO
 						break;
 					case FuncToken::Open:
+						// TODO
 						break;
 					}
 				}
@@ -641,8 +331,7 @@ int InterpretFile(const char* filename)
 
 		case SymbolType::Variable:
 			{
-				DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "an existing variable.\n");
-				Variable(line, false); // We are almost certainly reassigning the variable if its name is at the start of a line
+				Variable(lineStream, startingSymbol); // We are almost certainly reassigning the variable if its name is at the start of a lineStream
 			}
 			break;
 
@@ -650,13 +339,8 @@ int InterpretFile(const char* filename)
 			{
 				switch (g_Keywords.find(startingSymbol)->second)
 				{
-				case KeywordToken::end: // HACK: Not really sure why "end" is being handled like this but ok
-					goto END;
-					break;
-
 				case KeywordToken::var:
-					DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "for declaring a new var.\n");
-					Variable(line);
+					Variable(lineStream);
 					break;
 				}
 			}
@@ -664,24 +348,26 @@ int InterpretFile(const char* filename)
 
 		case SymbolType::Control:
 			{
-				DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "a control keyword.\n");
-				Control(line);
+				Control(lineStream);
 			}
 			break;
 
 		default: // Any literal type or otherwise unknown symbol
 			{
 				SayDebug("ERROR: INVALID SYNTAX! Couldn't find a definition!", DebugColor::Critical);
-				DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "undefined.\n");
-				DebugMessage(MSGTYPE::MSG_ERROR, "ERROR: INVALID SYNTAX! Couldn't find a definition for \"%s\".\n", startingSymbol.c_str());
+				goto END;
 			}
 			break;
 		}
+
+		//for (auto var : g_vars)
+		//{
+		//	SayDebug("Var " + var.first + " has value of " + std::to_string(var.second));
+		//}
 	}
 
 END:
 
-	DebugMessage(MSGTYPE::MSG_DEBUG, "End of document.\n");
 	SayDebug("Reached end of document.");
 
 	file.close();

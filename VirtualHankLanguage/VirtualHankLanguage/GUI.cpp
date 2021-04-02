@@ -262,7 +262,7 @@ void SayPretty(const std::string str, const Color8Bit color)
     std::string line;
     int i = 0;
     LineData reference = FindPositionInOverlay(PosSymbol::Pretty, 2);
-    while (std::getline(stream, line) && i < g_PrettyLineCount)
+    while (std::getline(stream, line, '\n') && i < g_PrettyLineCount)
     {
         LineData data = FindPositionInOverlay(PosSymbol::Pretty, i++);
         PrepareLine(data);

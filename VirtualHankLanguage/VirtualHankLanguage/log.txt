@@ -1,34 +1,43 @@
-Session No. 39 | Fri Apr  2 12:47:07 2021
+Session No. 75 | Fri Apr  2 15:09:12 2021
 
 Info: Program started.
-Info: Executing Virtual Hank Instruction Document Test.vhid using version number 0.
+Info: Executing Virtual Hank Instruction Document Test.vhid using version number 0
 Info: Now evaluating line 1
-Info: var x 123
-Info: Read the line-starting symbol "var"
-Info: Read variable symbol x which has not yet been declared
-Info: Declaring the variable x
-Info: Declared & initialized x to 123.000000
-Info: Returned var x (123.000000)
+Info: <[code]( var x 123 var y 456 (()()) )>
+Info: found
+Info: Read the variable symbol "x"
+Info: Read the parameter "123"
+Info: Used the literal value 123.000000 as a parameter
+Info: The value of x is 123.000000
 Info: Now evaluating line 2
-Info: var y 456
-Info: Read the line-starting symbol "var"
-Info: Read variable symbol y which has not yet been declared
-Info: Declaring the variable y
-Info: Declared & initialized y to 456.000000
-Info: Returned var y (456.000000)
+Info: <[code]( var z y )>
+Info: found
+Info: Read the variable symbol "z"
+Info: Read the parameter "y"
 Info: Now evaluating line 3
-Info: var z y
-Info: Read the line-starting symbol "var"
-Info: Read variable symbol z which has not yet been declared
-Info: Declaring the variable z
-Info: Returned var y (456.000000)
-Info: Read variable symbol y which has a value of 456.000000
-Info: Returned var y (456.000000)
-Info: Declared & initialized z to 456.000000
-Info: Returned var z (456.000000)
+Info: <[code]( Print "Apple" )>
+Info: found
+Info: Apple
 Info: Now evaluating line 4
-Info: Print "Apple"
-Info: Read the line-starting symbol "Print"
-Info: Calling function
-Info:  
+Info: <[code]( Wait var time var m x )>
+Info: found
+Info: Read the parameter "var"
+Info: Read the variable symbol "time"
+Info: Read the parameter "var"
+Info: Read the variable symbol "m"
+Info: Read the parameter "x"
+Info: Read the variable symbol "x"
+Info: The value of x is 123.000000
+Info: Used the variable value 123.000000 as a parameter
+Info: The value of m is 123.000000
+Info: Created a new variable as a parameter
+Info: The value of time is 123.000000
+Info: Created a new variable as a parameter
+Info: Now evaluating line 5
+Info: <[code]( var x 234 )>
+Info: found
+Info: Read the variable symbol "x"
+Info: Read the parameter "234"
+Info: Used the literal value 234.000000 as a parameter
+Info: The value of x is 234.000000
 Info: Reached end of document.
