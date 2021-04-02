@@ -312,25 +312,28 @@ int main()
 
     DrawOverlay();
 
-    SayDebug("This is a message",   DebugColor::Msg);
-    SayDebug("This is a warning",  DebugColor::Warning);
-    SayDebug("This is very bad", DebugColor::Critical);
+    SayDebug("Program started.", DebugColor::Msg);
 
     SayComm("Hi there! :D");
     SayComm("This is a really long line. I'm making this just to test how the GUI functions handle string overflow. I wrote the code so it can recursively wrap the text, prioritizing splitting at a space followed by breaking up words. It seems to be working pretty well :3");
+    SayComm("At this point I'm kinda just tryina fill up the comm with text to make sure it acts correctly when filled. It should, hopefully, start producing a sort of \"scrolling\" effect as new lines are added below the existing ones, until the top messages are gone.");
+    SayComm("Wow this has a lot more space than I thought");
+    SayComm("Aaaa");
+    SayComm("Words");
+    SayComm("Words");
+    SayComm("Words");
+    SayComm("More words");
+    SayComm("Even more words");
+    SayComm("eeeeeeeee");
+    SayComm("EEEEEEEEEEE");
+    SayComm("AAAAAAAAA");
 
     SayPretty(g_AsciiGraphics[0]);
+
+    InterpretFile("Test.vhid");
 
     SetPrintPos(0, 31);
 
-    return 0;
-
-    SayComm("Hello comms!");
-    SayComm("Hello comms!");
-    SayDebug("Hello debug!");
-    SayPretty(g_AsciiGraphics[0]);
-    DrawOverlay();
-    std::cin.ignore();
     return 0;
 
     InterpretFile("Test.vhid");

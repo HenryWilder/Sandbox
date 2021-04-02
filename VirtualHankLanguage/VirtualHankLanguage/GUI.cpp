@@ -110,7 +110,7 @@ void DrawOverlay()
 {
     SetPrintPos(0,0);
     ResetPrintColor();
-    printf("%s", g_overlay.c_str());
+    printf(g_overlay.c_str());
 }
 
 DebugLine g_debugLines[g_debugLineCount];
@@ -134,8 +134,8 @@ void PushDebug(const std::string& line, DebugColor color)
     log.close();
 
     static int s_msgNumber = 0;
-    char numberInsert[] = "[000] ";
-    sprintf_s(numberInsert, "[%#03i] ", ++s_msgNumber);
+    char numberInsert[] = "[00] ";
+    sprintf_s(numberInsert, "[%#02i] ", ++s_msgNumber);
     std::string _str = numberInsert + line;
     for (int i = 4; i > 0; --i)
     {
@@ -149,7 +149,8 @@ void DrawDebug()
     {
         const auto& debug = g_debugLines[line];
 
-        PrepareLine(FindPositionInOverlay(PosSymbol::Debug, line));
+        LineData data = FindPositionInOverlay(PosSymbol::Debug, line);
+        PrepareLine(data);
 
         if (!debug.m_str.empty())
         {
@@ -167,7 +168,10 @@ void DrawDebug()
                 break;
             }
 
-            printf("%s", debug.m_str.c_str());
+            if (debug.m_str.length() > data.width)
+                printf((debug.m_str.substr(0, data.width - 3) + "...").c_str());
+            else
+                printf(debug.m_str.c_str());
         }
     }
     ResetPrintColor();
@@ -189,6 +193,7 @@ void ClearComm()
 }
 void PushComm(std::string str)
 {
+    constexpr int maxComm = g_commLineCount - 1;
     if (!str.empty())
     {
         size_t start = str.find_first_not_of(" \t\n");
@@ -196,19 +201,19 @@ void PushComm(std::string str)
         else return;
 
         int line = 0;
-        if (!g_commLines[17].empty())
+        if (!g_commLines[maxComm].empty())
         {
             // New line
-            for (int i = 0; i < 17; ++i)
+            for (int i = 0; i < maxComm; ++i)
             {
                 g_commLines[i] = g_commLines[i + 1];
             }
-            line = 17;
+            line = maxComm;
         }
         else
         {
             // Fill in
-            for (int i = 0; i <= 17; ++i)
+            for (int i = 0; i <= maxComm; ++i)
             {
                 if (g_commLines[i].empty())
                 {
@@ -242,7 +247,7 @@ void DrawComm()
     {
         PrepareLine(FindPositionInOverlay(PosSymbol::Comm, line));
         const std::string& str = g_commLines[line];
-        if (!str.empty()) printf("%s", str.c_str());
+        if (!str.empty()) printf(str.c_str());
     }
 }
 void SayComm(const std::string& str)
@@ -261,7 +266,7 @@ void SayPretty(const std::string str, const Color8Bit color)
     {
         LineData data = FindPositionInOverlay(PosSymbol::Pretty, i++);
         PrepareLine(data);
-        printf("%s", line.substr((size_t)data.x() - (size_t)reference.x(), data.width).c_str());
+        printf(line.substr((size_t)data.x() - (size_t)reference.x(), data.width).c_str());
     }
     for (; i < g_PrettyLineCount; ++i)
     {

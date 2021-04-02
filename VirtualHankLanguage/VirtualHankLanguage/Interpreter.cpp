@@ -1,34 +1,51 @@
-#include "Interpreter.h"
+#include <sstream>
 #include <unordered_map>
+#include "GUI.h"
+#include "Interpreter.h"
 
 int g_version = 0;
 
 std::ifstream file;
 
-// Todo: fill with function pointers to functions
-const std::unordered_map<FunctionSymbol, FunctionPointer> g_FunctionSymbolList{
-	{ "Print",		FunctionPointer{} },
-	{ "Wait",		FunctionPointer{} },
-	{ "MouseTo",	FunctionPointer{} },
-	{ "Click",		FunctionPointer{} },
-	{ "Keypress",	FunctionPointer{} },
-	{ "Open",		FunctionPointer{} },
-};
-
-const FuncBase g_FunctionClassList[] =
+bool IsNumber(char first)
 {
-	FuncBase(), // ERR
-	FuncBase(),	// Print
-	FuncBase(),	// Wait
-	FuncBase(),	// MouseTo
-	FuncBase(),	// Click
-	FuncBase(),	// Keypress
-	FuncBase(),	// Open
+	return ((first >= '0' && first <= '9') || first == '-');
+}
+bool IsNumber(const char* input) { return IsNumber(input[0]); }
+bool IsNumber(const std::string& input) { return IsNumber(input[0]); }
 
-};
+bool CustomVars::IsVar(const std::string& symbol) const
+{
+	return this->m_vars.find(symbol) != this->m_vars.end();
+}
+void CustomVars::DeclareVar(const std::string& symbol)
+{
+	this->m_vars.insert({ symbol, float() });
+	SayDebug("Declared var " + symbol);
+}
+void CustomVars::DeclareVar(const std::string& symbol, float value)
+{
+	this->m_vars.insert({ symbol, value });
+	SayDebug("Declared & initialized " + symbol + " to " + std::to_string(value));
+}
+float CustomVars::GetVar(const std::string& symbol) const
+{
+	auto var = this->m_vars.find(symbol);
+	float value = NAN;
+	if (var != this->m_vars.end()) value = var->second;
+	SayDebug("Returned var " + symbol + " (" + std::to_string(value) + ")");
+	return value;
+}
+void CustomVars::SetVar(const std::string& symbol, float value)
+{
+	auto var = this->m_vars.find(symbol);
+	SayDebug("Setting " + symbol + "to " + std::to_string(value));
+	if (var != this->m_vars.end()) var->second = value;
+	else SayDebug("Could not set var!", DebugColor::Critical);
+}
+
 enum class FuncToken : char
 {
-	ERR = NULL,
 	Print,
 	Wait,
 	MouseTo,
@@ -36,28 +53,18 @@ enum class FuncToken : char
 	Keypress,
 	Open,
 };
-FuncToken Tokenize(FunctionSymbol function)
+const std::unordered_map<std::string, FuncToken> g_FunctionSymbolList
 {
-	for (int i = 0; i < sizeof(g_FunctionSymbolList); ++i) { if (function == g_FunctionSymbolList[i]) return FuncToken(i); }
-	return FuncToken::ERR;
-}
-bool ValidFunction(const FunctionSymbol function) { return (Tokenize(function) != FuncToken::ERR); }
-bool ValidFunction(const std::string function) { return ValidFunction(FunctionSymbol(function)); }
-bool ValidFunction(const char* function) { return ValidFunction(FunctionSymbol(function)); }
-
-const KeywordSymbol g_Keywords[] =
-{
-	"\\^%#&__KEYWORD_TYPE_ERR__",
-	"var",
-	"lit",
-	"func",
-	"ctrl",
-	"end",
-	"namspc",
+	{ "Print",		FuncToken::Print	},
+	{ "Wait",		FuncToken::Wait		},
+	{ "MouseTo",	FuncToken::MouseTo	},
+	{ "Click",		FuncToken::Click	},
+	{ "Keypress",	FuncToken::Keypress },
+	{ "Open",		FuncToken::Open		},
 };
+
 enum class KeywordToken : char
 {
-	ERR = NULL,
 	var,
 	lit,
 	func,
@@ -65,77 +72,64 @@ enum class KeywordToken : char
 	end,
 	namspc,
 };
-KeywordToken Tokenize(const KeywordSymbol keyword) // BROKEN: This keeps coming back for some reason... Says keyword is an "error-type" or something.
+const std::unordered_map<std::string, KeywordToken> g_Keywords
 {
-	for (int i = 0; i < sizeof(g_Keywords); ++i) { if (keyword == g_Keywords[i]) return KeywordToken(i); }
-	return KeywordToken::ERR;
-}
-bool ValidKeyword(const KeywordSymbol keyword) { return (Tokenize(keyword) != KeywordToken::ERR); }
-bool ValidKeyword(const std::string keyword) { return ValidKeyword(KeywordSymbol(keyword)); }
-bool ValidKeyword(const char* keyword) { return ValidKeyword(KeywordSymbol(keyword)); }
-
-const CtrlSymbol g_CtrlStatements[] =
-{
-	"\\$%^@__CTRL_TYPE_ERR__",
-	"if",
-	"for",
-	"while",
-	"break",
+	{ "var",	KeywordToken::var,		},
+	{ "lit",	KeywordToken::lit,		},
+	{ "func",	KeywordToken::func,		},
+	{ "ctrl",	KeywordToken::ctrl,		},
+	{ "end",	KeywordToken::end,		},
+	{ "namspc",	KeywordToken::namspc,	},
 };
+
 enum class CtrlToken : char
 {
-	ERR = NULL,
 	ctrl_if,
 	ctrl_for,
 	ctrl_while,
 	ctrl_break,
 };
-CtrlToken Tokenize(const CtrlSymbol statement)
+const std::unordered_map<std::string, CtrlToken> g_CtrlStatements
 {
-	for (int i = 0; i < sizeof(g_CtrlStatements); ++i) { if (statement == g_CtrlStatements[i]) return CtrlToken(i); }
-	return CtrlToken::ERR;
-}
-bool ValidCtrl(const CtrlSymbol statement) { return (Tokenize(statement) != CtrlToken::ERR); }
-bool ValidCtrl(const std::string statement) { return ValidCtrl(CtrlSymbol(statement)); }
-bool ValidCtrl(const char* statement) { return ValidCtrl(CtrlSymbol(statement)); }
+	{ "if",		CtrlToken::ctrl_if		},
+	{ "for",	CtrlToken::ctrl_for		},
+	{ "while",	CtrlToken::ctrl_while	},
+	{ "break",	CtrlToken::ctrl_break	},
+};
 
-bool IsNumber(const char first)
-{
-	if (first == '-') return true;
-	for (char numChar = '0'; numChar <= '9'; ++numChar) {
-		if (first == numChar) return true;
-	}
-	return false;
-}
-bool IsNumber(const char* input) { return IsNumber(input[0]); }
-bool IsNumber(const std::string input) { return IsNumber(input.at(0)); }
+CustomVars g_vars;
 
-size_t CustomVars::_Locate(const VariableSymbol& symbol) const
+
+void FuncCall(FuncToken func)
 {
-	for (size_t i = 0; i < m_vars.size(); ++i)
+	switch (func)
 	{
-		if (StringEquals(symbol.c_str(), m_vars.at(i)->c_str())) return i;
+	case FuncToken::Print:
+		{
+			std::string line;
+			std::getline(file, line);
+			SayComm(line);
+		}
+		break;
+
+	case FuncToken::Wait:
+		{
+			int time;
+			file >> time;
+			Sleep(time);
+		}
+		break;
+
+	case FuncToken::MouseTo:
+		break;
+	case FuncToken::Click:
+		break;
+	case FuncToken::Keypress:
+		break;
+	case FuncToken::Open:
+		break;
 	}
-	return m_vars.size();
 }
-bool CustomVars::IsVar(const VariableSymbol& symbol) const
-{
-	return (_Locate(symbol) != m_vars.size());
-}
-
-// SPAGHETTI: This code is directly ripped from the deconstructor. Let's try and consolidate them.
-void CustomVars::ClearAll()
-{
-	for (VariableSymbol*& var : m_vars) { delete var; }
-	if (m_vars.size()) m_vars.clear();
-}
-
-CustomVars vars;
-
-// Seems a bit odd that there
-bool ValidVar(const VariableSymbol& varName) { return vars.IsVar(varName); }
-bool ValidVar(const std::string& varName) { return ValidVar(VariableSymbol(varName)); }
-bool ValidVar(const char*& varName) { return ValidVar(VariableSymbol(varName)); }
 
 enum class SymbolType
 {
@@ -164,17 +158,27 @@ enum class SymbolType
 	Keyword,		// In list of keywords
 	Control,		// In list of control keywords
 	Function,		// In list of functions
-	Variable,		// In list of existing vars
+	Variable,		// In list of existing g_vars
 };
-SymbolType FindSymbolType(std::string symbol)
+SymbolType FindSymbolType(const std::string& symbol)
 {
-	if (symbol.at(0) == '\"') return SymbolType::StringLiteral;
-	else if (IsNumber(symbol)) return SymbolType::ValueLiteral;
-	else if (ValidKeyword(symbol)) return SymbolType::Keyword;
-	else if (ValidCtrl(symbol)) return SymbolType::Control;
-	else if (ValidFunction(symbol)) return SymbolType::Function;
-	else if (ValidVar(symbol)) return SymbolType::Variable;
-	else return SymbolType::ERR;
+	if (!symbol.empty())
+	{
+		if (symbol[0] == '\"')
+			return SymbolType::StringLiteral;
+		else if (IsNumber(symbol))
+			return SymbolType::ValueLiteral;
+		else if (g_Keywords.find(symbol) != g_Keywords.end())
+			return SymbolType::Keyword;
+		else if (g_CtrlStatements.find(symbol) != g_CtrlStatements.end())
+			return SymbolType::Control;
+		else if (g_FunctionSymbolList.find(symbol) != g_FunctionSymbolList.end())
+			return SymbolType::Function;
+		else if (g_vars.IsVar(symbol))
+			return SymbolType::Variable;
+		else
+			return SymbolType::ERR;
+	}
 }
 
 namespace DEBUGMSGNS
@@ -337,33 +341,19 @@ namespace DEBUGMSGNS
 				switch (FindSymbolType(symbol))
 				{
 				case SymbolType::Keyword:
-					
-					if (Tokenize((KeywordSymbol)(symbol)) == KeywordToken::var)
+					if (g_Keywords.find(symbol.c_str())->second == KeywordToken::var)
 					{
 						std::streampos preVar = file.tellg();
-						VariableSymbol varName;
+						std::string varName;
 						file >> varName;
-						if (!ValidVar(varName)) vars.DeclareVar(varName);
+						if (!g_vars.IsVar(varName)) g_vars.DeclareVar(varName);
 						file.seekg(preVar);
-					}
-					
-					highlight = HLT::HLT_KEYW;
-					break;
-				case SymbolType::Function:
-					highlight = HLT::HLT_FUNC;
-					break;
-				case SymbolType::ValueLiteral:
-					highlight = HLT::HLT_LIT;
-					break;
-				case SymbolType::Control:
-					highlight = HLT::HLT_CTRL;
-					break;
-				case SymbolType::StringLiteral:
-					highlight = HLT::HLT_STR;
-					break;
-				case SymbolType::Variable:
-					highlight = HLT::HLT_VAR;
-					break;
+					}							highlight = HLT::HLT_KEYW;	break;
+				case SymbolType::Function:		highlight = HLT::HLT_FUNC;	break;
+				case SymbolType::ValueLiteral:	highlight = HLT::HLT_LIT;	break;
+				case SymbolType::Control:		highlight = HLT::HLT_CTRL;	break;
+				case SymbolType::StringLiteral: highlight = HLT::HLT_STR;	break;
+				case SymbolType::Variable:		highlight = HLT::HLT_VAR;	break;
 				}
 
 				// Print symbol
@@ -379,16 +369,23 @@ namespace DEBUGMSGNS
 
 using namespace DEBUGMSGNS;
 
-// If "get" == true, do not assume we are setting the variable unless it is undeclared.
-int Variable(bool get)
-{
-	VariableSymbol symbol;
-	file >> symbol;
-	DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "Read the variable symbol \"%s\", which has ", symbol.c_str());
-	if (ValidVar(symbol)) DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "a value of %i.\n", vars.GetVar(symbol));
-	else DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "not yet been declared. Now declaring it as a new var.\n");
+#define DebugMessage(...)
+#define DebugMessageHLT(...)
 
-	if (!(get && vars.IsVar(symbol))) // If the variable already exists, and we do not want to set it, skip this section.
+// If "get" == true, do not assume we are setting the variable unless it is undeclared.
+float Variable(bool get)
+{
+	std::string symbol;
+	file >> symbol;
+	if (g_vars.IsVar(symbol))
+		SayDebug("Read variable symbol " + symbol + " which has a value of " + std::to_string(g_vars.GetVar(symbol)));
+	else
+	{
+		SayDebug("Read variable symbol " + symbol + " which has not yet been declared");
+		SayDebug("Declaring the variable " + symbol);
+	}
+
+	if (!(get && g_vars.IsVar(symbol))) // If the variable already exists, and we do not want to set it, skip this section.
 	{
 		std::streampos goBack = file.tellg();
 		std::string symbol1;
@@ -396,7 +393,7 @@ int Variable(bool get)
 		file.seekg(goBack);
 		DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "Read the symbol %s, ", symbol1.c_str());
 		// Determine value to set the var to
-		int value = INT_MAX;
+		float value = INFINITY;
 		switch (FindSymbolType(symbol1))
 		{
 		case SymbolType::Variable: // Initialize variable with another variable
@@ -407,7 +404,7 @@ int Variable(bool get)
 				DebugMessage(MSGTYPE::MSG_DEBUG, "Used the variable ");
 				DebugMessageHLT(MSGTYPE::MSG_DEBUG, HLT::HLT_VAR, "%s", symbol1.c_str());
 				DebugMessage(MSGTYPE::MSG_DEBUG, " (currently ");
-				DebugMessageHLT(MSGTYPE::MSG_DEBUG, HLT::HLT_LIT, "%i", value);
+				DebugMessageHLT(MSGTYPE::MSG_DEBUG, HLT::HLT_LIT, "%f", value);
 				DebugMessage(MSGTYPE::MSG_DEBUG, ") as the value for variable ");
 				DebugMessageHLT(MSGTYPE::MSG_DEBUG, HLT::HLT_VAR, "%s", symbol.c_str());
 				DebugMessage(MSGTYPE::MSG_DEBUG, ".\n");
@@ -417,14 +414,14 @@ int Variable(bool get)
 		case SymbolType::Function: // Initialize variable with function return
 			DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "for Function.\n");
 			DebugMessage(MSGTYPE::MSG_WARNING, "WARNING: Initializing a variable with a function is not yet supported");
-			// TODO: Set vars with functions
+			// TODO: Set g_vars with functions
 			break;
 
 		case SymbolType::ValueLiteral: // Initialize variable with literal
 			file >> value;
-			DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "for the literal value %i.\n", value);
+			DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "for the literal value %f.\n", value);
 			DebugMessage(MSGTYPE::MSG_DEBUG, "Used the literal ");
-			DebugMessageHLT(MSGTYPE::MSG_DEBUG, HLT::HLT_LIT, "%i", value);
+			DebugMessageHLT(MSGTYPE::MSG_DEBUG, HLT::HLT_LIT, "%f", value);
 			DebugMessage(MSGTYPE::MSG_DEBUG, " as the value for variable ");
 			DebugMessageHLT(MSGTYPE::MSG_DEBUG, HLT::HLT_VAR, "%s", symbol.c_str());
 			DebugMessage(MSGTYPE::MSG_DEBUG, ".\n");
@@ -436,84 +433,78 @@ int Variable(bool get)
 			break;
 		}
 
-		if (vars.IsVar(symbol)) // Variable exists
+		if (g_vars.IsVar(symbol)) // Variable exists
 		{
-			DebugMessage(MSGTYPE::MSG_DEBUG_PRODUCT, "Set the variable %s with new value %i (Previously %i).\n", symbol.c_str(), value, vars.GetVar(symbol));
-			vars.SetVar(symbol, value);
+			DebugMessage(MSGTYPE::MSG_DEBUG_PRODUCT, "Set the variable %s with new value %f (Previously %f).\n", symbol.c_str(), value, g_vars.GetVar(symbol));
+			g_vars.SetVar(symbol, value);
 		}
 		else // Variable does not exist, initialize
 		{
-			vars.DeclareVar(symbol, value);
-			DebugMessage(MSGTYPE::MSG_DEBUG_PRODUCT, "Declared new variable %s with init value %i.\n", symbol.c_str(), value);
+			g_vars.DeclareVar(symbol, value);
+			DebugMessage(MSGTYPE::MSG_DEBUG_PRODUCT, "Declared new variable %s with init value %f.\n", symbol.c_str(), value);
 		}
 	}
-	DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "Returning the value of %s (currently %i).\n", symbol.c_str(), vars.GetVar(symbol));
-	return vars.GetVar(symbol);
+	DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "Returning the value of %s (currently %f).\n", symbol.c_str(), g_vars.GetVar(symbol));
+	return g_vars.GetVar(symbol);
 }
 
-int Param()
+float Param()
 {
 	std::streampos goBack = file.tellg();
 	std::string symbol;
 	file >> symbol;
-	DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "Read the parameter keyword \"%s\"\n", symbol.c_str());
-	int value = INT_MAX;
+	SayDebug("Read the parameter keyword \"" + symbol + "\"");
+	float value = INFINITY;
 	switch (FindSymbolType(symbol)) {
 	case SymbolType::ValueLiteral:
 		file.seekg(goBack);
 		file >> value;
-		DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "Used the literal value %i as a parameter\n", value);
+		SayDebug("Used the literal value " + std::to_string(value) + " as a parameter");
 		break;
 	case SymbolType::Variable:
 		value = Variable();
 		break;
 	case SymbolType::Keyword: // TODO: Handle declaration of new var as a param
-		DebugMessage(MSGTYPE::MSG_ERROR, "WARNING: Declaring a new variable in a parameter for a function is not yet supported");
-		break;
-	case SymbolType::Function: // TODO: Functions as parameters for other functions
-		DebugMessage(MSGTYPE::MSG_WARNING, "WARNING: Using a function as a parameter for another function is not yet supported");
+		SayDebug("Tried declaring a new variable in a parameter for a function", DebugColor::Critical);
 		break;
 	default:
-		DebugMessage(MSGTYPE::MSG_ERROR, "WARNING: Using a function as a parameter for another function is not yet supported");
+	case SymbolType::Function: // TODO: Functions as parameters for other functions
+		SayDebug("Tried using a function as a parameter for another function", DebugColor::Critical);
 		break;
 	}
 	return value;
 }
 
-int Function()
+float Function()
 {
-	FunctionSymbol symbol;
+	std::string symbol;
 	file >> symbol;
-	DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "Read the function \"%s\" symbol for ", symbol.c_str());
 
-	FuncToken token = Tokenize(symbol);
+	FuncToken token = g_FunctionSymbolList.find(symbol)->second;
 
 	switch (token)
 	{
 	case FuncToken::Wait: // Wait
-	{
-		DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "Wait.\n");
-		int time = Param();
-		DebugMessage(MSGTYPE::MSG_DEBUG_PRODUCT, "Waiting %i ms...\n", time);
-		Sleep(time);
-		DebugMessage(MSGTYPE::MSG_DEBUG, "Finished wait.\n");
+		{
+			int time = (int)Param();
+			SayDebug("Waiting " + std::to_string(time) + " ms...");
+			Sleep(time);
+			SayDebug("Finished wait.");
+		}
 		break;
-	}
+
 	case FuncToken::Print: // Print
-	{
-		DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "Print.\n");
-		std::string str;
-		file >> str;
-		printf("%s\n", str.c_str());
-		DebugMessage(MSGTYPE::MSG_DEBUG_PRODUCT, "Printed the string ");
-		DebugMessageHLT(MSGTYPE::MSG_DEBUG_PRODUCT, HLT::HLT_STR, "\"%s\"", str.c_str());
-		DebugMessage(MSGTYPE::MSG_DEBUG_PRODUCT, ".\n");
+		{
+			std::string str;
+			file >> str;
+			SayComm(str);
+			SayDebug("Printed the string \"" + str + "\"");
+		}
 		break;
-	}
-	break;
+
 	// TODO: Add more functions
 	default:
-		DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "Undefined behavior.\n");
+		SayDebug("Undefined function", DebugColor::Warning);
 		break;
 	}
 	return 0;
@@ -522,9 +513,9 @@ int Function()
 // TODO: Implement control statments
 int Control()
 {
-	CtrlSymbol symbol;
+	std::string symbol;
 	file >> symbol;
-	CtrlToken ctrlSymbol = Tokenize(symbol);
+	CtrlToken ctrlSymbol = g_CtrlStatements.find(symbol.c_str())->second;
 	switch (ctrlSymbol)
 	{
 	case CtrlToken::ctrl_if: // If
@@ -559,6 +550,7 @@ int Control()
 		break;
 	default:
 		DebugMessage(MSGTYPE::MSG_ERROR, "ERROR: CONTROL KEYWORD USED WITHOUT VALID CONTROL SYMBOL.\n");
+		break;
 	}
 	return 0;
 }
@@ -620,7 +612,7 @@ int InterpretFile(const char* filename)
 	* 
 	*	Variables
 	*	=========
-	*	Note: only integer vars are supported in this version.
+	*	Note: only integer g_vars are supported in this version.
 	*   :var [var symbol] <var/lit> [init value]	// Declaration
 	*   :var [var symbol] <var/lit> [new value]		// Assignment
 	*	:func [function symbol] var [var symbol]	// Var as parameter
@@ -637,7 +629,7 @@ int InterpretFile(const char* filename)
 	*   :Mouse lit 123 lit 456		// literals
 	*   :Mouse var x var y			// variables
 	*   :Print small Foo			// string
-	*	Note: string parameters cannot use variables (all vars are ints) and expect
+	*	Note: string parameters cannot use variables (all g_vars are ints) and expect
 	*	a string without the lit keywords.
 	*
 	***************************************************************************/
@@ -658,7 +650,7 @@ int InterpretFile(const char* filename)
 		}
 		printf("\n");
 		// Cleanup
-		vars.ClearAll();
+		g_vars.ClearAll();
 		file.seekg(0);
 	}
 	*/
@@ -666,7 +658,12 @@ int InterpretFile(const char* filename)
 	file.ignore(256,' ');
 	int versionNumber;
 	file >> versionNumber;
-	DebugMessage(MSGTYPE::MSG_DEBUG, "Executing Virtual Hank Instruction Document \"%s\" using version number %i.\n", filename, versionNumber);
+	std::string str = "Executing Virtual Hank Instruction Document ";
+	str += filename;
+	str += " using version number ";
+	str += std::to_string(versionNumber);
+	str += ".";
+	SayDebug(str.c_str());
 
 	if (versionNumber < g_version)
 	{
@@ -675,53 +672,69 @@ int InterpretFile(const char* filename)
 
 	int line = 0;
 
-	while (true) // For each line
+	while (!file.eof()) // For each line
 	{
 		file.ignore(256, ':');
 		++line; // I want the lines to be { 1, 2, 3, ... } instead of { 0, 1, 2, ... }
-		DebugMessage(MSGTYPE::MSG_DEBUG_LINEINDIC, "\n[LINE %i]: ", line);
+		SayDebug("Moved to next line.");
 		//PrintLine();
 
 		std::string startingSymbol;
 		file >> startingSymbol;
 
+		SayDebug("Read the line-starting symbol \"" + startingSymbol + "\"");
+
 		DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "Read the line-starting symbol \"%s\" which is ", startingSymbol.c_str());
 
-		SymbolType type = FindSymbolType(startingSymbol);
-		switch (type)
+		switch (SymbolType type = FindSymbolType(startingSymbol))
 		{
 		case SymbolType::Function:
-			DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "a function.\n");
-			Function();
+			{
+				DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "a function.\n");
+				std::string name;
+				file >> name;
+				auto it = g_FunctionSymbolList.find(name);
+				if (it != g_FunctionSymbolList.end()) FuncCall(it->second);
+				else SayDebug("Invalid function name!", DebugColor::Critical);
+			}
 			break;
 
 		case SymbolType::Variable:
-			DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "an existing variable.\n");
-			Variable(false); // We are almost certainly reassigning the variable if its name is at the start of a line
+			{
+				DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "an existing variable.\n");
+				Variable(false); // We are almost certainly reassigning the variable if its name is at the start of a line
+			}
 			break;
 
 		case SymbolType::Keyword:
-		{
-			switch (Tokenize((KeywordSymbol)(startingSymbol.c_str())))
 			{
-			case KeywordToken::end: // HACK: Not really sure why "end" is being handled like this but ok
-				goto END;
-				break;
+				switch (g_Keywords.find(startingSymbol)->second)
+				{
+				case KeywordToken::end: // HACK: Not really sure why "end" is being handled like this but ok
+					goto END;
+					break;
 
-			case KeywordToken::var:
-				DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "for declaring a new var.\n");
-				Variable();
-				break;
+				case KeywordToken::var:
+					DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "for declaring a new var.\n");
+					Variable();
+					break;
+				}
 			}
 			break;
-		}
+
 		case SymbolType::Control:
-			DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "a control keyword.\n");
-			Control();
+			{
+				DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "a control keyword.\n");
+				Control();
+			}
 			break;
+
 		default: // Any literal type or otherwise unknown symbol
-			DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "undefined.\n");
-			DebugMessage(MSGTYPE::MSG_ERROR, "ERROR: INVALID SYNTAX! Couldn't find a definition for \"%s\".\n", startingSymbol.c_str());
+			{
+				SayDebug("ERROR: INVALID SYNTAX! Couldn't find a definition!", DebugColor::Critical);
+				DebugMessage(MSGTYPE::MSG_DEBUG_EXTRA, "undefined.\n");
+				DebugMessage(MSGTYPE::MSG_ERROR, "ERROR: INVALID SYNTAX! Couldn't find a definition for \"%s\".\n", startingSymbol.c_str());
+			}
 			break;
 		}
 	}
