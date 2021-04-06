@@ -1,0 +1,52 @@
+version 0
+var [ set [ str ] ] agree
+{
+	"y"
+	"yes"
+	"yea"
+	"yeah"
+	"yup"
+	"mhm"
+	"agree"
+	"affirmative"
+	"absolutely"
+	"yupperdoodle"
+	"yesyesyesyes"
+}
+var [ set [ str ] ] disag
+{
+	"n"
+	"no"
+	"nah"
+	"naw"
+	"nono"
+	"nu"
+	"negatory"
+	"don't"
+}
+Open "C:\\Program Files\Internet Explorer\iexplore.exe https://lachmanstuartcom.sharepoint.com/sites/LACHMANSTUART/Shared%20Documents/Forms/AllItems.aspx"
+Print "Would you like to run the program in manual mode? (yes/no)"
+Prompt 2
+< agree >
+	var offs
+	Print "Is this the correct monitor?";
+	Prompt 2
+	[]
+	[]
+	MouseTo screenOffset + 90, 1013
+	Sleep(2000)
+	SimulateMouseClickAt(screenOffset + library)
+	Sleep(800)
+	SimulateMouseClickAt(screenOffset + sync)
+	Sleep(400)
+	SimulateMouseGoto(screenOffset + allow)
+	PrintRaw(explainAllow)
+<~agree~>
+< disag >
+
+.auto
+
+ret
+
+.mnul
+ret

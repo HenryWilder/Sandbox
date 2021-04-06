@@ -88,13 +88,8 @@ struct DebugLine
 extern DebugLine g_debugLines[];
 extern std::string g_commLines[];
 
-void PushDebug(const std::string& line, DebugColor color);
-void DrawDebug();
 void SayDebug(const std::string& str, DebugColor color = DebugColor::Msg);
 
-void ClearComm();
-void PushComm(std::string);
-void DrawComm();
 void SayComm(const std::string&);
 
 void SayPretty(const std::string, Color8Bit = Color8Bit::Yellow);

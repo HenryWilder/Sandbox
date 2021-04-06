@@ -49,13 +49,13 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="Test.vhid">
-      <Filter>Resource Files</Filter>
-    </Text>
-    <Text Include="0.vhvf">
-      <Filter>Resource Files</Filter>
-    </Text>
     <Text Include="log.txt">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="calibrate.vhid">
+      <Filter>Resource Files</Filter>
+    </Text>
+    <Text Include="feature_test.vhid">
       <Filter>Resource Files</Filter>
     </Text>
   </ItemGroup>

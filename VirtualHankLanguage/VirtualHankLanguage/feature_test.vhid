@@ -1,5 +1,5 @@
 version 0
-var x 123 var y 456 (()());
+var x 123 var y 456;
 var z y;
 Print "Apple";
 Wait var time var m x;

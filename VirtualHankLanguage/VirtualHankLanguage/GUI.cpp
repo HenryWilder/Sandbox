@@ -1,4 +1,4 @@
-#include "GUI.h"
+﻿#include "GUI.h"
 
 char DensityRamp(const double value)
 {
@@ -50,37 +50,39 @@ void SetPrintPos(int x, int y)
     printf("\x1b[%i;%iH", y + 1, x + 1);
 }
 
-const std::string g_overlay =
-R"TXT(++====================================================================================================================++
+
+const std::string g_overlay // Overlay
+= 1 + R"ESC(
+++====================================================================================================================++
 ||   _    _      _ _         __          __        _     _ _       || debug data  /                                   ||
 ||  | |  | |    | | |        \ \        / /       | |   | | |      ||===========-`                                    ||
-||  | |__| | ___| | | ___     \ \  /\  / /__  _ __| | __| | |      || ~00                                           < ||
-||  |  __  |/ _ \ | |/ _ \     \ \/  \/ / _ \| '__| |/ _` | |      || ~01                                           < ||
-||  | |  | |  __/ | | (_) |     \  /\  / (_) | |  | | (_| |_|      || ~02                                           < ||
-||  |_|  |_|\___|_|_|\___( )     \/  \/ \___/|_|  |_|\__,_(_)      || ~03                                           < ||
-||_______________--------|/-------------------------------------.  || ~04                                           < ||
+||  | |__| | ___| | | ___     \ \  /\  / /__  _ __| | __| | |      || ~                                             < ||
+||  |  __  |/ _ \ | |/ _ \     \ \/  \/ / _ \| '__| |/ _` | |      || ~                                             < ||
+||  | |  | |  __/ | | (_) |     \  /\  / (_) | |  | | (_| |_|      || ~                                             < ||
+||  |_|  |_|\___|_|_|\___( )     \/  \/ \___/|_|  |_|\__,_(_)      || ~                                             < ||
+||_______________--------|/-------------------------------------.  || ~                                             < ||
 || communication \---------------------------------------------. `-||______________.._________________________________||
-||===============-'                                             `--||_______________,---------------------------------||
-|| >00                                                           < || pretty stuff /$00                             < ||
-|| >01                                                           < ||============-`$01                              < ||
-|| >02                                                           < || $02                                           < ||
-|| >03                                                           < || $03                                           < ||
-|| >04                                                           < || $04                                           < ||
-|| >05                                                           < || $05                                           < ||
-|| >06                                                           < || $06                                           < ||
-|| >07                                                           < || $07                                           < ||
-|| >08                                                           < || $08                                           < ||
-|| >09                                                           < || $09                                           < ||
-|| >10                                                           < || $10                                           < ||
-|| >11                                                           < || $11                                           < ||
-|| >12                                                           < || $12                                           < ||
-|| >13                                                           < || $13                                           < ||
-|| >14                                                           < || $14                                           < ||
-|| >15                                                           < || $15                                           < ||
-|| >16                                                           < || $16                                           < ||
-|| >17                                                           < || $17                                           < ||
-|| >18                                                           < || $18                                           < ||
-++====================================================================================================================++)TXT";
+||===============-'                                             `--||_______________,-----------------------------------
+|| >                                                           < ↑ || pretty stuff /$                                  <
+|| >                                                           < * ||============-`$                                   <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < ↓ ||$                                                 <
+++===================================================================$                                                 <)ESC";
 constexpr size_t g_debugLineCount = 5;
 constexpr size_t g_commLineCount = 19;
 constexpr size_t g_PrettyLineCount = 19;
@@ -115,71 +117,68 @@ void DrawOverlay()
 
 DebugLine g_debugLines[g_debugLineCount];
 
-void PushDebug(const std::string& line, DebugColor color)
+void SayDebug(DebugColor color, const char* fmt...)
 {
-    std::ofstream log("log.txt", std::ofstream::out | std::ofstream::app);
-    switch (color)
     {
-    case DebugColor::Msg:
-        log << "Info: ";
-        break;
-    case DebugColor::Warning:
-        log << "Warning: ";
-        break;
-    case DebugColor::Critical:
-        log << "Critical: ";
-        break;
-    }
-    log << line << std::endl;
-    log.close();
-
-    static int s_msgNumber = 0;
-    char numberInsert[] = "[00] ";
-    sprintf_s(numberInsert, "[%#02i] ", ++s_msgNumber);
-    std::string _str = numberInsert + line;
-    for (int i = 4; i > 0; --i)
-    {
-        g_debugLines[i] = g_debugLines[i - 1];
-    }
-    g_debugLines[0] = { _str, color };
-}
-void DrawDebug()
-{
-    for (int line = 4; line >= 0; --line)
-    {
-        const auto& debug = g_debugLines[line];
-
-        LineData data = FindPositionInOverlay(PosSymbol::Debug, line);
-        PrepareLine(data);
-
-        if (!debug.m_str.empty())
+        std::ofstream log("log.txt", std::ofstream::out | std::ofstream::app);
+        switch (color)
         {
-            switch (debug.m_color)
-            {
-            default:
-            case DebugColor::Msg:
-                SetPrintColor8Bit(Color8Bit::Yellow);
-                break;
-            case DebugColor::Warning:
-                SetPrintColor8Bit(Color8Bit::Bright_Offset + Color8Bit::Yellow);
-                break;
-            case DebugColor::Critical:
-                SetPrintColor8Bit(Color8Bit::Red);
-                break;
-            }
-
-            if (debug.m_str.length() > data.width)
-                printf((debug.m_str.substr(0, data.width - 3) + "...").c_str());
-            else
-                printf(debug.m_str.c_str());
+        case DebugColor::Msg:
+            log << "Info: ";
+            break;
+        case DebugColor::Warning:
+            log << "Warning: ";
+            break;
+        case DebugColor::Critical:
+            log << "Critical: ";
+            break;
         }
+        log << str << std::endl;
+        log.close();
+
+        static int s_msgNumber = 0;
+        char numberInsert[] = "[00] ";
+        sprintf_s(numberInsert, "[%#02i] ", ++s_msgNumber);
+        std::string _str = numberInsert + str;
+        for (int i = 4; i > 0; --i)
+        {
+            g_debugLines[i] = g_debugLines[i - 1];
+        }
+        g_debugLines[0] = { _str, color };
     }
-    ResetPrintColor();
-}
-void SayDebug(const std::string& str, DebugColor color)
-{
-    PushDebug(str, color);
-    DrawDebug();
+
+    {
+        for (int line = 4; line >= 0; --line)
+        {
+            const auto& debug = g_debugLines[line];
+
+            LineData data = FindPositionInOverlay(PosSymbol::Debug, line);
+            PrepareLine(data);
+
+            if (!debug.m_str.empty())
+            {
+                switch (debug.m_color)
+                {
+                default:
+                case DebugColor::Msg:
+                    SetPrintColor8Bit(Color8Bit::Yellow);
+                    break;
+                case DebugColor::Warning:
+                    SetPrintColor8Bit(Color8Bit::Bright_Offset + Color8Bit::Yellow);
+                    break;
+                case DebugColor::Critical:
+                    SetPrintColor8Bit(Color8Bit::Red);
+                    break;
+                }
+
+                if (debug.m_str.length() > data.width)
+                    printf((debug.m_str.substr(0, data.width - 3) + "...").c_str());
+                else
+                    printf(debug.m_str.c_str());
+            }
+        }
+        ResetPrintColor();
+    }
 }
 
 std::string g_commLines[g_commLineCount];
@@ -191,7 +190,7 @@ void ClearComm()
         line.clear();
     }
 }
-void PushComm(std::string str)
+void PushComm(const char* str)
 {
     constexpr int maxComm = g_commLineCount - 1;
     if (!str.empty())
@@ -240,23 +239,27 @@ void PushComm(std::string str)
         }
     }
 }
-void DrawComm()
+
+void SayComm(const char* fmt...)
 {
-    ResetPrintColor(); // Color guard
-    for (int line = 0; line < g_commLineCount; ++line)
+    va_list args;
+
+    PushComm(str);
+
+    delete args;
+
     {
-        PrepareLine(FindPositionInOverlay(PosSymbol::Comm, line));
-        const std::string& str = g_commLines[line];
-        if (!str.empty()) printf(str.c_str());
+        ResetPrintColor(); // Color guard
+        for (int line = 0; line < g_commLineCount; ++line)
+        {
+            PrepareLine(FindPositionInOverlay(PosSymbol::Comm, line));
+            const std::string& str = g_commLines[line];
+            if (!str.empty()) printf(str.c_str());
+        }
     }
 }
-void SayComm(const std::string& str)
-{
-    PushComm(str);
-    DrawComm();
-}
 
-void SayPretty(const std::string str, const Color8Bit color)
+void SayPretty(const Color8Bit color, const char* str...)
 {
     std::istringstream stream(str);
     std::string line;

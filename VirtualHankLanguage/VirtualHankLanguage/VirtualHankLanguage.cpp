@@ -4,10 +4,9 @@
 #include "Interpreter.h"
 #include "GUI.h"
 
-const char* versionNumber = R"TXT(Version 0.00.1)TXT";
+const char* versionNumber = R"(Version 0.00.1)";
 
-const char* splashText =
-R"TXT(
+const char* splashText = 1 + R"(
    _    _      _ _         __          __        _     _ _   
   | |  | |    | | |        \ \        / /       | |   | | |  
   | |__| | ___| | | ___     \ \  /\  / /__  _ __| | __| | |  
@@ -15,10 +14,12 @@ R"TXT(
   | |  | |  __/ | | (_) |     \  /\  / (_) | |  | | (_| |_|  
   |_|  |_|\___|_|_|\___( )     \/  \/ \___/|_|  |_|\__,_(_)  
                        |/                                    
-)TXT";
+)";
 
-const char* screen1 =
-R"TXT(Hi! My name is VirtualHank! I'm here to help you with tech issues. :)
+const char* screens[]
+{
+1 + R"(
+Hi! My name is VirtualHank! I'm here to help you with tech issues. :)
 Unfortunately, because I am only a program, I have some trouble with certain things you may find trivial.
 For this reason, I ask that you kindly keep my window open, so that I communicate to you when I need help.
 I would also like to let you know ahead of time: I may perform hardware simulation.
@@ -28,20 +29,20 @@ In case I do scare you at any point, or you feel you need to force-quit me but c
 I am programmed to return full control to you if you slam your cursor into any edge/corner of the screen.
 Once you've finished reading, press enter and I will begin.
 Do not worry. The first step will not have any scary mouse-movement whatsoever. And you have have the option
-to put me into manual mode.)TXT";
-
-const char* screen2 =
-R"TXT(For security reasons, I need you to sign in yourself.
+to put me into manual mode.)",
+1 + R"(
+For security reasons, I need you to sign in yourself.
 I could have been coded to access your sign-in data on my own using WTSQueryUserToken(),
 but that would have risked a security leak if not used properly. Letting you sign in is much safer.
 It would also be greatly appriciated if you would please maximize the Internet Explorer window.
 My programming is rather rigid, and I have trouble seeing. I can perform the actions needed to do this for you, but
 to know where the buttons to click are, I need IE to be maximized. Otherwise I may accidentally click the wrong spot.
 Let me know when you're ready to proceed!
-If you'd like to do this manually, type "manual" before pressing enter, and I'll tell you the steps :))TXT";
+If you'd like to do this manually, type "manual" before pressing enter, and I'll tell you the steps :))"
+};
 
-const char* manualMode =
-R"TXT(STEPS FOR SYNCING SHAREPOINT
+const char* manualMode = 1 + R"(
+STEPS FOR SYNCING SHAREPOINT
 ============================
 0. In the bottom-left corner of your Internet Explorer window, you should see a button/link that says
    "Return to classic SharePoint"
@@ -51,12 +52,12 @@ R"TXT(STEPS FOR SYNCING SHAREPOINT
 2. This will unroll an actions panel. On that panel, there will be a "Sync" button. Click it.
 3. A message box will appear in the center of your screen. Press "Allow".
    The message box is simply making sure you want to sync SharePoint.
-If you've completed all these steps, SharePoint should be syncing!)TXT";
+If you've completed all these steps, SharePoint should be syncing!)";
 
 const char* explainAllow =
-R"TXT(So you know, I have the ability to click Allow right now.
+R"_(So you know, I have the ability to click Allow right now.
 I care about making sure you don't feel as though I'm taking away control from you, though.
-If you want to sync SharePoint, you may press "Allow" yourself, now.)TXT";
+If you want to sync SharePoint, you may press "Allow" yourself, now.)_";
 
 void PrintRaw(const char* string) { std::cout << string << std::endl; }
 
@@ -71,93 +72,105 @@ POINT operator+(const POINT& p1, const POINT& p2)
     return { p1.x + p2.x, p1.y + p2.y };
 }
 
+const char g_LogFileName[]{ "log.txt" }; // Name of the output log file
+
 // Credit: https://blog.kazitor.com/2014/12/portal-ascii/
-const std::string g_AsciiGraphics[]{
-R"TXT(             .,-:;//;:=,
-         . :H@@@MM@M#H/.,+$;,
-      ,/X+ +M@@M@MM$=,-$HMMM@X/,
+const char* g_AsciiGraphics[]
+{
+    1 + R"(
+             .,-:;//;:=,
+         . :H@@@MM@M#H/.,+%;,
+      ,/X+ +M@@M@MM%=,-%HMMM@X/,
      -+@MM; $M@@MH+-,;XMMMM@MMMM@+-
     ;@M@@M- XM@X;. -+XXXXXHHH@M@M#@/.
-  ,$MM@@MH ,@$=            .---=-=:=,.
-  -@#@@@MX .,              -$HX$$$$$+;
+  ,%MM@@MH ,@%=            .---=-=:=,.
+  -@#@@@MX .,              -%HX$$%%%+;
  =-./@M@M$                  .;@MMMM@MM:
  X@/ -$MM/                    .+MM@@@M$
 ,@M@H: :@:                    . -X#@@@@-
 ,@@@MMX, .                    /H- ;@M@M=
-.H@@@@M@+,                    $MM+..$#$.
+.H@@@@M@+,                    %MM+..%#$.
  /MMMM@MMH/.                  XM@MH; -;
-  /$+$$XHH@$=              , .H@@@@MX,
-   .=--------.           -$H.,@@@@@MX,
-   .$MM@@@HHHXX$$$$+- .:$MMX -M@@MM$.
+  /%+%$XHH@$=              , .H@@@@MX,
+   .=--------.           -%H.,@@@@@MX,
+   .%MM@@@HHHXX$$$%+- .:$MMX -M@@MM%.
      =XMMM@MM@MM#H;,-+HMM@M+ /MMMX=
-       =$@M@M#@$-.=$@MM@@@M; $M$=
+       =%@M@M#@$-.=$@MM@@@M; %M%=
          ,:+$+-,/H#MMMMMMM@- -,
-               =++$$$$+/:-.)TXT",
+               =++%%%%+/:-.
+)",
 
-R"TXT(             =+$HM####@H$;,
+    1 + R"(
+             =+$HM####@H%;,
           /H###############M$,
           ,@################+
            .H##############+
              X############/
               $##########/
-               $########/
+               %########/
                 /X/;;+X/
 
                  -XHHX-
                 ,######,
 #############X  .M####M.  X#############
 ##############-   -//-   -##############
-X##############$,      ,+##############X
+X##############%,      ,+##############X
 -##############X        X##############-
- $############$          $############$
-  $##########;            ;##########$
+ %############%          %############%
+  %##########;            ;##########%
    ;#######M=              =M#######;
     .+M###@,                ,@###M+.
-       :XH.                  .HX:)TXT",
+       :XH.                  .HX:
+)",
 
-R"TXT(                 =/;;/-
+1 + R"(
+                 =/;;/-
                 +:    //
                /;      /;
               -X        H.
-.//;;;:;;-,   X=        :+   .-;:=;:;$;.
+.//;;;:;;-,   X=        :+   .-;:=;:;%;.
 M-       ,=;;;#:,      ,:#;;:=,       ,@
-:$           :$.=/++++/=.$=           $=
- ,$;         $/:+/;,,/++:+/         ;+.
-   ,+/.    ,;@+,        ,$H;,    ,/+,
+:%           :%.=/++++/=.$=           %=
+ ,%;         %/:+/;,,/++:+/         ;+.
+   ,+/.    ,;@+,        ,%H;,    ,/+,
       ;+;;/= @.  .H##X   -X :///+;
-      ;+=;;;.@,  .XM@$.  =X.//;=$/.
-   ,;:      :@$=        =$H:     .+$-
- ,$=         $;-///==///-//         =$,
-;+           :$-;;;;;;;;-X-           +:
+      ;+=;;;.@,  .XM@$.  =X.//;=%/.
+   ,;:      :@%=        =$H:     .+%-
+ ,%=         %;-///==///-//         =%,
+;+           :%-;;;;;;;;-X-           +:
 @-      .-;;;;M-        =M/;;;-.      -X
- :;;::;;-.    $-        :+    ,-;;-;:==
+ :;;::;;-.    %-        :+    ,-;;-;:==
               ,X        H.
-               ;/      $=
+               ;/      %=
                 //    +;
-                 ,////,)TXT",
+                 ,////,
+)",
 
-R"TXT(                          .,---.
+1 + R"(
+                          .,---.
                         ,/XM#MMMX;,
-                      -$##########M$,
-                     -@######$  $###@=
+                      -%##########M%,
+                     -@######%  $###@=
       .,--,         -H#######$   $###M:
    ,;$M###MMX;     .;##########$;HM###X=
 ,/@###########H=      ;################+
--+#############M/,      $##############+
-$M###############=      /##############:
+-+#############M/,      %##############+
+%M###############=      /##############:
 H################      .M#############;.
 @###############M      ,@###########M:.
 X################,      -$=X#######@:
-/@##################$-     +######$-
+/@##################%-     +######$-
 .;##################X     .X#####+,
  .;H################/     -X####+.
    ,;X##############,       .MM/
       ,:+$H@M#######M#$-    .$$=
            .,-=;+$@###X:    ;/=.
                   .,/X$;   .::,
-                      .,    ..)TXT",
+                      .,    ..
+)",
 
-R"TXT(                     -$-
+1 + R"(
+                     -$-
                     .H##H,
                    +######+
                 .+#########H.
@@ -169,16 +182,18 @@ R"TXT(                     -$-
  -M###.  M#################@.  ;######H
  M####-  +###############$   =@#######X
  H####$   -M###########+   :#########M,
-  /####X-   =########$   :M########@/.
-    ,;$H@X;   .$###X   :##MM@$+;:-
+  /####X-   =########%   :M########@/.
+    ,;%H@X;   .$###X   :##MM@%+;:-
                  ..
   -/;:-,.              ,,-==+M########H
- -##################@HX$$+$$$$$$+:,,
-    .-/H$$$+$$$H@###############M@+=:/+:
-/XHX$:#####MH$=    ,---:;;;;/&&XHM,:###$
-$@#MX $+;-                      )TXT",
+ -##################@HX%%+%%$%%%+:,,
+    .-/H%%%+%%$H@###############M@+=:/+:
+/XHX%:#####MH%=    ,---:;;;;/&&XHM,:###$
+$@#MX %+;-                           .
+)",
 
-R"TXT(                                     :X-
+1 + R"(
+                                     :X-
                                   :X###
                                 ;@####@
                               ;M######X
@@ -189,99 +204,111 @@ R"TXT(                                     :X-
                       .H############$=.
          ,/:         ,M##########M;.
       -+@###;       =##########M;
-   =$M#######;     :#########M/
+   =%M#######;     :#########M/
 -$M###########;   :########/
  ,;X###########; =#######$.
      ;H#########+######M=
        ,+#############+
           /M########@-
-            ;M#####$
+            ;M#####%
               +####:
-               ,$M-)TXT",
+               ,$M-
+)",
 
-    R"TXT(            .+
+    1 + R"(
+            .+
              /M;
               H#@:              ;,
               -###H-          -@/
-               $####$.  -;  .$#X
+               %####$.  -;  .%#X
                 M#####+;#H :M#M.
-..          .+/;$#############-
- -/$H$+;-,    +##############/
-    .:$M###MH$$+############X  ,--=;-
+..          .+/;%#############-
+ -/%H%+;-,    +##############/
+    .:$M###MH$%+############X  ,--=;-
         -/H#####################H+=.
            .+#################X.
-         =$M####################H;.
-            /@###############+;;/$$;,
-         -$###################$
+         =%M####################H;.
+            /@###############+;;/%%;,
+         -%###################$
        ;H######################M=
-    ,$#####MH$$;+#####M###-/@####$
-  :$H$+;=-      -####X.,H#   -+M##@-
+    ,%#####MH$%;+#####M###-/@####%
+  :$H%+;=-      -####X.,H#   -+M##@-
  .              ,###;    ;      =$##+
                 .#H,               :XH,
-                 +                   .;-)TXT",
+                 +                   .;-
+)",
 
-    R"TXT(           .-;+$XHHHHHHX$+;-.
-        ,;X@@X$/;=----=:/$X@@X/,
-      =$@@$=.              .=+H@X:
+    1 + R"(
+           .-;+$XHHHHHHX$+;-.
+        ,;X@@X%/;=----=:/%X@@X/,
+      =$@@%=.              .=+H@X:
     -XMX:                      =XMX=
    /@@:                          =H@+
-  $@X,                            .$@$
- +@X.                               $@$
+  %@X,                            .$@$
+ +@X.                               $@%
 -@@,                                .@@=
-$@$                                  +@$
+%@%                                  +@$
 H@:                                  :@H
 H@:         :HHHHHHHHHHHHHHHHHHX,    =@H
-$@$         ;@M@@@@@@@@@@@@@@@@@H-   +@$
+%@%         ;@M@@@@@@@@@@@@@@@@@H-   +@$
 =@@,        :@@@@@@@@@@@@@@@@@@@@@= .@@:
- +@X        :@@@@@@@@@@@@@@@M@@@@@@:$@$
+ +@X        :@@@@@@@@@@@@@@@M@@@@@@:%@%
   $@$,      ;@@@@@@@@@@@@@@@@@M@@@@@@$.
    +@@HHHHHHH@@@@@@@@@@@@@@@@@@@@@@@+
     =X@@@@@@@@@@@@@@@@@@@@@@@@@@@@X=
       :$@@@@@@@@@@@@@@@@@@@M@@@@$:
         ,;$@@@@@@@@@@@@@@@@@@X/-
-           .-;+$XXHHHHHX$+;-.)TXT",
+           .-;+$XXHHHHHX$+;-.
+)",
 
-    R"TXT(            ,:/+/-
+    1 + R"(
+            ,:/+/-
             /M/              .,-=;//;-
-       .:/= ;MH/,    ,=/+$$XH@MM#@:
+       .:/= ;MH/,    ,=/+%$XH@MM#@:
       -$##@+$###@H@MMM#######H:.    -/H#
  .,H@H@ X######@ -H#####@+-     -+H###@X
-  .,@##H;      +XM##M/,     =$@###@X;-
-X$-  :M##########$.    .:$M###@$:
-M##H,   +H@@@$/-.  ,;$M###@$,          -
-M####M=,,---,.-$$H####M$:          ,+@##
-@##################@/.         :$H##@$-
+  .,@##H;      +XM##M/,     =%@###@X;-
+X%-  :M##########$.    .:%M###@%:
+M##H,   +H@@@$/-.  ,;$M###@%,          -
+M####M=,,---,.-%%H####M$:          ,+@##
+@##################@/.         :%H##@$-
 M###############H,         ;HM##M$=
 #################.    .=$M##M$=
 ################H..;XM##M$=          .:+
-M###################@$=           =+@MH$
-@#################M/.         =+H#X$=
+M###################@%=           =+@MH%
+@#################M/.         =+H#X%=
 =+M###############M,      ,/X#H+:,
   .;XM###########H=   ,/X#H+:;
      .=+HM#######M+/+HM@+=.
-         ,:/$XM####H/.
-              ,.:=-.)TXT",
+         ,:/%XM####H/.
+              ,.:=-.
+)",
 
-    R"TXT(       #+ @      # #              M#@
- .    .X  X.$##@;# #   +@#######X. @H$
-   ,==.   ,######M+  -#####$M####M-    #
-  :H##M$:=##+ .M##M,;#####/+#######$ ,M#
+    1 + R"(
+       #+ @      # #              M#@
+ .    .X  X.%##@;# #   +@#######X. @H%
+   ,==.   ,######M+  -#####%M####M-    #
+  :H##M%:=##+ .M##M,;#####/+#######% ,M#
  .M########=  =@#@.=#####M=M#######=  X#
  :@@MMM##M.  -##M.,#######M#######. =  M
              @##..###:.    .H####. @@ X,
    ############: ###,/####;  /##= @#. M
-           ,M## ;##,@#M;/M#M  @# X#$ X#
-.$=   ######M## ##.M#:   ./#M ,M #M ,#$
+           ,M## ;##,@#M;/M#M  @# X#% X#
+.%=   ######M## ##.M#:   ./#M ,M #M ,#$
 ##/         $## #+;#: #### ;#/ M M- @# :
 #+ #M@MM###M-;M #:$#-##$H# .#X @ + $#. #
-      ######/.: #$=# M#:MM./#.-#  @#: H#
-+,.=   @###: /@ $#,@  ##@X #,-#@.##$ .@#
+      ######/.: #%=# M#:MM./#.-#  @#: H#
++,.=   @###: /@ %#,@  ##@X #,-#@.##% .@#
 #####+;/##/ @##  @#,+       /#M    . X,
    ;###M#@ M###H .#M-     ,##M  ;@@; ###
    .M#M##H ;####X ,@#######M/ -M###$  -H
-    .M###$  X####H  .@@MM@;  ;@#M@
+    .M###%  X####H  .@@MM@;  ;@#M@
       H#M    /@####/      ,++.  / ==-,
-               ,=/:, .+X@MMH@#H  #####$=)TXT",
+               ,=/:, .+X@MMH@#H  #####$=
+)",
+
+// TODO: Add more graphics (optional)
+
 };
 
 int main()
