@@ -1,45 +1,115 @@
 #include <iostream>
+#include <fstream>
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+#include <sstream>
 #include <ctime>
-#include "Functions.h"
-#include "Interpreter.h"
-#include "GUI.h"
+#include <iostream>
 
-const char* versionNumber = R"(Version 0.00.1)";
+#pragma region Windows functions
 
-const char* splashText = 1 + R"(
-   _    _      _ _         __          __        _     _ _   
-  | |  | |    | | |        \ \        / /       | |   | | |  
-  | |__| | ___| | | ___     \ \  /\  / /__  _ __| | __| | |  
-  |  __  |/ _ \ | |/ _ \     \ \/  \/ / _ \| '__| |/ _` | |  
-  | |  | |  __/ | | (_) |     \  /\  / (_) | |  | | (_| |_|  
-  |_|  |_|\___|_|_|\___( )     \/  \/ \___/|_|  |_|\__,_(_)  
-                       |/                                    
-)";
+#include <windows.h>
+#include <shlobj.h>
+#include <atlstr.h>
+#include <tchar.h>
 
-const char* screens[]
+void Open(std::string& str)
 {
-1 + R"(
-Hi! My name is VirtualHank! I'm here to help you with tech issues. :)
-Unfortunately, because I am only a program, I have some trouble with certain things you may find trivial.
-For this reason, I ask that you kindly keep my window open, so that I communicate to you when I need help.
-I would also like to let you know ahead of time: I may perform hardware simulation.
-I will try my best not to take away control from you. I hope you are able to trust me.
-It will make it easier for me to help you if you can trust me to perform my programming.
-In case I do scare you at any point, or you feel you need to force-quit me but can't press my close button,
-I am programmed to return full control to you if you slam your cursor into any edge/corner of the screen.
-Once you've finished reading, press enter and I will begin.
-Do not worry. The first step will not have any scary mouse-movement whatsoever. And you have have the option
-to put me into manual mode.)",
-1 + R"(
-For security reasons, I need you to sign in yourself.
-I could have been coded to access your sign-in data on my own using WTSQueryUserToken(),
-but that would have risked a security leak if not used properly. Letting you sign in is much safer.
-It would also be greatly appriciated if you would please maximize the Internet Explorer window.
-My programming is rather rigid, and I have trouble seeing. I can perform the actions needed to do this for you, but
-to know where the buttons to click are, I need IE to be maximized. Otherwise I may accidentally click the wrong spot.
-Let me know when you're ready to proceed!
-If you'd like to do this manually, type "manual" before pressing enter, and I'll tell you the steps :))"
-};
+
+    PROCESS_INFORMATION processInfo;
+    STARTUPINFO startupInfo;
+
+    ZeroMemory(&startupInfo, sizeof(startupInfo));
+    startupInfo.cb = sizeof(startupInfo);
+    ZeroMemory(&processInfo, sizeof(processInfo));
+
+    LPWSTR commandline = new WCHAR[MAX_PATH];
+    for (size_t i = 0; i < str.size(); ++i)
+    {
+        commandline[i] = (WCHAR)(str[i]);
+    }
+    for (size_t i = str.size(); i < MAX_PATH; ++i)
+    {
+        commandline[i] = NULL;
+    }
+    int attempt = 0;
+RETRY:
+    BOOL success = CreateProcess(
+        NULL,
+        commandline,
+        NULL,
+        NULL,
+        FALSE,
+        0,
+        NULL,
+        NULL,
+        &startupInfo,
+        &processInfo
+    );
+    if (success)
+    {
+        //WaitForSingleObject(processInfo.hProcess, INFINITE);
+
+        CloseHandle(processInfo.hThread);
+        CloseHandle(processInfo.hProcess);
+    }
+    else
+    {
+        int response = MessageBox(GetConsoleWindow(), L"The process could not be started...", L"Oops", 5L | 30L);
+        if (response == IDRETRY)
+        {
+            if (attempt++ < 5) goto RETRY;
+        }
+    }
+    delete[] commandline;
+}
+
+POINT GetMousePos()
+{
+    POINT p;
+    if (GetCursorPos(&p)) return p;
+    else return { 0,0 };
+}
+
+void SimulateMouseMove(long x, long y)
+{
+    INPUT input;
+    input.type = INPUT_MOUSE;
+    input.mi.mouseData = 0;
+    input.mi.time = 0; // Pleaseeeee don't mess with this... it makes the monitor go funky...
+    input.mi.dx = x;
+    input.mi.dy = y;
+    input.mi.dwFlags = MOUSEEVENTF_MOVE;
+    SendInput(1, &input, sizeof(input));
+}
+
+void SimulateMouseGoto(long x, long y)
+{
+    INPUT input;
+    input.type = INPUT_MOUSE;
+    input.mi.mouseData = 0;
+    input.mi.time = 0; // Pleaseeeee don't mess with this... it makes the monitor go funky...
+    input.mi.dx = x * 34;
+    input.mi.dy = y * 61;
+    input.mi.dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE;
+    SendInput(1, &input, sizeof(input));
+}
+
+void SimulateMouseClick()
+{
+    INPUT input;
+    ZeroMemory(&input, sizeof(input));
+    input.type = INPUT_MOUSE;
+    input.mi.dwFlags = MOUSEEVENTF_LEFTDOWN;
+    SendInput(1, &input, sizeof(input));
+    Sleep(10);
+    input.mi.dwFlags = MOUSEEVENTF_LEFTUP;
+    SendInput(1, &input, sizeof(INPUT));
+}
+
+#pragma endregion
+
 
 const char* manualMode = 1 + R"(
 STEPS FOR SYNCING SHAREPOINT
@@ -54,25 +124,17 @@ STEPS FOR SYNCING SHAREPOINT
    The message box is simply making sure you want to sync SharePoint.
 If you've completed all these steps, SharePoint should be syncing!)";
 
-const char* explainAllow =
-R"_(So you know, I have the ability to click Allow right now.
-I care about making sure you don't feel as though I'm taking away control from you, though.
-If you want to sync SharePoint, you may press "Allow" yourself, now.)_";
-
-void PrintRaw(const char* string) { std::cout << string << std::endl; }
-
 constexpr POINT center = { 960, 540 };
 constexpr POINT returnToClassic = { 90, 1013 };
 constexpr POINT library = { 150, 150 };
 constexpr POINT sync = { 600, 200 };
 constexpr POINT allow = { 1000, 570 };
 
-POINT operator+(const POINT& p1, const POINT& p2)
-{
-    return { p1.x + p2.x, p1.y + p2.y };
-}
+const char* g_FileName_Log = "log.txt"; // Name of the output log file
+const char* g_FileName_Calibrate = "calibrate.vhid"; // Name of the calibration instruction document
+const char* g_Filename_StoredData = "userdata.txt"; // Name of the file where user data is stored
 
-const char g_LogFileName[]{ "log.txt" }; // Name of the output log file
+#pragma region Graphics
 
 // Credit: https://blog.kazitor.com/2014/12/portal-ascii/
 const char* g_AsciiGraphics[]
@@ -311,33 +373,615 @@ M###################@%=           =+@MH%
 
 };
 
-int main()
+enum class Color8Bit
 {
+    /*************************
+    * Key
+    * ===
+    * Name            FG  BG
+    * Black           30  40
+    * Red             31  41
+    * Green           32  42
+    * Yellow          33  43
+    * Blue            34  44
+    * Magenta         35  45
+    * Cyan            36  46
+    * White           37  47
+    * Bright Black    90  100
+    * Bright Red      91  101
+    * Bright Green    92  102
+    * Bright Yellow   93  103 // TODO use background color
+    * Bright Blue     94  104
+    * Bright Magenta  95  105
+    * Bright Cyan     96  106
+    * Bright White    97  107
+    **************************/
+
+    Black = 30,
+    Red,
+    Green,
+    Yellow,
+    Blue,
+    Magenta,
+    Cyan,
+    White,
+
+    Bright_Offset = 60,
+    BG_Offset = 10,
+};
+
+Color8Bit operator|(Color8Bit l, Color8Bit r)
+{
+    return (Color8Bit)((int)l + (int)r);
+}
+
+void SetPrintColor8Bit(Color8Bit color)
+{
+    printf("\x1b[%im", (int)color);
+}
+void ResetPrintColor()
+{
+    SetPrintColor8Bit(Color8Bit::Yellow);
+}
+void SetPrintColorRGB(unsigned char r, unsigned char g, unsigned char b)
+{
+    printf("\x1b[48;2;%i;%i;%im", r, g, b);
+}
+void SetPrintPos(int x, int y)
+{
+    printf("\x1b[%i;%iH", y + 1, x + 1);
+}
+
+// Overlay
+const std::string g_overlay = 1 + R"ESC(
+++====================================================================================================================++
+||   _    _      _ _         __          __        _     _ _       || debug data  /                                   ||
+||  | |  | |    | | |        \ \        / /       | |   | | |      ||===========-`                                    ||
+||  | |__| | ___| | | ___     \ \  /\  / /__  _ __| | __| | |      || ~                                             < ||
+||  |  __  |/ _ \ | |/ _ \     \ \/  \/ / _ \| '__| |/ _` | |      || ~                                             < ||
+||  | |  | |  __/ | | (_) |     \  /\  / (_) | |  | | (_| |_|      || ~                                             < ||
+||  |_|  |_|\___|_|_|\___( )     \/  \/ \___/|_|  |_|\__,_(_)      || ~                                             < ||
+||_______________--------|/-------------------------------------.  || ~                                             < ||
+|| communication \---------------------------------------------. `-||______________.._________________________________||
+||===============-'                                             `--||_______________,-----------------------------------
+|| >                                                           < ^ || pretty stuff /$                                  <
+|| >                                                           < * ||============-`$                                   <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < * ||$                                                 <
+|| >                                                           < v ||$                                                 <
+++===================================================================$                                                 <)ESC";
+
+constexpr size_t g_debugLineCount = 5;
+constexpr size_t g_commLineCount = 19;
+constexpr size_t g_PrettyLineCount = 19;
+
+// Symbol used for positioning ancoring in overlay
+enum class PosSymbol : char
+{
+    Comm = '>',
+    Debug = '~',
+    Pretty = '$',
+};
+struct LineData
+{
+    size_t pos, width;
+    int x()
     {
-        int sessionNumber;
-        {
-            std::ifstream log("log.txt", std::ifstream::in);
-            log.ignore(64, '.');
-            log >> sessionNumber;
+        return (int)(pos % 121ull);
+    }
+    int y()
+    {
+        return (int)(pos / 121ull);
+    }
+};
+LineData FindPositionInOverlay(PosSymbol symbol, int index)
+{
+    char search[] = "x00";
+    search[0] = (char)symbol;
+    if (index > 9) ++search[1];
+    search[2] += index % 10;
+    size_t pos = g_overlay.find(search);
+    size_t width = g_overlay.find('<', pos) - pos;
+    return LineData{ pos, width + 1 };
+}
 
-            log.close();
-        }
-        {
-            std::ofstream log("log.txt", std::ofstream::out);
+void PrepareLine(LineData line)
+{
+    SetPrintPos(line.x(), line.y());
+    for (int i = 0; i < line.width; ++i)
+    {
+        printf(" ");
+    }
+    SetPrintPos(line.x(), line.y());
+}
 
+void DrawOverlay()
+{
+    SetPrintPos(0, 0);
+    ResetPrintColor();
+    printf(g_overlay.c_str());
+}
 
-            log.clear();
-            time_t now = time(0);
-            char dt[28];
-            ctime_s(dt, sizeof(dt), &now);
+enum class DebugColor
+{
+    Msg,
+    Warning,
+    Critical,
+};
+struct DebugLine
+{
+    std::string m_str;
+    DebugColor m_color = DebugColor::Msg;
+};
+DebugLine g_debugLines[g_debugLineCount]; // Limited set, get truncated if too long.
 
-            log << "Session No. " << sessionNumber + 1 << " | " << dt << std::endl;
+const char* g_DebugMessagePrefix[3]
+{
+    "Info: ",
+    "Warning: ",
+    "Critical: "
+};
+void SayDebug(DebugColor color, const char* fmt...)
+{
+    static int s_msgNumber = 0;
+    for (int i = 4; i > 0; --i)
+    {
+        g_debugLines[i] = g_debugLines[i - 1];
+    }
+    {
+        FILE* log = fopen(g_FileName_Log, "a+");
+        
+        fprintf_s(log, g_DebugMessagePrefix[(int)color]);
+        va_list args;
+        va_start(args, fmt);
 
-            log.close();
-        }
+        vfprintf_s(log, fmt, args);
+        fclose(log);
+
+        LineData data = FindPositionInOverlay(PosSymbol::Debug, line);
+        PrepareLine(data);
+
+        char numberInsert[sizeof("~                                             <")];
+        sprintf_s(numberInsert, "[%#02i] %42s", ++s_msgNumber, );
+        std::string _str = numberInsert + str;
+        
+        va_end(args);
+
+        g_debugLines[0] = { _str, color };
     }
 
-    DrawOverlay();
+    {
+        for (int line = 4; line >= 0; --line)
+        {
+            const auto& debug = g_debugLines[line];
+
+            LineData data = FindPositionInOverlay(PosSymbol::Debug, line);
+            PrepareLine(data);
+
+            if (!debug.m_str.empty())
+            {
+                switch (debug.m_color)
+                {
+                default:
+                case DebugColor::Msg:
+                    SetPrintColor8Bit(Color8Bit::Yellow);
+                    break;
+                case DebugColor::Warning:
+                    SetPrintColor8Bit(Color8Bit::Bright_Offset + Color8Bit::Yellow);
+                    break;
+                case DebugColor::Critical:
+                    SetPrintColor8Bit(Color8Bit::Red);
+                    break;
+                }
+
+                if (debug.m_str.length() > data.width)
+                    printf((debug.m_str.substr(0, data.width - 3) + "...").c_str());
+                else
+                    printf(debug.m_str.c_str());
+            }
+        }
+        ResetPrintColor();
+    }
+}
+
+std::stringstream g_commLines; // Unlimited stream, wrap if too long.
+size_t g_commLineStreamLength;
+
+void ClearComm()
+{
+    g_commLines.clear();
+}
+void PushComm(const char* str)
+{
+    constexpr int maxComm = g_commLineCount - 1;
+    if (!str.empty())
+    {
+        size_t start = str.find_first_not_of(" \t\n");
+        if (start != str.npos) str = str.substr(start);
+        else return;
+
+        int line = 0;
+        if (!g_commLines[maxComm].empty())
+        {
+            // New line
+            for (int i = 0; i < maxComm; ++i)
+            {
+                g_commLines[i] = g_commLines[i + 1];
+            }
+            line = maxComm;
+        }
+        else
+        {
+            // Fill in
+            for (int i = 0; i <= maxComm; ++i)
+            {
+                if (g_commLines[i].empty())
+                {
+                    line = i;
+                    break;
+                }
+            }
+        }
+
+        auto [pos, space] = FindPositionInOverlay(PosSymbol::Comm, line);
+
+        if (str.length() > space)
+        {
+            std::string thisLine = str.substr(0ull, space);
+            size_t _space = thisLine.rfind(" ");
+            if (_space < space) space = _space;
+            thisLine = thisLine.substr(0ull, space);
+            g_commLines[line] = thisLine;
+            PushComm(str.substr(space));
+        }
+        else
+        {
+            g_commLines[line] = str;
+        }
+    }
+}
+
+void SayComm(const char* str)
+{
+    g_commLines << str;
+
+    std::string line;
+    ResetPrintColor(); // Color guard
+    while (std::getline(g_commLines, line))
+    {
+        PrepareLine(FindPositionInOverlay(PosSymbol::Comm, line));
+        const std::string& str = g_commLines[line];
+        if (!str.empty()) printf(str.c_str());
+    }
+}
+
+void SayPretty(const Color8Bit color, const char* str...)
+{
+    std::istringstream stream(str);
+    std::string line;
+    int i = 0;
+    LineData reference = FindPositionInOverlay(PosSymbol::Pretty, 2);
+    while (std::getline(stream, line, '\n') && i < g_PrettyLineCount)
+    {
+        LineData data = FindPositionInOverlay(PosSymbol::Pretty, i++);
+        PrepareLine(data);
+        printf(line.substr((size_t)data.x() - (size_t)reference.x(), data.width).c_str());
+    }
+    for (; i < g_PrettyLineCount; ++i)
+    {
+        PrepareLine(FindPositionInOverlay(PosSymbol::Pretty, i));
+    }
+}
+
+#pragma endregion
+
+enum class Type
+{
+    int_t,
+    float_t,
+    string_t,
+    list_t,
+    label_t,
+};
+
+enum class Instruction
+{
+    // 1 parameter
+    lbl,    // Label <name>
+    jmp,    // goto <name>
+
+    // Functions
+    KPrs,   // Simulate keypress <key>
+    MClc,   // Simulate mouseclick <mousebutton>
+    Prin,   // Prints the specified string
+    Open,   // Opens the specified program (complicated)
+    Prmp,   // Takes user input and jumps to the specified label
+    Wait,   // Sleep <time>
+
+    // 2 parameters
+    var,    // Create a variable (<type> <name>)
+    set,    // b = a
+
+    // Functions
+    Stor,   // userdata.ignore(INFINITY,a); userdata << <b>;
+    Mous,   // Moves the mouse to the specified x and y coordinates (can also take an array[2] as input)
+
+    // 3 parameters
+    add,    // c = a + b
+    sub,    // c = a - b
+    mul,    // c = a * b
+    div,    // c = a / b
+    mod,    // c = a % b
+};
+
+const std::unordered_map<std::string, Instruction> g_Instructions
+{
+    { "lbl",    Instruction::lbl  },
+    { "jmp",    Instruction::jmp  },
+
+    { "KPrs",   Instruction::KPrs },
+    { "MClc",   Instruction::MClc },
+    { "Prin",   Instruction::Prin },
+    { "Open",   Instruction::Open },
+    { "Prmp",   Instruction::Prmp },
+    { "Wait",   Instruction::Wait },
+
+    { "var",    Instruction::var  },
+    { "set",    Instruction::set  },
+
+    { "Stor",   Instruction::Stor },
+    { "Mous",   Instruction::Mous },
+
+    { "add",    Instruction::add  },
+    { "sub",    Instruction::sub  },
+    { "mul",    Instruction::mul  },
+    { "div",    Instruction::div  },
+    { "mod",    Instruction::mod  },
+};
+
+int main()
+{
+    // Prepare log file
+    {
+        FILE* log;
+        int sessionNumber;
+        // Read
+        log = fopen(g_FileName_Log, "r");
+        fscanf_s(log, "Session No. %i", &sessionNumber);
+        fclose(log);
+        // Write
+        log = fopen(g_FileName_Log, "w");
+        time_t now = time(0);
+        char dt[28];
+        ctime_s(dt, sizeof(dt) - 1, &now);
+        dt[27] = 0;
+        ++sessionNumber;
+        fprintf_s(log, "Session No. %i | %s\n", sessionNumber, dt);
+        fclose(log);
+    }
+
+    SetPrintPos(0, 0);
+    ResetPrintColor();
+    printf(g_overlay.c_str());
+
+    char* filename;
+    {
+        FILE* file = fopen(filename, "r"); // Open the file
+
+        int versionNumber;
+        fscanf_s(file, "version %i", &versionNumber);
+        SayDebug(DebugColor::Msg, "Executing Virtual Hank Instruction Document %s using version number %i", filename, versionNumber);
+
+        // TODO: Handle incompatible versions
+
+        int lineNumber = 0;
+        
+        std::unordered_map<std::string, size_t> labelPositions; // name : position
+
+        // TODO: Fill out labels map with seek positions
+        while ()
+        {
+            char name[16];
+            fscanf(file, "lbl %14s:", name, _countof(name));
+            if (name) labelPositions[name] = ftell(file);
+        }
+
+        rewind(file);
+
+        while (true)
+        {
+            std::string instruction;
+            char _instruction[8];
+            fscanf_s(file, "%7s", _instruction, _countof(_instruction));
+            instruction = _instruction;
+            auto it = g_Instructions.find(instruction);
+            if (it != g_Instructions.end())
+            {
+                // TODO
+                switch (it->second)
+                {
+                case Instruction::jmp:
+                {
+                    char label[16];
+                    fscanf(file, "%14s;", label, _countof(name));
+                    auto it = labelPositions.find(label);
+                    if (it != labelPositions.end()) fseek(file, it->second, SEEK_SET);
+
+                }   break;
+                case Instruction::KPrs:
+                    break;
+                case Instruction::MClc:
+                    break;
+                case Instruction::Prin:
+                    break;
+                case Instruction::Open:
+                    break;
+                case Instruction::Prmp:
+                    break;
+                case Instruction::Wait:
+                    break;
+                case Instruction::var:
+                    break;
+                case Instruction::set:
+                    break;
+                case Instruction::Stor:
+                    break;
+                case Instruction::Mous:
+                    break;
+                case Instruction::add:
+                    break;
+                case Instruction::sub:
+                    break;
+                case Instruction::mul:
+                    break;
+                case Instruction::div:
+                    break;
+                case Instruction::mod:
+                    break;
+                default:
+                    SayDebug(DebugColor::Critical, "");
+                    break;
+                }
+            }
+
+            auto it = instructionSet.find(instruction);
+            if (it != instructionSet.end()) // Instruction is valid
+            {
+
+            }
+            else
+            {
+                SayDebug(Error);
+            }
+        }
+
+        while (std::getline(file, _line, ';')) // For each lineStream
+        {
+            ++lineNumber; // I want the lines to be { 1, 2, 3, ... } instead of { 0, 1, 2, ... }
+            SayDebug("Now evaluating line " + std::to_string(lineNumber));
+            std::stringstream lineStream(_line);
+            {
+                size_t start = _line.find_first_not_of(" \n\t");
+                SayDebug("<[code]( " + _line.substr(start) + " )>");
+            }
+
+            std::string startingSymbol;
+            lineStream >> startingSymbol;
+
+            switch (SymbolType type = FindSymbolType(startingSymbol))
+            {
+            case SymbolType::Function:
+            {
+                auto it = g_FunctionSymbolList.find(startingSymbol);
+                if (it != g_FunctionSymbolList.end())
+                {
+                    switch (it->second)
+                    {
+                    case FuncToken::Print:
+                    {
+                        size_t start = _line.find('\"');
+                        start++;
+                        size_t length = _line.find('\"', start) - start;
+                        std::string str = _line.substr(start, length);
+                        SayComm(str);
+                        SayDebug(str);
+                    }
+                    break;
+
+                    case FuncToken::Wait:
+                    {
+                        try
+                        {
+                            float time_ms = Param(lineStream);
+                            Sleep((DWORD)time_ms);
+                        }
+                        catch (const char* msg)
+                        {
+                            SayDebug(msg, DebugColor::Critical);
+                        }
+                    }
+                    break;
+
+                    case FuncToken::MouseTo:
+                        // TODO
+                        break;
+                    case FuncToken::Click:
+                        // TODO
+                        break;
+                    case FuncToken::Keypress:
+                        // TODO
+                        break;
+                    case FuncToken::Open:
+                        // TODO
+                        break;
+                    }
+                }
+                else
+                {
+                    SayDebug("Function name not found in function list!", DebugColor::Critical);
+                }
+            }
+            break;
+
+            case SymbolType::Variable:
+            {
+                Variable(lineStream, startingSymbol); // We are almost certainly reassigning the variable if its name is at the start of a lineStream
+            }
+            break;
+
+            case SymbolType::Keyword:
+            {
+                switch (g_Keywords.find(startingSymbol)->second)
+                {
+                case KeywordToken::var:
+                    Variable(lineStream);
+                    break;
+                }
+            }
+            break;
+
+            case SymbolType::Control:
+            {
+                Control(lineStream);
+            }
+            break;
+
+            default: // Any literal type or otherwise unknown symbol
+            {
+                SayDebug("ERROR: INVALID SYNTAX! Couldn't find a definition!", DebugColor::Critical);
+                goto END;
+            }
+            break;
+            }
+
+            //for (auto var : g_vars)
+            //{
+            //	SayDebug("Var " + var.first + " has value of " + std::to_string(var.second));
+            //}
+        }
+
+    END:
+
+        SayDebug("Reached end of document.");
+
+        file.close();
+    }
+
+    
 
     SayDebug("Program started.", DebugColor::Msg);
 

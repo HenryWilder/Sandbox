@@ -160,6 +160,11 @@
     <Text Include="calibrate.vhid" />
     <Text Include="log.txt" />
     <Text Include="feature_test.vhid" />
+    <Text Include="userdata.txt" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="sharepoint_filetree.vhid" />
+    <None Include="startup.vhid" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
