@@ -1,3 +1,4 @@
+#if 0
 #include "VersionConversion.h"
 
 std::string FormatText(const char* text, ...)
@@ -29,3 +30,4 @@ void UpdateFile(const char* filename, int fVersion)
 
 	versionFormatFile.close();
 }
+#endif

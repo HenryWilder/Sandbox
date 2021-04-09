@@ -1,3 +1,4 @@
+#if 0
 #include "Functions.h"
 
 void ClearScreen()
@@ -179,3 +180,4 @@ void SimulateMouseClickAt(long x, long y)
 }
 
 void SimulateMouseClickAt(POINT p) { SimulateMouseClickAt(p.x, p.y); }
+#endif

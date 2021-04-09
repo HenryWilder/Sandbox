@@ -144,15 +144,20 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Functions.cpp" />
+    <ClCompile Include="Functions2.cpp" />
     <ClCompile Include="GUI.cpp" />
     <ClCompile Include="Interpreter.cpp" />
+    <ClCompile Include="Interpreter2.cpp" />
+    <ClCompile Include="Source.cpp" />
     <ClCompile Include="VersionConversion.cpp" />
     <ClCompile Include="VirtualHankLanguage.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Functions.h" />
+    <ClInclude Include="Functions2.h" />
     <ClInclude Include="GUI.h" />
     <ClInclude Include="Interpreter.h" />
+    <ClInclude Include="Interpreter2.h" />
     <ClInclude Include="resource.h" />
     <ClInclude Include="VersionConversion.h" />
   </ItemGroup>

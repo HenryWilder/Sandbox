@@ -1,3 +1,4 @@
+#if 0
 #pragma once
 #include <windows.h>
 #include <string.h>
@@ -34,3 +35,4 @@ void SimulateMouseClick();
 
 void SimulateMouseClickAt(long x, long y);
 void SimulateMouseClickAt(POINT p);
+#endif

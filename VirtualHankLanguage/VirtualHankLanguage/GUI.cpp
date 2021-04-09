@@ -1,4 +1,5 @@
-﻿#include "GUI.h"
+﻿#if 0
+#include "GUI.h"
 
 char DensityRamp(const double value)
 {
@@ -254,3 +255,4 @@ int LineData::y()
 {
     return (int)(pos / 121ull);
 }
+#endif
