@@ -1,16 +1,19 @@
-#include <stdio.h>			
+#include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
-#include <iostream>			
-#include <fstream>			
-#include <cstdarg>			
-#include <string>			
-#include <sstream>			
-#include <unordered_map>	
-#include <unordered_set>	
-#include <list>				
-#include <vector>			
-#include <any>				
+#include <iostream>
+#include <fstream>
+#include <cstdarg>
+#include <string>
+#include <sstream>
+#include <unordered_map>
+#include <map>
+#include <unordered_set>
+#include <set>
+#include <list>
+#include <vector>
+#include <array>
+#include <any>
 
 #define _DEPRECATE(_text) __declspec(deprecated(_text))
 #define DEPRECATED(_replacement) _DEPRECATE("has been depricated. Please use '" #_replacement "' instead.")
@@ -20,6 +23,144 @@
 #else
 #define ASSERT(cond,message)
 #endif // _CONTAINER_DEBUG_LEVEL > 0
+
+template<typename Ty, typename Cont>
+bool Contains(Cont container, Ty what)
+{
+	static_assert(false, "The specific container using this function has not been explicitly instatiated!");
+}
+
+// Array (std)
+template<typename T, size_t size> bool Contains(const std::array<T, size>& container, T what)
+{
+	for (size_t i = 0; i < size; ++i)
+	{
+		if (container[i] == what) return true;
+	}
+	return false;
+}
+// Array (std)
+template<typename T, size_t size> bool Contains(const std::array<T, size>&& container, T what)
+{
+	for (size_t i = 0; i < size; ++i)
+	{
+		if (container[i] == what) return true;
+	}
+	return false;
+}
+// Array ([])
+template<typename T, size_t size> bool Contains(const T (&container)[size], T what)
+{
+	for (size_t i = 0; i < size; ++i)
+	{
+		if (container[i] == what) return true;
+	}
+	return false;
+}
+// Array ([])
+template<typename T, size_t size> bool Contains(const T (&&container)[size], T what)
+{
+	for (size_t i = 0; i < size; ++i)
+	{
+		if (container[i] == what) return true;
+	}
+	return false;
+}
+// Vector
+template<typename T> bool Contains(const std::vector<T>& container, T what)
+{
+	for (const T& element : container)
+	{
+		if (element == what) return true;
+	}
+	return false;
+}
+// Vector
+template<typename T> bool Contains(const std::vector<T>&& container, T what)
+{
+	for (const T& element : container)
+	{
+		if (element == what) return true;
+	}
+	return false;
+}
+// Map - key
+template<typename Key, typename Val> bool Contains(const std::map<Key,Val>& container, Key what)
+{
+	auto it = container.find(what);
+	return (it != container.end());
+}
+// Map - key
+template<typename Key, typename Val> bool Contains(const std::map<Key,Val>&& container, Key what)
+{
+	auto it = container.find(what);
+	return (it != container.end());
+}
+// Map (unordered) - key
+template<typename Key, typename Val> bool Contains(const std::unordered_map<Key,Val>& container, Key what)
+{
+	auto it =  container.find(what);
+	return (it != container.end());
+}
+// Map (unordered) - key
+template<typename Key, typename Val> bool Contains(const std::unordered_map<Key,Val>&& container, Key what)
+{
+	auto it =  container.find(what);
+	return (it != container.end());
+}
+// Set
+template<typename T> bool Contains(const std::set<T>& container, T what)
+{
+	auto it = container.find(what);
+	return (it != container.end());
+}
+// Set
+template<typename T> bool Contains(const std::set<T>&& container, T what)
+{
+	auto it = container.find(what);
+	return (it != container.end());
+}
+// Set (unordered)
+template<typename T> bool Contains(const std::unordered_set<T>& container, T what)
+{
+	auto it = container.find(what);
+	return (it != container.end());
+}
+// Set (unordered)
+template<typename T> bool Contains(const std::unordered_set<T>&& container, T what)
+{
+	auto it = container.find(what);
+	return (it != container.end());
+}
+// String (std)
+template<> bool Contains(const std::string& container, char what)
+{
+	size_t it = container.find(what);
+	return (it != container.npos);
+}
+// String (std)
+template<> bool Contains(const std::string&& container, char what)
+{
+	size_t it = container.find(what);
+	return (it != container.npos);
+}
+// String (c-style)
+template<> bool Contains(const char* container, char what)
+{
+	for (const char* c = container; *c; ++c)
+	{
+		if (*c == what) return true;
+	}
+	return false;
+}
+
+void find()
+{
+	std::vector<int> vec;
+	std::unordered_map<std::string, int> map;
+	std::unordered_set<int> set;
+	Contains(vec, 2);
+}
 
 using Tag = std::string;
 
