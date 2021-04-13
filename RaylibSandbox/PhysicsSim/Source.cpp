@@ -2,9 +2,11 @@
 #include <raylib.h>
 #include <raymath.h>
 
+#define sign(x) (((x) > (decltype(x))(0)) - ((x) < (decltype(x))(0)))
+
 #pragma region Vector math
 
-inline Vector2  operator- (Vector2  vec) { return      Vector2Negate(vec); }
+inline Vector2  operator- (Vector2  vec) { return Vector2Negate(vec); }
 inline Vector2  operator+ (Vector2  a, Vector2 b) { return      Vector2Add(a, b); }
 inline Vector2& operator+=(Vector2& a, Vector2 b) { return (a = Vector2Add(a, b)); }
 inline Vector2  operator+ (Vector2  a, float val) { return      Vector2AddValue(a, val); }
@@ -22,7 +24,7 @@ inline Vector2& operator/=(Vector2& a, Vector2 b) { return (a = Vector2Divide(a,
 inline Vector2  operator/ (Vector2  a, float div) { return      Vector2Scale(a, 1.0f / div); }
 inline Vector2& operator/=(Vector2& a, float div) { return (a = Vector2Scale(a, 1.0f / div)); }
 
-inline Vector3  operator- (Vector3  vec) { return      Vector3Negate(vec); }
+inline Vector3  operator- (Vector3  vec) { return Vector3Negate(vec); }
 inline Vector3  operator+ (Vector3  a, Vector3 b) { return      Vector3Add(a, b); }
 inline Vector3& operator+=(Vector3& a, Vector3 b) { return (a = Vector3Add(a, b)); }
 inline Vector3  operator+ (Vector3  a, float val) { return      Vector3AddValue(a, val); }
@@ -43,53 +45,106 @@ inline Vector3& operator/=(Vector3& a, float div) { return (a = Vector3Scale(a, 
 #pragma endregion
 
 template<typename Vec_t>
-struct MassPoint
+struct Math // Does not actually store anything; just a wrapper for our templates
 {
-    MassPoint(Vector2 pos, float mass) : x(pos), v{ 0,0 }, F{ 0,0 }, m(mass) {}
-
-	Vec_t x; // Position
-	Vec_t v; // Velocity
-	Vec_t F; // Force
-	float m; // Mass
-};
-using MassPoint1D = MassPoint<float>;
-using MassPoint2D = MassPoint<Vector2>;
-using MassPoint3D = MassPoint<Vector3>;
-
-template<typename Vec_t>
-struct Spring
-{
-    Spring(MassPoint<Vec_t> *pt1, MassPoint<Vec_t> *pt2, float stiffness, float restLength, float damping) : a(pt1), b(pt2), ks(stiffness), L0(restLength), kd(damping) {}
-    MassPoint<Vec_t> *a;
-    MassPoint<Vec_t> *b;
-    float ks; // Stiffness
-    float L0; // Rest length
-    float kd; // Damping factor
-};
-using Spring1D = Spring<float>;
-using Spring2D = Spring<Vector2>;
-using Spring3D = Spring<Vector3>;
-
-float SpringForce(Spring2D *sp)
-{
-    float x; // Distance (?)
-    x = (Vector2Distance(sp->b->x, sp->a->x) - sp->L0);
-    float Fs; // Spring force
-    Fs = sp->ks * x;
-    return Fs;
-}
-
-void FrameUpdateMassPt2(MassPoint2D *pt, float Δt, Vector2 gravity, std::vector<Vector2> forces)
-{
-    pt->F = { 0, 0 };
-    pt->F += (gravity * pt->m); // Gravity
-    for (Vector2 force : forces)
+    struct MassPoint
     {
-        pt->F += (force); // Forces
+        MassPoint(Vector2 pos, float mass) : x(pos), v(Vector2Zero()), F(Vector2Zero()), m(mass) {}
+
+        Vec_t x; // Position
+        Vec_t v; // Velocity
+        Vec_t F; // Force
+        float m; // Mass
+    };
+
+    struct SpringProperties
+    {
+        SpringProperties(float stiffness, float restLength, float damping) : ks(stiffness), L0(restLength), kd(damping) {}
+
+        float ks; // Stiffness
+        float L0; // Rest length
+        float kd; // Damping factor
+    };
+
+    struct Spring
+    {
+        Spring(MassPoint* connection, SpringProperties& properties) : b(connection), p(properties) {}
+
+        MassPoint* a;
+        MassPoint* b;
+        SpringProperties& p;
+    };
+
+    Vec_t NullVector(void);
+    float VectorDistance(Vec_t, Vec_t);
+    float VectorDotProduct(Vec_t, Vec_t);
+    Vec_t VectorNormalize(Vec_t);
+
+    float SpringForce(Spring* sp)
+    {
+        // Base force
+        float x; // Distance (?)
+        float Fs; // Spring force
+        x = (VectorDistance(sp->b->x, sp->a->x) - sp->p.L0);
+        Fs = sp->p.ks * x;
+
+        // Damping
+        Vec_t normalizedDirection;
+        Vec_t velocityDifference;
+        float Fd;
+        normalizedDirection = VectorNormalize(sp->b->x - sp->a->x);
+        velocityDifference = (sp->a->v - sp->b->v);
+        Fd = VectorDotProduct(normalizedDirection, velocityDifference) * sp->p.kd;
+
+        // Final
+        float Ft; // Total force
+        Ft = Fs + Fd;
+
+        return Ft;
     }
-    pt->v += ((pt->F * Δt) / pt->m); // Velocity
-    pt->x += (pt->v * Δt); // Update position
-}
+
+    void FrameUpdateMassPt2(MassPoint* pt, float Δt, Vec_t gravity, Spring* sp)
+    {
+        pt->F = NullVector();
+        pt->F += (gravity * pt->m); // Gravity
+        pt->F += SpringForce(sp); // Forces
+        pt->v += ((pt->F * Δt) / pt->m); // Velocity
+        pt->x += (pt->v * Δt); // Update position
+    }
+
+    void Collision()
+    {
+        // todo
+    }
+};
+using Math1D = Math<float>;
+using Math2D = Math<Vector2>;
+using Math3D = Math<Vector3>;
+
+inline float   Math1D::NullVector() { return 0.0f; }
+inline Vector2 Math2D::NullVector() { return Vector2Zero(); }
+inline Vector3 Math3D::NullVector() { return Vector3Zero(); }
+
+inline float Math1D::VectorDistance(float   pt1, float pt2)   { return abs(pt2 - pt1); }
+inline float Math2D::VectorDistance(Vector2 pt1, Vector2 pt2) { return Vector2Distance(pt1, pt2); }
+inline float Math3D::VectorDistance(Vector3 pt1, Vector3 pt2) { return Vector3Distance(pt1, pt2); }
+
+inline float Math1D::VectorDotProduct(float   pt1, float pt2)   { return pt2 * pt1; }
+inline float Math2D::VectorDotProduct(Vector2 pt1, Vector2 pt2) { return Vector2DotProduct(pt1, pt2); }
+inline float Math3D::VectorDotProduct(Vector3 pt1, Vector3 pt2) { return Vector3DotProduct(pt1, pt2); }
+
+inline float   Math1D::VectorNormalize(float   vec) { return (float)sign(vec); }
+inline Vector2 Math2D::VectorNormalize(Vector2 vec) { return Vector2Normalize(vec); }
+inline Vector3 Math3D::VectorNormalize(Vector3 vec) { return Vector3Normalize(vec); }
+
+
+using MassPoint1D = Math1D::MassPoint;
+using MassPoint2D = Math2D::MassPoint;
+using MassPoint3D = Math3D::MassPoint;
+
+using Spring1D = Math1D::Spring;
+using Spring2D = Math2D::Spring;
+using Spring3D = Math3D::Spring;
 
 int main()
 {
@@ -105,7 +160,8 @@ int main()
     // TODO: Load persistent assets & variables
 
     MassPoint2D points[]{ MassPoint2D({ 32.0f, 14.0f }, 1.0f), MassPoint2D({ 5.0f, 10.0f }, 1.0f) };
-    Spring2D springs[]{ Spring2D(points + 0, points + 1, 0.0f, 1.0f, 0.5f) };
+    Spring2D::Properties properties[]{ Spring2D::Properties(0.0f, 1.0f, 0.5f) };
+    Spring2D springs[]{ Spring2D(points + 0, points + 1, properties[0]), Spring2D(points + 1, points + 0, properties[0]) };
 
     while (!WindowShouldClose())
     {
@@ -114,6 +170,10 @@ int main()
         ******************************************/
 
         // TODO: simulate frame
+        for (size_t i = 0;)
+        {
+
+        }
 
         /******************************************
         *   Draw the frame
