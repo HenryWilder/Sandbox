@@ -127,11 +127,11 @@ int main()
 
             for (Spring2D& sp : springs)
             {
-                sp.a->x
+                DrawLineV(sp.a->x, sp.b->x, WHITE);
             }
             for (MassPoint2D& pt : points)
             {
-
+                DrawCircleV(pt.x, 4.0f, RED);
             }
 
         } EndDrawing();
