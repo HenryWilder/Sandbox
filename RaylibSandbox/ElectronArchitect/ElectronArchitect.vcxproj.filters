@@ -21,6 +21,9 @@
     <ClCompile Include="Paraphrase.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Transistors.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <None Include="wire.frag">
@@ -55,6 +58,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="MethodInterface.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Transistors.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
