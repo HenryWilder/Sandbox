@@ -1,539 +1,136 @@
 #include <raymath.h>
 #include "Transistors.h"
+#if 0
+#define ASSERT_VALID_PTR(ptr) _ASSERT_EXPR(!!(ptr), "Passed null parameter(s) \"" #ptr "\".");
 
-#pragma region LogicDelegate
-
-	void LogicDelegate::CopyInputs(LogicDelegate* logic)
-	{
-		switch (logic->GetType())
-		{
-		case Eval::L_AND: this->CopyInputs(static_cast<LogicAND*>(logic)); break;
-		case Eval::L_NOT: this->CopyInputs(static_cast<LogicNOT*>(logic)); break;
-		case Eval::L_ORR: this->CopyInputs(static_cast<LogicORR*>(logic)); break;
-		case Eval::L_XOR: this->CopyInputs(static_cast<LogicXOR*>(logic)); break;
-		}
-	}
-
-#pragma endregion
-
-#pragma region Gate
-
-	Gate::Gate() : position(Vector2Zero()), evaluated(), evaluation(), logic(new LogicORR) {}
-	Gate::Gate(Vector2 position) : position(position), evaluated(), evaluation(), logic(new LogicORR) {}
-	Gate::Gate(Vector2 position, Eval type) : position(position), evaluated(), evaluation()
-	{
-		switch (type)
-		{
-		case Eval::L_AND: logic = new LogicAND; break;
-		case Eval::L_NOT: logic = new LogicNOT; break;
-		case Eval::L_ORR: logic = new LogicORR; break;
-		case Eval::L_XOR: logic = new LogicXOR; break;
-		}
-	}
-	Gate::~Gate()
-	{
-		delete logic;
-	}
-	Vector2 Gate::GetPosition()
-	{
-		return position;
-	}
-	void Gate::SetPosition(Vector2 pos)
-	{
-		position = pos;
-	}
-	bool Gate::Evaluate()
-	{
-		if (!evaluated)
-		{
-			evaluation = logic->Evaluate();
-			evaluated = true;
-		}
-		return evaluation;
-	}
-	void Gate::Reset()
-	{
-		evaluated = false;
-	}
-	size_t Gate::Count_I() const
-	{
-		return logic->InputCount();
-	}
-	size_t Gate::Count_O() const
-	{
-		return o.size();
-	}
-	void Gate::Push_I(Gate* input)
-	{
-		return logic->PushInput(input);
-	}
-	void Gate::Erase_I(Gate* input)
-	{
-		return logic->EraseInput(input);
-	}
-	void Gate::Push_O(Gate* output)
-	{
-		o.insert(output);
-	}
-	void Gate::Erase_O(Gate* output)
-	{
-		o.erase(output);
-	}
-	Status Gate::CouldPush_I(Gate* input) const
-	{
-		return logic->CouldPushInput(input);
-	}
-	Status Gate::CouldErase_I(Gate* input) const
-	{
-		return logic->CouldEraseInput(input);
-	}
-	Status Gate::CouldPush_O(Gate* output) const
-	{
-		if (o.find(output) != o.end()) return Status::Complete;
-		else return Status::Possible;
-	}
-	Status Gate::CouldErase_O(Gate* output) const
-	{
-		if (o.find(output) != o.end()) return Status::Possible;
-		else return Status::Complete;
-	}
-	Eval Gate::GetType()
-	{
-		return logic->GetType();
-	}
-	void Gate::SetType(Eval type)
-	{
-		if (logic)
-		{
-			if (GetType() == type) return;
-			LogicDelegate* past = logic;
-			switch (type)
-			{
-			case Eval::L_AND: logic = new LogicAND; break;
-			case Eval::L_NOT: logic = new LogicNOT; break;
-			case Eval::L_ORR: logic = new LogicORR; break;
-			case Eval::L_XOR: logic = new LogicXOR; break;
-			}
-			if (past)
-			{
-				logic->CopyInputs(past);
-				past->ClearSelfReferences(this, logic->InputCount());
-				delete past;
-			}
-		}
-	}
-
-#pragma endregion
-
-bool Solder(Gate* input, Gate* output)
+bool CanConnectPins(OPin* from, IPin* to)
 {
-	Status oPushable = input->CouldPush_O(output);
-	Status iPushable = input->CouldPush_I(input);
-	if (oPushable != Status::CantDoIt && iPushable != Status::CantDoIt)
+#define PREV_OPEN_TEST !to->prev
+#define NOT_IN_NEXT_TEST from->next.find(to) == from->next.end()
+#if _DEBUG
+	ASSERT_VALID_PTR(from && to);
+	bool b_PrevIsOpen = (PREV_OPEN_TEST);
+	bool b_NotInNext = (NOT_IN_NEXT_TEST);
+	if (b_PrevIsOpen != b_NotInNext) // Connection is not mutual
 	{
-		if (oPushable != Status::Complete) input->Push_O(output);
-		if (iPushable != Status::Complete) output->Push_I(input);
-		return true;
+		bool b_PrevIsFrom = (to->prev == from);
+		// "from" is in "to", but "to" is not in "from"
+		_ASSERT_EXPR(!(b_PrevIsFrom && b_NotInNext),
+					 "\"from\" does not recognise connection to \"to\"");
+		// "to" is in "from", but "from" is not in "to"
+		_ASSERT_EXPR(!(!b_PrevIsFrom && !b_NotInNext),
+					 "\"to\" does not recognise connection to \"from\"");
 	}
-	else return false;
+	return (b_PrevIsOpen && b_NotInNext);
+#else
+	return ((PREV_OPEN_TEST) && (NOT_IN_NEXT_TEST));
+#endif
+#undef PREV_OPEN_TEST
+#undef NOT_IN_NEXT_TEST
 }
-void DeSolder(Gate* input, Gate* output)
+
+void ConnectPins(OPin* from, IPin* to)
 {
-	Status oEraseable = input->CouldErase_O(output);
-	Status iEraseable = input->CouldErase_I(input);
-	if (oEraseable != Status::CantDoIt && iEraseable != Status::CantDoIt)
-	{
-		if (oEraseable != Status::Complete) input->Erase_O(output);
-		if (iEraseable != Status::Complete) output->Erase_I(input);
-	}
+#if _DEBUG
+	ASSERT_VALID_PTR(from && to);
+	_ASSERT_EXPR(CanConnectPins(from, to), "Did not confirm safety of connection operation before connecting.");
+#endif
+	from->next.insert(to);
+	to->prev = from;
 }
-void Gate::Destroy()
+
+void DisconnectOuputs(OPin* pin)
 {
-	logic->ClearSelfReferences(this);
-	for (Gate* output : o)
+#if _DEBUG
+	ASSERT_VALID_PTR(pin);
+#endif
+	for (IPin* output : pin->next)
 	{
-		Status stat = output->CouldErase_I(this);
-		if (stat == Status::Possible) output->Erase_I(this);
+		output->prev = nullptr;
+	}
+	pin->next.clear();
+}
+
+void DisconnectInputs(IPin* pin)
+{
+#if _DEBUG
+	ASSERT_VALID_PTR(pin);
+	_ASSERT_EXPR(pin->prev, "Prev was nullptr.");
+#endif
+	for (size_t i = 0; i < pin->prev->next.size(); ++i)
+	{
+		if (pin->prev->next[i] == pin)
+		{
+			pin->prev->next.erase(pin->prev->next.begin() + i);
+			break;
+		}
+	}
+	pin->prev = nullptr;
+}
+
+typedef bool (*BasicTransistor_t)(IPinChipSet* evalSrc);
+
+bool Transistor_OR(IPinChipSet* evalSrc)
+{
+	return ((*evalSrc)[0].prev->b_state || (*evalSrc)[1].prev->b_state);
+}
+bool Transistor_NOT(IPinChipSet* evalSrc)
+{
+	return !(*evalSrc)[0].prev->b_state;
+}
+
+void CreateChipInternal(ChipBaseInternal* chip)
+{
+#if _DEBUG
+	_ASSERT_EXPR(!chip->i && !chip->o, "Chip has already been initialized.");
+#endif
+	chip->i = new ChipBaseInternal::Connection[chip->base->iCount];
+	chip->o = new ChipBaseInternal::Connection[chip->base->oCount];
+}
+void DestroyChipInternal(ChipBaseInternal* chip)
+{
+	if (chip->i) delete[] chip->i;
+	if (chip->o) delete[] chip->o;
+}
+
+std::unordered_map<std::string, ChipBase> g_ChipsSrc;
+
+void PackageChipBase(std::string& name, Chip** package, size_t count)
+{
+	ChipBase& base = g_ChipsSrc[name];
+	for (size_t i = 0; i < count; ++i)
+	{
+
 	}
 }
 
-#pragma region LogicAND
+void CreateChipInstance(Chip* chip, ChipBase*)
+{
+	// Todo
+}
+void DestroyChipInstance()
+{
+	// Todo
+}
 
-	bool LogicAND::Evaluate() const
+void EvaluateChip(Chip* chip)
+{
+	// Todo
+}
+
+void TickTransistors(Chip** chips, size_t count)
+{
+	// Reset
+	for (size_t i = 0; i < count; ++i)
 	{
-		for (Gate* gate : i)
-		{
-			if (!gate->Evaluate()) return false;
-		}
-		return true;
+		chips[i]->b_dirty = true;
 	}
-	size_t LogicAND::InputCount() const
+	// Evaluate
+	for (size_t i = 0; i < count; ++i)
 	{
-		return i.size();
+		if (!chips[i]->b_dirty) continue;
+		EvaluateChip(chips[i]);
+		chips[i]->b_dirty = false;
 	}
-	void LogicAND::PushInput(Gate* input)
-	{
-		i.insert(input);
-	}
-	void LogicAND::EraseInput(Gate* input)
-	{
-		i.erase(input);
-	}
-	Status LogicAND::CouldPushInput(Gate* input) const
-	{
-		if (i.find(input) != i.end()) return Status::Complete;
-		else return Status::Possible;
-	}
-	Status LogicAND::CouldEraseInput(Gate* input) const
-	{
-		if (i.find(input) != i.end()) return Status::Possible;
-		else return Status::Complete;
-	}
-	Eval LogicAND::GetType() const
-	{
-		return Eval::L_AND;
-	}
-	void LogicAND::CopyInputs(LogicAND* src)
-	{
-		this->i = src->i;
-	}
-	void LogicAND::CopyInputs(LogicNOT* src)
-	{
-		if (src->i) this->i = { src->i };
-		else this->i = { };
-	}
-	void LogicAND::CopyInputs(LogicORR* src)
-	{
-		this->i = src->i;
-	}
-	void LogicAND::CopyInputs(LogicXOR* src)
-	{
-		if (src->i.a)
-		{
-			if (src->i.b) this->i = { src->i.a, src->i.b };
-			else this->i = { src->i.a };
-		}
-		else
-		{
-			if (src->i.b) this->i = { src->i.b };
-			else this->i = { };
-		}
-	}
-	void LogicAND::ClearSelfReferences(Gate* self, size_t start)
-	{
-#ifdef _DEBUG
-		_ASSERT_EXPR(
-			start > 0ull,
-			"Called ClearSelfReferences(Gate*, size_t) with start offset when start offset was zero! Please use ClearSelfReferences(Gate*) instead when clearing without an offset!");
-		_ASSERT_EXPR(
-			start < i.size(),
-			"Tried to use an offset beyond the bounds of the logic unit's capacity!");
+}
 #endif
-		auto it = i.begin();
-		// iterate to start
-		if (start)
-		{
-			while (it != i.end() && start)
-			{
-				++it;
-				--start;
-			}
-		}
-		while (it != i.end())
-		{
-			Status stat = (*it)->CouldErase_O(self);
-			if (stat == Status::Possible) (*it)->Erase_O(self);
-			++it;
-		}
-	}
-	void LogicAND::ClearSelfReferences(Gate* self)
-	{
-		for (Gate* input : i)
-		{
-			if (input->CouldErase_O(self) == Status::Possible) input->Erase_O(self);
-		}
-	}
-
-#pragma endregion
-
-#pragma region LogicNOT
-
-	bool LogicNOT::Evaluate() const
-	{
-		return !i->Evaluate();
-	}
-	size_t LogicNOT::InputCount() const
-	{
-		return (i != nullptr ? 1ull : 0ull);
-	}
-	void LogicNOT::PushInput(Gate* input)
-	{
-#ifdef _DEBUG
-		_ASSERT_EXPR(
-			CouldPushInput(input) != Status::CantDoIt,
-			"Tried to push input without input being free! This can lead to issues where past inputs still see this as an output!");
-#endif
-		i = input;
-	}
-	void LogicNOT::EraseInput(Gate* input)
-	{
-#ifdef _DEBUG
-		_ASSERT_EXPR(
-			CouldEraseInput(input) != Status::CantDoIt,
-			"Tried to erase input without checking that the input matches! This can lead to issues where past inputs still see this as an output!");
-#endif
-		i = nullptr;
-	}
-	Status LogicNOT::CouldPushInput(Gate* input) const
-	{
-		if (!input) return Status::CantDoIt; // Can't push nullptr
-		if (i)
-		{
-			if (i == input) return Status::Complete; // Input already matches
-			else return Status::CantDoIt; // Can't overwrite
-		}
-		else return Status::Possible; // Can push (i is nullptr)
-	}
-	Status LogicNOT::CouldEraseInput(Gate* input) const
-	{
-		if (!input) return Status::CantDoIt; // Can't erase nullptr
-		if (i)
-		{
-			if (i == input) return Status::Possible; // Can erase (input found)
-			else return Status::CantDoIt; // Can't erase (input didn't match existing)
-		}
-		else return Status::Complete; // Already erased (input is nullptr)
-	}
-	Eval LogicNOT::GetType() const
-	{
-		return Eval::L_NOT;
-	}
-	void LogicNOT::CopyInputs(LogicAND* src)
-	{
-		if (!src->i.empty()) this->i = *src->i.begin();
-		else this->i = nullptr;
-	}
-	void LogicNOT::CopyInputs(LogicNOT* src)
-	{
-		this->i = src->i;
-	}
-	void LogicNOT::CopyInputs(LogicORR* src)
-	{
-		if (!src->i.empty()) this->i = *src->i.begin();
-		else this->i = nullptr;
-	}
-	void LogicNOT::CopyInputs(LogicXOR* src)
-	{
-		if (src->i.a) this->i = src->i.a;
-		else this->i = src->i.b;
-	}
-	void LogicNOT::ClearSelfReferences(Gate* self, size_t start)
-	{
-#ifdef _DEBUG
-		_ASSERT_EXPR(
-			start > 0ull,
-			"Called ClearSelfReferences(Gate*, size_t) with start offset when start offset was zero! Please use ClearSelfReferences(Gate*) instead when clearing without an offset!");
-		_ASSERT_EXPR(
-			false,
-			"Tried to use an offset beyond the bounds of the logic unit's capacity!"); // Don't bother using ClearSelfReferences() with offset on a LogicNOT at all.
-#endif
-		if (i && i->CouldErase_O(self) == Status::Possible)
-		{
-			i->Erase_O(self);
-		}
-	}
-	void LogicNOT::ClearSelfReferences(Gate* self)
-	{
-		if (i && i->CouldErase_O(self) == Status::Possible) i->Erase_O(self);
-	}
-
-#pragma endregion
-
-#pragma region LogicORR
-
-	bool LogicORR::Evaluate() const
-	{
-		for (Gate* gate : i)
-		{
-			if (gate->Evaluate()) return true;
-		}
-		return false;
-	}
-	size_t LogicORR::InputCount() const
-	{
-		return i.size();
-	}
-	void LogicORR::PushInput(Gate* input)
-	{
-		i.insert(input);
-	}
-	void LogicORR::EraseInput(Gate* input)
-	{
-		i.erase(input);
-	}
-	Status LogicORR::CouldPushInput(Gate* input) const
-	{
-		if (i.find(input) != i.end()) return Status::Complete;
-		else return Status::Possible;
-	}
-	Status LogicORR::CouldEraseInput(Gate* input) const
-	{
-		if (i.find(input) != i.end()) return Status::Possible;
-		else return Status::Complete;
-	}
-	Eval LogicORR::GetType() const
-	{
-		return Eval::L_ORR;
-	}
-	void LogicORR::CopyInputs(LogicAND* src)
-	{
-		this->i = src->i;
-	}
-	void LogicORR::CopyInputs(LogicNOT* src)
-	{
-		if (src->i) this->i = { src->i };
-		else this->i = { };
-	}
-	void LogicORR::CopyInputs(LogicORR* src)
-	{
-		this->i = src->i;
-	}
-	void LogicORR::CopyInputs(LogicXOR* src)
-	{
-		if (src->i.a)
-		{
-			if (src->i.b) this->i = { src->i.a, src->i.b };
-			else this->i = { src->i.a };
-		}
-		else
-		{
-			if (src->i.b) this->i = { src->i.b };
-			else this->i = { };
-		}
-	}
-	void LogicORR::ClearSelfReferences(Gate* self, size_t start)
-	{
-#ifdef _DEBUG
-		_ASSERT_EXPR(
-			start > 0ull,
-			"Called ClearSelfReferences(Gate*, size_t) with start offset when start offset was zero! Please use ClearSelfReferences(Gate*) instead when clearing without an offset!");
-		_ASSERT_EXPR(
-			start < i.size(),
-			"Tried to use an offset beyond the bounds of the logic unit's capacity!");
-#endif
-		auto it = i.begin();
-		// iterate to start
-		if (start)
-		{
-			while (it != i.end() && start)
-			{
-				++it;
-				--start;
-			}
-		}
-		while (it != i.end())
-		{
-			Status stat = (*it)->CouldErase_O(self);
-			if (stat == Status::Possible) (*it)->Erase_O(self);
-			++it;
-		}
-	}
-	void LogicORR::ClearSelfReferences(Gate* self)
-	{
-		for (Gate* input : i)
-		{
-			if (input->CouldErase_O(self) == Status::Possible) input->Erase_O(self);
-		}
-	}
-
-#pragma endregion
-
-#pragma region LogicXOR
-
-	bool LogicXOR::Evaluate() const
-	{
-		return (i.a->Evaluate() ? !i.b->Evaluate() : i.a->Evaluate());
-	}
-	size_t LogicXOR::InputCount() const
-	{
-		return ((i.a != nullptr ? 1ull : 0ull) + (i.b != nullptr ? 1ull : 0ull));
-	}
-	void LogicXOR::PushInput(Gate* input)
-	{
-#ifdef _DEBUG
-		_ASSERT_EXPR(
-			CouldPushInput(input) != Status::CantDoIt,
-			"Tried to push input without checking that an input is free to push to! This can lead to issues where past inputs still see this as an output!");
-#endif
-		if (!i.a) i.a = input;
-		else if (!i.b && (input != i.a)) i.b = input;
-	}
-	void LogicXOR::EraseInput(Gate* input)
-	{
-#ifdef _DEBUG
-		_ASSERT_EXPR(
-			CouldEraseInput(input) != Status::CantDoIt,
-			"Tried to erase input without checking that the input matches! This can lead to issues where past inputs still see this as an output!");
-#endif
-		if (i.a == input) i.a = nullptr;
-		else if (i.b == input) i.b = nullptr;
-	}
-	Status LogicXOR::CouldPushInput(Gate* input) const
-	{
-		if (i.a == input || i.b == input) return Status::Complete;
-		else if (!i.a || !i.b) return Status::Possible;
-		else return Status::CantDoIt;
-	}
-	Status LogicXOR::CouldEraseInput(Gate* input) const
-	{
-		if (i.a == input || i.b == input) return Status::Possible;
-		else if (i.a != input && i.b != input) return Status::Complete;
-		else return Status::CantDoIt;
-	}
-	Eval LogicXOR::GetType() const
-	{
-		return Eval::L_XOR;
-	}
-	void LogicXOR::CopyInputs(LogicAND* src)
-	{
-		if (src->i.size() > 0) this->i.a = *src->i.begin();
-		else this->i.a = nullptr;
-		if (src->i.size() > 1) this->i.b = *++src->i.begin();
-		else this->i.b = nullptr;
-	}
-	void LogicXOR::CopyInputs(LogicNOT* src)
-	{
-		this->i.a = src->i;
-		this->i.b = nullptr;
-	}
-	void LogicXOR::CopyInputs(LogicORR* src)
-	{
-		if (src->i.size() > 0) this->i.a = *src->i.begin();
-		else this->i.a = nullptr;
-		if (src->i.size() > 1) this->i.b = *++src->i.begin();
-		else this->i.b = nullptr;
-	}
-	void LogicXOR::CopyInputs(LogicXOR* src)
-	{
-		this->i = src->i;
-	}
-	void LogicXOR::ClearSelfReferences(Gate* self, size_t start)
-	{
-#ifdef _DEBUG
-		_ASSERT_EXPR(
-			start > 0ull,
-			"Called ClearSelfReferences(Gate*, size_t) with start offset when start offset was zero! Please use ClearSelfReferences(Gate*) instead when clearing without an offset!");
-		_ASSERT_EXPR(
-			start < 2ull,
-			"Tried to use an offset beyond the bounds of the logic unit's capacity!");
-#endif
-		if (start == 0ull; i.a && i.a->CouldErase_O(self) == Status::Possible) i.a->Erase_O(self);
-		if (start <= 1ull; i.b && i.b->CouldErase_O(self) == Status::Possible) i.b->Erase_O(self);
-	}
-	void LogicXOR::ClearSelfReferences(Gate* self)
-	{
-		if (i.a && i.a->CouldErase_O(self) == Status::Possible) i.a->Erase_O(self);
-		if (i.b && i.b->CouldErase_O(self) == Status::Possible) i.b->Erase_O(self);
-	}
-
-#pragma endregion

@@ -1,219 +1,113 @@
 #pragma once
+#include <vector>
+#include <stack>
 #include <set>
+#include <unordered_map>
 #include <raylib.h>
-
-enum class Eval : char
+#if 0
+struct OPin;
+struct IPin
 {
-	L_AND = '&',
-	L_NOT = '!',
-	L_ORR = '|',
-	L_XOR = '^',
+	OPin* prev = nullptr;
+};
+struct OPin
+{
+	std::set<IPin*> next;
+	bool b_state = false;
 };
 
-enum class Status : bool
+using IPinChipSet = std::vector<IPin>;
+using OPinChipSet = std::vector<OPin>;
+
+struct Pin
 {
-	CantDoIt = false, // Can't do it (breaks rules)
-	Complete = false, // Already did it (don't need to)
-	Possible = true, // Can do it
+	enum class Side { Null, In, Out } tag;
+	union
+	{
+		IPin* iPin;
+		OPin* oPin;
+	};
 };
 
-class Gate;
-class LogicDelegate;
-class LogicAND;
-class LogicNOT;
-class LogicORR;
-class LogicXOR;
 
-class LogicDelegate
+bool CanConnectPins(OPin* from, IPin* to);
+void ConnectPins(OPin* from, IPin* to);
+void DisconnectOuputs(OPin* pin);
+void DisconnectInputs(IPin* pin);
+
+typedef bool (*Transistor_t)(IPinChipSet* evalSrc);
+
+bool Transistor_OR(IPinChipSet* evalSrc);  // Basic transistor OR
+bool Transistor_NOT(IPinChipSet* evalSrc); // Basic transistor NOT
+
+
+struct RelPin
 {
-public:
-	virtual bool Evaluate() const = 0;
+	short chipID; // Index of the chip
+	short pinID; // Index of the pin on the chip
+};
+struct IPinRel
+{
+	RelPin prev;
+};
+struct OPinRel
+{
+	std::vector<RelPin> next;
+};
+struct ChipBase;
+struct ChipBaseInternal
+{
+	ChipBase* base; // Pointer to the base
+	std::vector<RelPin> i; // Static size & values
+	std::vector<RelPin> o; // Static size & values
+};
+void CreateChipInternal(ChipBaseInternal* chip);
+void DestroyChipInternal(ChipBaseInternal* chip);
 
-	virtual size_t InputCount() const = 0;
+// Has set number of inputs and outputs once created
+// All internal connections are relative to eachother
+struct ChipBase
+{
+	std::string name;
+	std::vector<OPinRel> i; // Relative connections to internals (on the input side)
+	std::vector<IPinRel> o; // Relative connections from internals (on the output side)
 
-	virtual void PushInput(Gate* input) = 0;
-	virtual void EraseInput(Gate* input) = 0;
-
-	virtual Status CouldPushInput(Gate* input) const = 0;
-	virtual Status CouldEraseInput(Gate* input) const = 0;
-
-	virtual Eval GetType() const = 0;
-
-	virtual void CopyInputs(LogicAND*) = 0;
-	virtual void CopyInputs(LogicNOT*) = 0;
-	virtual void CopyInputs(LogicORR*) = 0;
-	virtual void CopyInputs(LogicXOR*) = 0;
-	void CopyInputs(LogicDelegate* logic);
-
-	virtual void ClearSelfReferences(Gate* self, size_t start) = 0;
-	virtual void ClearSelfReferences(Gate* self) = 0;
+	enum class Type { Basic, Package } tag;
+	union
+	{
+		Transistor_t bsc; // Basic transistor function
+		std::vector<ChipBaseInternal> pkg; // Chip/transistor package
+	};
 };
 
-class Gate
+extern std::unordered_map<unsigned short, const ChipBase*> g_ChipBases;
+
+struct ChipBaseRef
 {
-private:
-	Vector2 position;
-	bool evaluated;
-	bool evaluation;
-	LogicDelegate* logic;
-	std::set<Gate*> o;
-
-public:
-	Gate();
-	Gate(Vector2 position);
-	Gate(Vector2 position, Eval type);
-	~Gate();
-
-	Vector2 GetPosition();
-	void SetPosition(Vector2 pos);
-
-	bool Evaluate();
-	void Reset();
-
-	size_t Count_I() const;
-	size_t Count_O() const;
-
-	void Push_I(Gate* input);
-	void Erase_I(Gate* input);
-
-	void Push_O(Gate* output);
-	void Erase_O(Gate* output);
-
-	Status CouldPush_I(Gate* input) const;
-	Status CouldErase_I(Gate* input) const;
-
-	Status CouldPush_O(Gate* output) const;
-	Status CouldErase_O(Gate* output) const;
-
-	Eval GetType();
-	void SetType(Eval type);
-
-	void Destroy();
+	unsigned short id;
+	const ChipBase* operator*()
+	{
+		auto it = g_ChipBases.find(id);
+		if (it != g_ChipBases.end()) return it->second;
+		else return nullptr;
+	}
 };
 
-bool Solder(Gate* input, Gate* output);
-void DeSolder(Gate* input, Gate* output);
-
-class LogicAND : public LogicDelegate
+struct Chip
 {
-private:
-	std::set<Gate*> i;
-
-public:
-	friend class LogicNOT;
-	friend class LogicORR;
-	friend class LogicXOR;
-
-	bool Evaluate() const override;
-
-	size_t InputCount() const override;
-
-	void PushInput(Gate* input) override;
-	void EraseInput(Gate* input) override;
-
-	Status CouldPushInput(Gate* input) const override;
-	Status CouldEraseInput(Gate* input) const override;
-
-	Eval GetType() const override;
-
-	void CopyInputs(LogicAND*) override;
-	void CopyInputs(LogicNOT*) override;
-	void CopyInputs(LogicORR*) override;
-	void CopyInputs(LogicXOR*) override;
-
-	void ClearSelfReferences(Gate* self, size_t start) override;
-	void ClearSelfReferences(Gate* self) override;
+	IPinChipSet i;
+	OPinChipSet o;
+	ChipBaseRef base;
+	Vector2 origin; // Display size & shape deduced from number of inputs/outputs
+	bool b_dirty; // Whether we need to re-evaluate
 };
 
-class LogicNOT : public LogicDelegate
-{
-private:
-	Gate* i;
+void PackageChipBase(std::string& name, Chip** package, size_t count);
 
-public:
-	friend class LogicAND;
-	friend class LogicORR;
-	friend class LogicXOR;
+void CreateChipInstance(Chip* chip, ChipBase*);
+void DestroyChipInstance();
 
-	bool Evaluate() const override;
+void EvaluateChip(Chip* chip);
 
-	size_t InputCount() const override;
-
-	void PushInput(Gate* input) override;
-	void EraseInput(Gate* input) override;
-
-	Status CouldPushInput(Gate* input) const override;
-	Status CouldEraseInput(Gate* input) const override;
-
-	Eval GetType() const override;
-
-	void CopyInputs(LogicAND*) override;
-	void CopyInputs(LogicNOT*) override;
-	void CopyInputs(LogicORR*) override;
-	void CopyInputs(LogicXOR*) override;
-
-	void ClearSelfReferences(Gate* self, size_t start) override;
-	void ClearSelfReferences(Gate* self) override;
-};
-
-class LogicORR : public LogicDelegate
-{
-private:
-	std::set<Gate*> i;
-
-public:
-	friend class LogicAND;
-	friend class LogicNOT;
-	friend class LogicXOR;
-
-	bool Evaluate() const override;
-
-	size_t InputCount() const override;
-
-	void PushInput(Gate* input) override;
-	void EraseInput(Gate* input) override;
-
-	Status CouldPushInput(Gate* input) const override;
-	Status CouldEraseInput(Gate* input) const override;
-
-	Eval GetType() const override;
-
-	void CopyInputs(LogicAND*) override;
-	void CopyInputs(LogicNOT*) override;
-	void CopyInputs(LogicORR*) override;
-	void CopyInputs(LogicXOR*) override;
-
-	void ClearSelfReferences(Gate* self, size_t start) override;
-	void ClearSelfReferences(Gate* self) override;
-};
-
-class LogicXOR : public LogicDelegate
-{
-private:
-	struct { Gate* a; Gate* b; } i;
-
-public:
-	friend class LogicAND;
-	friend class LogicNOT;
-	friend class LogicORR;
-
-	bool Evaluate() const override;
-
-	size_t InputCount() const override;
-
-	void PushInput(Gate* input) override;
-	void EraseInput(Gate* input) override;
-
-	Status CouldPushInput(Gate* input) const override;
-	Status CouldEraseInput(Gate* input) const override;
-
-	Eval GetType() const override;
-
-	void CopyInputs(LogicAND*) override;
-	void CopyInputs(LogicNOT*) override;
-	void CopyInputs(LogicORR*) override;
-	void CopyInputs(LogicXOR*) override;
-
-	void ClearSelfReferences(Gate* self, size_t start) override;
-	void ClearSelfReferences(Gate* self) override;
-};
+void TickTransistors(Chip** chips, size_t count);
+#endif

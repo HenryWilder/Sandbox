@@ -18,10 +18,10 @@
     <ClCompile Include="Source.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Paraphrase.cpp">
+    <ClCompile Include="Transistors.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="Transistors.cpp">
+    <ClCompile Include="Interactive.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -48,19 +48,10 @@
     </Image>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Inheritance.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Composition.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="Handler.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="MethodInterface.h">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="Transistors.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Interactive.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

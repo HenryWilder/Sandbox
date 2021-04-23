@@ -216,7 +216,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="Paraphrase.cpp" />
+    <ClCompile Include="Interactive.cpp" />
     <ClCompile Include="Source.cpp" />
     <ClCompile Include="Transistors.cpp" />
   </ItemGroup>
@@ -231,10 +231,7 @@
     <Image Include="Gate_L-XOR.png" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="Composition.h" />
-    <ClInclude Include="Handler.h" />
-    <ClInclude Include="Inheritance.h" />
-    <ClInclude Include="MethodInterface.h" />
+    <ClInclude Include="Interactive.h" />
     <ClInclude Include="Transistors.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
