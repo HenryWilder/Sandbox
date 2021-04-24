@@ -1,4 +1,5 @@
 #pragma once
+#include <set>
 #include <raylib.h>
 
 struct Draggable_Base
@@ -7,25 +8,19 @@ struct Draggable_Base
 	virtual bool IsHovering() = 0;
 };
 
-struct Draggable
+// 0-flags mean default
+enum DraggingFlags
 {
-	Draggable_Base* id;
-};
+	DRAG_SNAP_RELATIVE		= 0b00,
+	DRAG_SNAP_CENTER		= 0b01,
 
-enum DraggingSnap
-{
-	DRAG_SNAP_CENTER,
-	DRAG_RELATIVE,
-};
-
-struct Dragger
-{
-	DraggingSnap snap;
+	DRAG_COLLISION_IGNORE	= 0b00,
+	DRAG_COLLISION_BLOCKS	= 0b10, // TODO
 };
 
 struct InteractionData
 {
-	Dragger dragger;
+	int settings;
 	struct {
 		Vector2 current;
 		Vector2 previous;
@@ -36,13 +31,21 @@ struct InteractionData
 };
 extern InteractionData g_IA;
 
-void UpdateDragSettings(Dragger);
-void TickDragging();
+struct Draggable
+{
+	Draggable_Base* id;
+};
 
-bool IsDraggable(Draggable object);
-bool IsBeingDragged(Draggable object);
+void UpdateDragSettings(int settings);
+void TickDragging(); // Call every frame
+bool IsHovered(Draggable object); // Whether the mouse is hovering the object
+bool IsBeingDragged(Draggable object); // Whether the object is in the selection
 void BeginDragging(Draggable object);
 void StopDragging(Draggable object);
+template<typename T> Draggable LoadDraggableR(T* what); // Requires an instatiation of DragDataR<T>
+template<typename T> Draggable LoadDraggableC(T* what); // Requires an instatiation of DragDataC<T>
+void UnloadDraggable(Draggable object);
+void DeselectAll();
 
 /* Must be manually instantiated for each class you plan to make draggable.
   @Example:
@@ -78,16 +81,15 @@ struct DraggableR : public Draggable_Base
 	void Move() override
 	{
 		Rectangle& rec = GetRectangle(object);
-		switch (g_IA.dragger.snap)
+		if (g_IA.settings & DRAG_SNAP_CENTER)
 		{
-		case DRAG_SNAP_CENTER:
 			rec.x = g_IA.mousePos.current.x - (rec.width * 0.5f);
 			rec.y = g_IA.mousePos.current.y - (rec.height * 0.5f);
-			break;
-		case DRAG_RELATIVE:
+		}
+		else
+		{
 			rec.x += g_IA.mousePos.delta.x;
 			rec.y += g_IA.mousePos.delta.y;
-			break;
 		}
 	}
 	bool IsHovering() override
@@ -146,7 +148,14 @@ struct DraggableC : public Draggable_Base
 	void Move() override
 	{
 		Vector2& center = GetCenter(object);
-		center = Vector2Add(center, g_IA.mousePos.delta);
+		if (g_IA.settings & DRAG_SNAP_CENTER)
+		{
+			center = g_IA.mousePos.current;
+		}
+		else
+		{
+			center = Vector2Add(center, g_IA.mousePos.delta);
+		}
 	}
 	bool IsHovering() override
 	{
@@ -162,5 +171,8 @@ Draggable LoadDraggableC(T* what)
 	return { object };
 }
 
-void UnloadDraggable(Draggable object);
-void DeselectAll();
+#define DEFINE_DRAG_DATA_RECTANGLE(TYPE,sourcePointerParameterName,collisionRectangle) \
+template<> struct DragDataR<TYPE> { static Rectangle& GetRectangle(TYPE* sourcePointerParameterName) { return collisionRectangle; } }
+
+#define DEFINE_DRAG_DATA_CIRCLE(TYPE,sourcePointerParameterName,centerPoint,radius) \
+template<> struct DragDataC<TYPE> { static Vector2& GetCenter(TYPE* sourcePointerParameterName) { return centerPoint; } static float GetRadius(TYPE* sourcePointerParameterName) { return radius; } }

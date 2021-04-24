@@ -18,6 +18,7 @@ struct Block
     Color activeColor;
     Color inactiveColor;
 };
+DEFINE_DRAG_DATA_RECTANGLE(Block, source, source->collision);
 struct Ball
 {
     Vector2 center;
@@ -25,25 +26,7 @@ struct Ball
     Color activeColor;
     Color inactiveColor;
 };
-
-template<> struct DragDataR<Block>
-{
-    static Rectangle& GetRectangle(Block* source)
-    {
-        return source->collision;
-    }
-};
-template<> struct DragDataC<Ball>
-{
-    static Vector2& GetCenter(Ball* source)
-    {
-        return source->center;
-    }
-    static float GetRadius(Ball* source)
-    {
-        return source->radius;
-    }
-};
+DEFINE_DRAG_DATA_CIRCLE(Ball, source, source->center, source->radius);
 
 int main()
 {
@@ -51,10 +34,6 @@ int main()
     int windowHeight = 720;
     InitWindow(windowWidth, windowHeight, "Test");
     SetTargetFPS(60);
-
-    /******************************************
-    *   Load textures, shaders, and meshes
-    ******************************************/
 
     Block box{ { 0,0,32,64}, SKYBLUE, BLUE };
     Ball ball{ { 48,128 }, 16.0f, GREEN, DARKGREEN };
@@ -65,19 +44,13 @@ int main()
         LoadDraggableC(&ball)
     };
 
-    Dragger settings { DRAG_RELATIVE, };
-
-    UpdateDragSettings(settings);
+    UpdateDragSettings(DRAG_SNAP_CENTER | DRAG_COLLISION_BLOCKS);
 
     while (!WindowShouldClose())
     {
-        /******************************************
-        *   Simulate frame and update variables
-        ******************************************/
-
         for (Draggable element : interactive)
         {
-            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && IsDraggable(element))
+            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && IsHovered(element))
             {
                 BeginDragging(element);
             }
@@ -89,27 +62,23 @@ int main()
 
         TickDragging();
 
-        /******************************************
-        *   Draw the frame
-        ******************************************/
-
         BeginDrawing(); {
 
             ClearBackground(BLACK);
 
-            if (IsBeingDragged(interactive[0]) || IsDraggable(interactive[0])) DrawRectangleRec(box.collision, box.activeColor);
-            else DrawRectangleRec(box.collision,box.inactiveColor);
+            if (IsBeingDragged(interactive[0]) || IsHovered(interactive[0]))
+                DrawRectangleRec(box.collision, box.activeColor);
+            else
+                DrawRectangleRec(box.collision,box.inactiveColor);
 
-            if (IsBeingDragged(interactive[1]) || IsDraggable(interactive[1])) DrawCircleV(ball.center, ball.radius, ball.activeColor);
-            else DrawCircleV(ball.center, ball.radius,ball.inactiveColor);
+            if (IsBeingDragged(interactive[1]) || IsHovered(interactive[1]))
+                DrawCircleV(ball.center, ball.radius, ball.activeColor);
+            else
+                DrawCircleV(ball.center, ball.radius,ball.inactiveColor);
 
 
         } EndDrawing();
     }
-
-    /******************************************
-    *   Unload and free memory
-    ******************************************/
 
     for (Draggable element : interactive)
     {

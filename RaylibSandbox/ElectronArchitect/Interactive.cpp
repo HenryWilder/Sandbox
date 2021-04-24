@@ -1,13 +1,11 @@
-#include <vector>
-#include <set>
 #include <raymath.h>
 #include "Interactive.h"
 
 InteractionData g_IA;
 
-void UpdateDragSettings(Dragger data)
+void UpdateDragSettings(int data)
 {
-	g_IA.dragger = data;
+	g_IA.settings = data;
 }
 
 void TickDragging()
@@ -22,7 +20,7 @@ void TickDragging()
 	}
 }
 
-bool IsDraggable(Draggable object)
+bool IsHovered(Draggable object)
 {
 	return object.id->IsHovering();
 }
