@@ -30,49 +30,64 @@ using namespace std;
 constexpr double g_tick =
     1.0 / (double)CLOCKS_PER_SEC; 
 
-struct Vector2 {
-    float x;
-    float y;
-};
+struct Vector2 { float x; float y; };
 
-struct Rectangle {
-    float x;
-    float y;
-    float w;
-    float h;
-};
+struct Rectangle { float x; float y; float w; float h; };
 
-struct Triangle{
-    Vector2 p1;
-    Vector2 p2;
-    Vector2 p3;
-};
+struct Triangle{ Vector2 p1; Vector2 p2; Vector2 p3; };
+
+typedef int ID_t;
 
 struct Texture{
-    int id;
-    int width;
-    int height;
+    ID_t id;
+    int width, height;
 };
 typedef Texture RenderTexture;
 typedef Texture Texture2D;
+
+struct TexSrc {
+    enum {
+        CT, // Const Tex
+        RT  // Render Tex
+    } tag;
+    union {
+        const char* ctex; // Const Tex
+        char* rtex; // Render Tex
+    };
+};
 
 struct Camera2D {
     Vector2 pos;
     float zoom;
 };
 
-struct Camera2DStackNode {
-    Camera2DStackNode* prev;
-    Camera2D cam;
+enum UniformType {
+    UNIFORM_VAL,
+    UNIFORM_VEC1,
+    UNIFORM_VEC2,
+    UNIFORM_TEX,
 };
-
-typedef char (*Shader)(
-    Vector2 fragTexCoord,
-    Texture texture0);
-
-struct ShaderStackNode {
-    ShaderStackNode* prev;
-    Shader shd;
+struct ShaderParam {
+    int type;
+    union {
+        char val;
+        float vec1;
+        float vec2[2];
+        Texture tex;
+    };
+};
+struct GenericShader {
+    void(*func)();
+    unordered_map<string,ShaderParam> inputs;
+    unordered_map<string,ShaderParam> uniforms;
+    unordered_map<string,ShaderParam> outputs;
+};
+struct ShaderData {
+    GenericShader vert;
+    GenericShader frag;
+};
+struct Shader {
+    ID_t id;
 };
 
 
@@ -86,15 +101,8 @@ struct CoreData {
     chrono::high_resolution_clock
         ::time_point
         nextFrameTime;
-    // Textures
-    struct TexSrc {
-        enum { CT, RT } tag;
-        union {
-            const char* ctex;
-            char* rtex;
-        };
-    };
-    unordered_map<int, TexSrc> textures;
+    unordered_map<ID_t, TexSrc> textures;
+    unordered_map<ID_t, ShaderData> shaders;
     stack<RenderTexture> frame;
     Rectangle bounds;
     stack<Camera2D> camera;
@@ -111,7 +119,6 @@ void SetTargetFramerate(unsigned long fps) {
     CORE.nextFrameTime =
         chrono::high_resolution_clock::now() +
         CORE.targetFrameDuration;
-    LOG("Frame duration: %u\n", frameDuration);
 }
 void FrameEndSleep() {
     this_thread::sleep_until(CORE.nextFrameTime);
@@ -133,23 +140,19 @@ double GetFrameTime() {
 // Pushes a new top camera
 void BeginCamera2DMode(Camera2D camera) {
     CORE.camera.push(camera);
-    LOG("Pushed camera\n");
 }
 // Pops the current top camera
 void EndCamera2DMode() {
     CORE.camera.pop();
-    LOG("Popped camera\n");
 }
 
 // Pushes a new top shader
 void BeginShaderMode(Shader shader) {
     CORE.shader.push(shader);
-    LOG("Pushed shader\n");
 }
 // Pops the current top shader
 void EndShaderMode() {
     CORE.shader.pop();
-    LOG("Popped shader\n");
 }
 
 int g_TopTexID = 0;
@@ -159,28 +162,25 @@ Texture2D LoadTexture(
     int height,
     const char* texture) {
     CORE.textures[g_TopTexID].tag =
-        CoreData::TexSrc::CT;
+        TexSrc::CT;
     CORE.textures[g_TopTexID].ctex = texture;
     Texture2D out{ g_TopTexID, width, height };
     ++g_TopTexID;
-    LOG("Loaded texture %i: \"%s\"\n", out.id, texture);
     return out;
 }
 void UnloadTexture(Texture2D tex) {
     CORE.textures.erase(tex.id);
-    LOG("Unloaded texture %i\n", tex.id);
 }
 
 RenderTexture LoadRenderTexture(
     int width,
     int height) {
     CORE.textures[g_TopTexID].tag = 
-        CoreData::TexSrc::RT;
+        TexSrc::RT;
     CORE.textures[g_TopTexID].rtex =
         new char[(width + 1) * height];
     RenderTexture out{ g_TopTexID, width, height };
     ++g_TopTexID;
-    LOG("Loaded render texture %i { %i, %i }\n", out.id, out.width, out.height);
     return out;
 }
 void UnloadRenderTexture(RenderTexture tex) {
@@ -189,7 +189,6 @@ void UnloadRenderTexture(RenderTexture tex) {
     {
         delete[] it->second.rtex;
         CORE.textures.erase(it);
-        LOG("Unloaded render texture %i\n", tex.id);
     }
 }
 
@@ -199,11 +198,9 @@ void BeginTextureMode(RenderTexture texture) {
     CORE.bounds.y = 0;
     CORE.bounds.w = texture.width;
     CORE.bounds.h = texture.height;
-    LOG("Pushed texture for rendering\n");
 }
 void EndTextureMode() {
     CORE.frame.pop();
-    LOG("Popped texture for rendering\n");
 }
 
 void BeginDrawing() {
@@ -212,17 +209,13 @@ void BeginDrawing() {
     CORE.bounds.y = 0;
     CORE.bounds.w = frame.width;
     CORE.bounds.h = frame.height;
-    LOG("Began drawing\n");
 }
 void EndDrawing() {
     auto it = CORE.textures.find(CORE.frame.top().id);
     const char* buffer = it->second.rtex;
     printf("\x1b[1;1f\x1b[48;m%s", buffer);
-    LOG("Drew the bufer\n");
     CORE.frameTime = clock();
-    LOG("Sleeping\n");
     FrameEndSleep();
-    LOG("Finished sleeping\n");
 }
 
 char SampleTexture2D(Texture tex, Vector2 uv) {
@@ -235,7 +228,7 @@ char SampleTexture2D(Texture tex, Vector2 uv) {
     uv.y *= (float)tex.height;
     int index = (lroundf(uv.y) * tex.width)
         + lroundf(uv.x);
-    if (it->second.tag == CoreData::TexSrc::RT)
+    if (it->second.tag == TexSrc::RT)
         return it->second.rtex[index];
     else
         return it->second.ctex[index];
@@ -257,7 +250,6 @@ void ClearBackground(char c) {
         buffer[(y * (frame.width + 1)) + frame.width] = '\n';
     }
     buffer[(frame.width + 1) * frame.height] = '\0';
-    LOG("Cleared background\n");
 }
 
 // Initialize the buffer
@@ -271,9 +263,8 @@ void InitWindow(int width, int height) {
     cam0.pos = Vector2Zero();
     cam0.zoom = 1.0f;
     CORE.camera.push(cam0);
-    Shader shd0 = DefaultShader;
-    CORE.shader.push(shd0);
-    LOG("Initialized window\n");
+    // Shader shd0 = DefaultShader;
+    // CORE.shader.push(shd0);
 }
 bool WindowShouldClose() {
     return false; // todo
@@ -282,10 +273,9 @@ void CloseWindow() {
     for (auto it : CORE.textures) {
         // Only delete render textures
         if (it.second.tag ==
-            CoreData::TexSrc::RT)
+            TexSrc::RT)
             delete[] it.second.rtex;
     }
-    LOG("Closed window\n");
 }
 
 Vector2 WorldToScreen(Vector2 pt)
@@ -319,7 +309,6 @@ void DrawPixel(Vector2 pt, char c) {
                     * lroundf(pt.y)) + lroundf(pt.x));
         buffer[index] = c;
     }
-    LOG("Drew pixel at { %3.3f, %3.3f }\n",pt.x,pt.y);
 }
 
 // Used for testing if a point is within a triangle
@@ -331,6 +320,40 @@ bool EdgeFunc(
     return ((c.x - a.x) * (b.y - a.y) -
             (c.y - a.y) * (b.x - a.x)
             >= 0);
+}
+
+void DrawTriangle(int x1, int y1, int x2, int y2, int x3, int y3)
+{
+    ShaderData* shader =
+        &CORE.shaders.find(CORE.shader.top().id)->second;
+
+    shader->vert.inputs.find("pos") = x1,y1; // todo
+    shader->vert.func();
+
+    int minx, maxx;
+    int miny, maxy;
+    minx = max(min(min(x1,x2),x3),0);
+    maxx = min(max(max(x1,x2),x3),CORE.frame.top().width);
+    miny = max(min(min(y1,y2),y3),0);
+    maxy = min(max(max(y1,y2),y3),CORE.frame.top().height);
+
+    for (int y = miny; y < maxy; ++y) {
+        for (int x = minx; x < maxx; ++x) {
+            if (((x - x1) * (x - x2) - (y - y1) * (y - y2) >= 0) &&
+                ((x - x2) * (x - x3) - (y - y2) * (y - y3) >= 0) &&
+                ((x - x1) * (x - x3) - (y - y1) * (y - y3) >= 0))
+            {
+
+            }
+        }
+    }
+}
+void DrawTriangleTri(Triangle tri)
+{
+    DrawTriangle(
+        (int)lroundf(tri.p1.x), (int)lroundf(tri.p1.y),
+        (int)lroundf(tri.p2.x), (int)lroundf(tri.p2.y),
+        (int)lroundf(tri.p3.x), (int)lroundf(tri.p3.y));
 }
 
 #define BLACK ' '
