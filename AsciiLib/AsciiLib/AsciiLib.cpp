@@ -6,110 +6,152 @@
 #include <stdio.h>
 #include <memory>
 
-const char g_ramp_big[70] = { ' ','.','\'','`','^','\"',',',':',';','I','l','!','i','>','<','~','+','_','-','?',']','[','}','{','1',')','(','|','\\','/','t','f','j','r','x','n','u','v','c','z','X','Y','U','J','C','L','Q','0','O','Z','m','w','q','p','d','b','k','h','a','o','*','#','M','W','&','8','%','B','@','$' };
-const char g_ramp_lil[10] = { ' ','.',':','-','=','+','*','#','%','@' };
+const char g_ramp[70] = { ' ','.','\'','`','^','\"',',',':',';','I','l','!','i','>','<','~','+','_','-','?',']','[','}','{','1',')','(','|','\\','/','t','f','j','r','x','n','u','v','c','z','X','Y','U','J','C','L','Q','0','O','Z','m','w','q','p','d','b','k','h','a','o','*','#','M','W','&','8','%','B','@','$' };
 
-typedef char FrameData_g;
+unsigned char* g_buffer;
+char* g_frame;
+size_t g_bufferWidth, g_bufferHeight;
 
-struct FrameData_c
+void InitBuffer(size_t width, size_t height)
 {
-	const char pre[2] = { '\x1b','[' };
-	char r[3] = { '0','0','0' };
-	const char rs = ';';
-	char g[3] = { '0','0','0' };
-	const char gs = ';';
-	char b[3] = { '0','0','0' };
-	const char post = 'm';
-	char c = ' ';
-};
-
-Gray* g_buff_g;
-Color* g_buff_c;
-char* g_frame; // What actually gets printed
-size_t g_bufferWidth;
-size_t g_bufferHeight;
-size_t g_frameWidth;
-size_t g_frameHeight;
-
-void ClearBackground_g(Gray clearValue)
-{
-	for (size_t i = 0; i < (g_bufferWidth * g_bufferHeight); ++i)
+	g_bufferWidth = width;
+	g_bufferHeight = height;
+	g_buffer = new unsigned char[width * height];
+	memset(g_buffer, 0, width * height);
+	size_t frameSize = (width + 1) * height;
+	g_frame = new char[frameSize];
+	memset(g_frame, ' ', frameSize);
+	for (size_t y = 0; y < height; ++y)
 	{
-		g_buff_g[i] = clearValue;
+		g_frame[y * (width + 1) + width] = '\n';
 	}
-}
-void ClearBackground_c(Color clearValue)
-{
-	for (size_t i = 0; i < (g_bufferWidth * g_bufferHeight); ++i)
-	{
-		g_buff_c[i] = clearValue;
-	}
+	g_frame[frameSize - 1] = '\0';
 }
 
-void DrawBufferl_g()
+void ClearBackground()
 {
-	
+	memset(g_buffer, 0u, g_bufferWidth * g_bufferHeight);
 }
-void DrawBufferb_g()
-{
 
-}
-void DrawBuffer_c()
+void DrawBuffer()
 {
-	size_t i = 0;
-	for (int y = 0; y < g_bufferHeight; ++y)
+	constexpr float incr = 70.0f / 255.0f;
+	size_t i_f = 0;
+	size_t i_b = 0;
+	for (size_t y = 0; y < g_bufferHeight; ++y)
 	{
-		for (int x = 0; x < g_bufferWidth; ++x)
+		for (size_t x = 0; x < g_bufferWidth; ++x)
 		{
-			char* pix = g_frame + (y * (g_bufferWidth * sizeof(FrameData_c) + 1) + x);
-			pix g_buff_c[i].r, g_buff_c[i].g, g_buff_c[i].b, g_buff_c[i].c);
-			++i;
+			unsigned char value = g_buffer[i_b];
+			long rampIndex = lroundf((float)value * incr);
+			g_frame[i_f] = g_ramp[rampIndex];
+			++i_b;
+			++i_f;
+		}
+		++i_f;
+	}
+	printf(g_frame);
+}
+
+size_t BufferIndex_i(size_t x, size_t y)
+{
+	return y * g_bufferWidth + x;
+}
+size_t BufferIndex_f(float x, float y)
+{
+	return BufferIndex_i(lroundf(x), lroundf(y));
+}
+
+void DrawPt(unsigned char c, float x, float y)
+{
+	g_buffer[BufferIndex_f(x,y)] = c;
+}
+
+void DrawTexture(Texture tex, long x, long y)
+{
+	size_t texXStart = 0;
+	if (x < 0)
+	{
+		texXStart = abs(x);
+		if (texXStart > tex.width)
+			return;
+	}
+	size_t texYStart = 0;
+	if (y < 0)
+	{
+		texYStart = abs(y);
+		if (texYStart > tex.height)
+			return;
+	}
+	size_t lineSize;
+	{
+		size_t a = tex.width - texXStart;
+		size_t b = g_bufferWidth - x;
+		lineSize = std::min(a,b);
+	}
+	size_t lines;
+	{
+		size_t a = tex.height - texYStart;
+		size_t b = g_bufferHeight - y;
+		lines = std::min(a,b);
+	}
+
+	for (size_t l = 0; l < lines; ++l)
+	{
+		size_t buffX = x + texXStart;
+		size_t buffY = y + l + texYStart;
+		size_t texX = texXStart;
+		size_t texY = texYStart + l;
+
+		size_t bufferI = g_bufferWidth * buffY + buffX;
+		size_t texI = tex.width * texY + texX;
+		memcpy(g_buffer + bufferI, tex.data + texI, lineSize);
+	}
+}
+
+float Lerp(float a, float b, float t)
+{
+	return a + t * (b - a);
+}
+
+// uv should be { 0..1, 0..1 }
+unsigned char SampleTexture(const Texture& tex, Vector2 uv)
+{
+	uv.x = fmodf(uv.x, 1.0f);
+	uv.y = fmodf(uv.y, 1.0f);
+	uv.x *= (float)tex.width;
+	uv.y *= (float)tex.height;
+	return tex.data[lroundf(uv.y) * tex.width + lroundf(uv.x)];
+}
+
+void DrawTextureEx(Texture tex, Vector2 scale, Vector2 origin, Vector2 position)
+{
+	long px = lroundf(position.x - origin.x);
+	long py = lroundf(position.y - origin.y);
+
+	if (scale.x == 1.0f && scale.y == 1.0f)
+		return DrawTexture(tex, px, py);
+
+	Texture scaled;
+	scaled.width = lroundf(tex.width * scale.x);
+	scaled.height = lroundf(tex.height * scale.y);
+	scaled.data = new unsigned char[scaled.width * scaled.height];
+
+	Vector2 uv;
+	Vector2 invScaledSize = { 1.0f / ((float)scaled.width - 1.0f), 1.0f / ((float)scaled.height - 1.0f) };
+	for (size_t y = 0; y < scaled.height; ++y)
+	{
+		uv.y = (float)y * invScaledSize.y;
+		for (size_t x = 0; x < scaled.width; ++x)
+		{
+			uv.x = (float)x * invScaledSize.x;
+			scaled.data[y * scaled.width + x] = SampleTexture(tex, uv);
 		}
 	}
+
+	DrawTexture(scaled, px, py);
+
+	delete[] scaled.data;
 }
 
-void InitBuffer_g(int width, int height)
-{
-	g_bufferWidth = width;
-	g_bufferHeight = height;
-	size_t size = g_bufferWidth * g_bufferHeight;
-	g_buff_g = new Gray[size];
-	g_frameWidth = g_bufferWidth + 1;
-	g_frameHeight = g_bufferHeight;
-	g_frame_g = new FrameData_g[g_frameWidth * g_frameHeight];
-	for (size_t y = 0; y < g_frameHeight - 1; ++y)
-	{
-		g_frame[g_frameWidth * y + g_frameWidth - 1] = '\n';
-	}
-	g_frame[g_frameWidth * g_frameHeight - 1] = '\0';
-}
-void InitBuffer_c(int width, int height)
-{
-	g_bufferWidth = width;
-	g_bufferHeight = height;
-	size_t size = (g_bufferWidth * g_bufferHeight) * sizeof(Color);
-	g_buff_c = new Color[size];
-	g_frameWidth = g_bufferWidth + 1;
-	g_frameHeight = g_bufferHeight;
-	g_frame_c = new FrameData_c[g_frameWidth * g_frameHeight];
-	for (size_t y = 0; y < g_frameHeight - 1; ++y)
-	{
-		g_frame_c[g_frameWidth * y + g_frameWidth - 1] = '\n';
-	}
-	g_frame_c[g_frameWidth * g_frameHeight - 1] = '\0';
-}
-
-void FlushBuffer_g()
-{
-	g_bufferWidth = 0ull;
-	g_bufferHeight = 0ull;
-	delete[] g_buff_g;
-	delete[] g_frame_g;
-}
-void FlushBuffer_c()
-{
-	g_bufferWidth = 0ull;
-	g_bufferHeight = 0ull;
-	delete[] g_buff_c;
-	delete[] g_frame_c;
-}
+void Draw

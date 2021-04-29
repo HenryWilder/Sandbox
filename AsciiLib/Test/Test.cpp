@@ -6,7 +6,25 @@
 
 int main()
 {
-    InitBuffer(10,10);
+    InitBuffer(32, 28);
+    ClearBackground();
+
+    unsigned char tex[16 * 8];
+    for (size_t y = 0; y < 8; ++y)
+    {
+        for (size_t x = 0; x < 16; ++x)
+        {
+            tex[y * 16 + x] = (unsigned char)(((float)x / 16.0f) * 255.0f);
+        }
+    }
+    Texture texture0 =
+    {
+        16u,8u,
+        tex
+    };
+    DrawTextureEx(texture0, { 1.0f,1.0f }, { 0.0f,0.0f }, { 0.0f, 0.0f });
+    DrawTextureEx(texture0, { 2.0f,2.0f }, { 0.0f,0.0f }, { 0.0f, 9.0f });
+    DrawBuffer();
 }
 
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
