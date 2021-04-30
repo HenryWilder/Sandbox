@@ -84,6 +84,34 @@ enum BlockID : char
     BLOCK_T,
     BLOCK_Z,
 };
+constexpr size_t GetBlockWidth(BlockID id)
+{
+    switch (id)
+    {
+    case BLOCK_I: return 1;
+    case BLOCK_J: return 2;
+    case BLOCK_L: return 2;
+    case BLOCK_O: return 2;
+    case BLOCK_S: return 3;
+    case BLOCK_T: return 3;
+    case BLOCK_Z: return 3;
+    default: return 0;
+    }
+}
+constexpr size_t GetBlockHeight(BlockID id)
+{
+    switch (id)
+    {
+    case BLOCK_I: return 4;
+    case BLOCK_J: return 3;
+    case BLOCK_L: return 3;
+    case BLOCK_O: return 2;
+    case BLOCK_S: return 2;
+    case BLOCK_T: return 2;
+    case BLOCK_Z: return 2;
+    default: return 0;
+    }
+}
 struct Piece
 {
     struct Orientation
@@ -97,7 +125,7 @@ typedef Piece::Orientation Shape;
 Color g_pallet[] = 
 {
     BLACK,
-    WHITE,
+    GRAY,
     SKYBLUE,
     BLUE,
     ORANGE,
@@ -116,46 +144,63 @@ const Piece g_pieces[] =
     ********/
 
     Piece{ /* I */
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
+        Shape{ { { 0,0 }, { 0,1 }, { 0,2 }, { 0,3 } } },
+        Shape{ { { 0,0 }, { 1,0 }, { 2,0 }, { 3,0 } } },
+        Shape{ { { 0,0 }, { 0,1 }, { 0,2 }, { 0,3 } } },
+        Shape{ { { 0,0 }, { 1,0 }, { 2,0 }, { 3,0 } } },
     },
     Piece{ /* J */
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
+        Shape{ { { 1,0 }, { 1,1 }, { 1,2 }, { 0,2 } } },
+        Shape{ { { 0,0 }, { 1,0 }, { 2,0 }, { 2,1 } } },
+        Shape{ { { 0,0 }, { 0,1 }, { 0,2 }, { 1,0 } } },
+        Shape{ { { 0,1 }, { 1,1 }, { 2,1 }, { 0,0 } } },
     },
+    /*
+    * 
+    * x
+    * x
+    * xx
+    * 
+    *   x
+    * xxx
+    *
+    * xx
+    *  x
+    *  x
+    * 
+    * xxx
+    * x
+    * 
+    */
     Piece{ /* L */
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
+        Shape{ { { 0,0 }, { 0,1 }, { 0,2 }, { 1,2 } } },
+        Shape{ { { 0,1 }, { 1,1 }, { 2,1 }, { 2,0 } } },
+        Shape{ { { 0,0 }, { 1,0 }, { 1,1 }, { 1,2 } } },
+        Shape{ { { 0,0 }, { 1,0 }, { 2,0 }, { 0,1 } } },
     },
     Piece{ /* O */
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
+        Shape{ { { 0,0 }, { 1,0 }, { 1,1 }, { 0,1 } } },
+        Shape{ { { 0,0 }, { 1,0 }, { 1,1 }, { 0,1 } } },
+        Shape{ { { 0,0 }, { 1,0 }, { 1,1 }, { 0,1 } } },
+        Shape{ { { 0,0 }, { 1,0 }, { 1,1 }, { 0,1 } } },
     },
     Piece{ /* S */
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
+        Shape{ { { 0,1 }, { 1,1 }, { 1,0 }, { 2,0 } } },
+        Shape{ { { 0,0 }, { 0,1 }, { 1,1 }, { 1,2 } } },
+        Shape{ { { 0,1 }, { 1,1 }, { 1,0 }, { 2,0 } } },
+        Shape{ { { 0,0 }, { 0,1 }, { 1,1 }, { 1,2 } } },
     },
     Piece{ /* T */
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
+        Shape{ { { 0,0 }, { 1,0 }, { 2,0 }, { 1,1 } } },
+        Shape{ { { 0,0 }, { 0,1 }, { 0,2 }, { 1,1 } } },
+        Shape{ { { 0,1 }, { 1,1 }, { 2,1 }, { 1,0 } } },
+        Shape{ { { 1,0 }, { 1,1 }, { 1,2 }, { 0,1 } } },
     },
     Piece{ /* Z */
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
-        Shape{ { { 0,0 }, { 0,0 }, { 0,0 }, { 0,0 } } },
+        Shape{ { { 0,0 }, { 1,0 }, { 1,1 }, { 2,1 } } },
+        Shape{ { { 1,0 }, { 1,1 }, { 0,1 }, { 0,2 } } },
+        Shape{ { { 0,0 }, { 1,0 }, { 1,1 }, { 2,1 } } },
+        Shape{ { { 1,0 }, { 1,1 }, { 0,1 }, { 0,2 } } },
     }
 };
 
@@ -165,7 +210,7 @@ const Color& GetBlockColor(BlockID id)
 }
 const Shape& GetShape(BlockID id, size_t rot)
 {
-    return g_pieces[id - 2].rot[rot];
+    return g_pieces[id - 2].rot[rot % 4];
 }
 
 template<typename T, size_t _width, size_t _height>
@@ -249,12 +294,16 @@ int main()
         board[{ x, board.height() - 1 }] = BLOCK_BORDER;
     }
 
-    auto RandomBlock = [] { return (BlockID)((rand() % 7) + 2); };
     BlockID block_current = BLOCK_NULL;
+    auto RandomBlock = [&block_current] { return (BlockID)((rand() % 7) + 2); };
     BlockID block_next = RandomBlock();
     int rotation = 0;
 
-    auto RandomX = [&board] { return (size_t)((rand() % (board.width() - 2)) + 1); };
+    auto RandomX = [&board, &block_current]
+    {
+        size_t mid = (board.width() - 2) / 2;
+        return mid - GetBlockWidth(block_current) / 2;
+    };
     size_t positionX;
     size_t positionY;
 
@@ -264,13 +313,18 @@ int main()
         block_next = RandomBlock();
         positionX = RandomX();
         positionY = 1;
+        rotation = 0;
     };
 
     size_t level = 0;
     size_t score = 0;
 
-    size_t simTime = 10;
+    size_t simTime = 30;
+    constexpr size_t shiftTime = 0;
+    size_t shift = 0;
     size_t timer = 0;
+
+    bool win = false;
 
     constexpr size_t boardScale = 32;
     constexpr size_t uiWidth = 6;
@@ -310,27 +364,33 @@ int main()
         }
         if (IsKeyPressed(KEY_UP))
         {
-            bool canRotatePos = !board.CheckCollisionShape(block_current, (rotation + 1) % 4, positionX, positionY);
+            int pRotation = (rotation - 1) % 4;
+            bool canRotatePos = !board.CheckCollisionShape(block_current, pRotation, positionX, positionY);
             if (canRotatePos)
             {
-                --rotation;
+                rotation = pRotation;
             }
         }
         else if (IsKeyPressed(KEY_DOWN))
         {
-            bool canRotateNeg = !board.CheckCollisionShape(block_current, (rotation + 3) % 4, positionX, positionY);
+            int pRotation = (rotation + 1) % 4;
+            bool canRotateNeg = !board.CheckCollisionShape(block_current, pRotation, positionX, positionY);
             if (canRotateNeg)
             {
-                ++rotation;
+                rotation = pRotation;
             }
         }
-        if (IsKeyDown(KEY_RIGHT_SHIFT))
+        if (IsKeyPressed(KEY_RIGHT_SHIFT))
+        {
+            shift = level;
+        }
+        if (IsKeyDown(KEY_RIGHT_SHIFT) && shift == level && timer < (simTime - shiftTime))
         {
             timer = 0;
         }
         
 
-        if (!timer) // Simulation frame
+        if (!timer && !win) // Simulation frame
         {
             if (!block_current) SpawnPiece();
             bool colliding = board.CheckCollisionShape(block_current, rotation, positionX, positionY + 1);
@@ -338,11 +398,32 @@ int main()
             {
                 board.InsertShape(block_current, rotation, positionX, positionY);
                 SpawnPiece();
+                if (board.CheckCollisionShape(block_current, rotation, positionX, positionY + 1)) win = true; // TODO: Needs work.
                 ++level;
             }
             else
             {
                 ++positionY;
+            }
+            for (size_t y = 1; y < board.height() - 1; ++y)
+            {
+                bool clearLine = true;
+                for (size_t x = 1; x < board.width() - 1; ++x)
+                {
+                    if (!board[{x, y}])
+                    {
+                        clearLine = false;
+                        break;
+                    }
+                }
+                if (clearLine)
+                {
+                    for (size_t x = 1; x < board.width() - 1; ++x)
+                    {
+                        // TODO
+                        board[{x, y}] = BLOCK_NULL;
+                    }
+                }
             }
             timer = simTime; // Reset the clock
         }
@@ -411,9 +492,24 @@ int main()
                     DrawText(TextFormat("%i",score), elementRec.x, elementRec.y, elementRec.h, WHITE);
                 }
                 EndScissorMode();
-            }
+                elementRec.y = boardScale * 6;
+                elementRec.h = elementRec.w;
+                BeginScissorModeRec(elementRec);
+                {
+                    ClearBackground(BLACK);
 
-            DrawText(TextFormat("%i",timer),0,0,32,RED);
+                    Color color = GetBlockColor(block_next);
+                    int offsetX = ((4 * boardScale) - (GetBlockWidth(block_next) * boardScale)) / 2;
+                    int offsetY = ((4 * boardScale) - (GetBlockHeight(block_next) * boardScale)) / 2;
+                    for (Int2 pos : GetShape(block_next, 0).off)
+                    {
+                        int screenX = pos.x * boardScale + elementRec.x + offsetX;
+                        int screenY = pos.y * boardScale + elementRec.y + offsetY;
+                        DrawRectangle(screenX, screenY, boardScale, boardScale, color);
+                    }
+                }
+                EndScissorMode();
+            }
 
         } EndDrawing();
     }
