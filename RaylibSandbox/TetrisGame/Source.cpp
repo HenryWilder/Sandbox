@@ -1,6 +1,7 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <stdlib.h>
+#include <memory.h>
 
 #define sign(x) (((x) > (decltype(x))(0)) - ((x) < (decltype(x))(0)))
 
@@ -53,16 +54,8 @@ inline Vector3& operator/=(Vector3& a, float div) { return (a = Vector3Scale(a, 
 
 struct Int2
 {
-    size_t x, y;
+    int x, y;
 };
-Int2 operator+(Int2 a, Int2 b)
-{
-    return Int2{ a.x + b.x, a.y + b.y };
-}
-bool operator==(Int2 a, Int2 b)
-{
-    return a.x == b.x && a.y == b.y;
-}
 struct IntRec
 {
     int x, y, w, h;
@@ -72,10 +65,11 @@ void BeginScissorModeRec(IntRec section)
     BeginScissorMode(section.x, section.y, section.w, section.h);
 }
 
-enum BlockID : char
+enum BlockID : unsigned char
 {
-    BLOCK_NULL,
-    BLOCK_BORDER,
+    BLOCK_NULL = 0,
+    BLOCK_BORDER = 1,
+
     BLOCK_I,
     BLOCK_J,
     BLOCK_L,
@@ -83,8 +77,11 @@ enum BlockID : char
     BLOCK_S,
     BLOCK_T,
     BLOCK_Z,
+
+    BLOCK_IDS,
+    BLOCK_SHAPES = BLOCK_IDS - BLOCK_I,
 };
-constexpr size_t GetBlockWidth(BlockID id)
+constexpr int GetBlockWidth(BlockID id)
 {
     switch (id)
     {
@@ -98,7 +95,7 @@ constexpr size_t GetBlockWidth(BlockID id)
     default: return 0;
     }
 }
-constexpr size_t GetBlockHeight(BlockID id)
+constexpr int GetBlockHeight(BlockID id)
 {
     switch (id)
     {
@@ -155,23 +152,6 @@ const Piece g_pieces[] =
         Shape{ { { 0,0 }, { 0,1 }, { 0,2 }, { 1,0 } } },
         Shape{ { { 0,1 }, { 1,1 }, { 2,1 }, { 0,0 } } },
     },
-    /*
-    * 
-    * x
-    * x
-    * xx
-    * 
-    *   x
-    * xxx
-    *
-    * xx
-    *  x
-    *  x
-    * 
-    * xxx
-    * x
-    * 
-    */
     Piece{ /* L */
         Shape{ { { 0,0 }, { 0,1 }, { 0,2 }, { 1,2 } } },
         Shape{ { { 0,1 }, { 1,1 }, { 2,1 }, { 2,0 } } },
@@ -204,7 +184,7 @@ const Piece g_pieces[] =
     }
 };
 
-const Color& GetBlockColor(BlockID id)
+Color& GetBlockColor(BlockID id)
 {
     return g_pallet[id];
 }
@@ -235,18 +215,18 @@ struct Board
     {
         return spaces[i];
     }
-    T& operator[](Int2 p)
+    T& at(size_t x, size_t y)
     {
-        return spaces[p.y * _width + p.x];
+        return spaces[y * _width + x];
     }
 
     const T& operator[](int i) const
     {
         return spaces[i];
     }
-    const T& operator[](Int2 p) const
+    const T& at(size_t x, size_t y) const
     {
-        return spaces[p.y * _width + p.x];
+        return spaces[y * _width + x];
     }
 
     void Fill(T value)
@@ -262,48 +242,86 @@ struct Board
         const Shape& shape = GetShape(id,rotation);
         const Int2 baseOffset = { x,y };
         return (
-            !!(*this)[(shape.off[0] + baseOffset)] ||
-            !!(*this)[(shape.off[1] + baseOffset)] ||
-            !!(*this)[(shape.off[2] + baseOffset)] ||
-            !!(*this)[(shape.off[3] + baseOffset)]);
+            !!at(shape.off[0].x + x, shape.off[0].y + y) ||
+            !!at(shape.off[1].x + x, shape.off[1].y + y) ||
+            !!at(shape.off[2].x + x, shape.off[2].y + y) ||
+            !!at(shape.off[3].x + x, shape.off[3].y + y));
     }
 
     void InsertShape(BlockID id, size_t rotation, size_t x, size_t y)
     {
         const Shape& shape = GetShape(id, rotation);
         const Int2 baseOffset = { x,y };
-        (*this)[(shape.off[0] + baseOffset)] = id;
-        (*this)[(shape.off[1] + baseOffset)] = id;
-        (*this)[(shape.off[2] + baseOffset)] = id;
-        (*this)[(shape.off[3] + baseOffset)] = id;
+        at(shape.off[0].x + x, shape.off[0].y + y) = id;
+        at(shape.off[1].x + x, shape.off[1].y + y) = id;
+        at(shape.off[2].x + x, shape.off[2].y + y) = id;
+        at(shape.off[3].x + x, shape.off[3].y + y) = id;
+    }
+
+    void ClearChunk(
+        size_t startLine,   // The y-position of the beginning of the chunk
+        size_t lineCount,   // The number of lines in the chunk
+        int clearValue = 0, // What to clear the duplicate values with
+        size_t border = 0)  // The size of the board's border
+    {
+        /***************
+        * 
+        *   ########
+        *   AB    C#
+        *   #   x  #
+        *   # xxx  #
+        *   #xx xxx#
+        *   #x  x x#
+        *   #x xx x#
+        *   D------#
+        *   #------#
+        *   #xx  xx#
+        *   #xxxxx #
+        *   ########
+        * 
+        ***************/
+        const size_t borderOffsetTop = width() * border;        // A
+        const size_t gutsWidth = width() - 2 * border;          // Size of B..C
+        T* const guts = spaces + borderOffsetTop + border;      // B
+        const size_t chunkSize = width() * lineCount;           // Size of the dashed area
+        const size_t copySize = chunkSize - borderOffsetTop;    // Size from A to D
+        T* const offsetPos = guts + chunkSize;                  // Where the memory from the chunk A..D is getting moved to (which is A + the size of the dashed area)
+
+        // Move (copy) the entire board starting at the top border and ending at the line being destroyed down a block, overwriting the lines being destroyed.
+        memmove((void*)offsetPos, (void*)guts, copySize);
+
+        // Now that the memory has been moved (copied), we need to reset the spaces that were originally at the top
+        T* clearLine = guts;
+        for (size_t y = 0; y < lineCount; ++y, clearLine += width())
+        {
+            memset((void*)clearLine, clearValue, gutsWidth);
+        }
     }
 };
 
 int main()
 {
-    Board<BlockID, 10 + 2, 24 + 2> board;
+    constexpr size_t borderWidth = 1;
+    using GameBoard = Board<BlockID, 10 + 2 * borderWidth, 24 + 2 * borderWidth>;
+    GameBoard board;
     board.Fill(BLOCK_NULL);
     for (size_t y = 0; y < board.height(); ++y)
     {
-        board[{ 0, y }] = BLOCK_BORDER;
-        board[{ board.width() - 1, y }] = BLOCK_BORDER;
+        board.at(0, y) = BLOCK_BORDER;
+        board.at(board.width() - 1, y) = BLOCK_BORDER;
     }
     for (size_t x = 0; x < board.width(); ++x)
     {
-        board[{ x, 0 }] = BLOCK_BORDER;
-        board[{ x, board.height() - 1 }] = BLOCK_BORDER;
+        board.at(x, 0) = BLOCK_BORDER;
+        board.at(x, board.height() - 1) = BLOCK_BORDER;
     }
 
     BlockID block_current = BLOCK_NULL;
-    auto RandomBlock = [&block_current] { return (BlockID)((rand() % 7) + 2); };
+    auto RandomBlock = [&block_current] { return (BlockID)((rand() % 7) + BLOCK_I); };
     BlockID block_next = RandomBlock();
     int rotation = 0;
 
-    auto RandomX = [&board, &block_current]
-    {
-        size_t mid = (board.width() - 2) / 2;
-        return mid - GetBlockWidth(block_current) / 2;
-    };
+    constexpr size_t boardMiddle = (GameBoard::width() - 2 * borderWidth) / 2ull + borderWidth;
     size_t positionX;
     size_t positionY;
 
@@ -311,8 +329,8 @@ int main()
     {
         block_current = block_next;
         block_next = RandomBlock();
-        positionX = RandomX();
-        positionY = 1;
+        positionX = boardMiddle - GetBlockWidth(block_current) / 2ull;
+        positionY = borderWidth;
         rotation = 0;
     };
 
@@ -326,7 +344,7 @@ int main()
 
     bool win = false;
 
-    constexpr size_t boardScale = 32;
+    constexpr size_t boardScale = 8;
     constexpr size_t uiWidth = 6;
     constexpr size_t windowWidth = (board.width() + uiWidth) * boardScale;
     constexpr size_t windowHeight = board.height() * boardScale;
@@ -338,7 +356,7 @@ int main()
     ******************************************/
 
     Texture2D blockTexture = LoadTexture("block.png");
-    SetShapesTexture(blockTexture, {0,0,32,32});
+    SetShapesTexture(blockTexture, { 0,0,32,32 });
 
     while (!WindowShouldClose())
     {
@@ -346,22 +364,12 @@ int main()
         *   Simulate frame and update variables   *
         ******************************************/
 
-        if (IsKeyPressed(KEY_LEFT))
-        {
-            bool canMoveLeft = !board.CheckCollisionShape(block_current, rotation, positionX - 1, positionY);
-            if (canMoveLeft)
-            {
-                --positionX;
-            }
-        }
-        else if (IsKeyPressed(KEY_RIGHT))
-        {
-            bool canMoveRight = !board.CheckCollisionShape(block_current, rotation, positionX + 1, positionY);
-            if (canMoveRight)
-            {
-                ++positionX;
-            }
-        }
+        int pXD = (int)IsKeyPressed(KEY_RIGHT) - (int)IsKeyPressed(KEY_LEFT);
+        size_t pX = (size_t)((long long)positionX + (long long)pXD);
+        bool canMoveX = !board.CheckCollisionShape(block_current, rotation, pX, positionY);
+        pXD *= canMoveX;
+        positionX = (size_t)((long long)positionX + (long long)pXD);
+
         if (IsKeyPressed(KEY_UP))
         {
             int pRotation = (rotation - 1) % 4;
@@ -405,26 +413,31 @@ int main()
             {
                 ++positionY;
             }
+
+            size_t startClear;
+            size_t clearSize = 0;
+            bool clearLine = false;
             for (size_t y = 1; y < board.height() - 1; ++y)
             {
+                if (!clearLine) startClear = y;
                 bool clearLine = true;
                 for (size_t x = 1; x < board.width() - 1; ++x)
                 {
-                    if (!board[{x, y}])
+                    if (!board.at(x, y))
                     {
                         clearLine = false;
                         break;
                     }
                 }
-                if (clearLine)
+                if (clearLine) ++clearSize;
+                else if (clearSize > 0) // There are lines to clear
                 {
-                    for (size_t x = 1; x < board.width() - 1; ++x)
-                    {
-                        // TODO
-                        board[{x, y}] = BLOCK_NULL;
-                    }
+                    board.ClearChunk(startClear, clearSize, BLOCK_NULL, 1);
+                    score += 10;
+                    clearSize = 0;
                 }
             }
+
             timer = simTime; // Reset the clock
         }
         else
@@ -447,10 +460,10 @@ int main()
                 for (size_t x = 0; x < board.width(); ++x)
                 {
                     size_t screenX = x * boardScale;
-                    BlockID id = board[{ x, y }];
+                    BlockID id = board.at(x, y);
                     if (id)
                     {
-                        DrawRectangle(screenX, screenY, boardScale, boardScale, GetBlockColor(id));
+                        DrawRectangle((int)screenX, (int)screenY, (int)boardScale, (int)boardScale, GetBlockColor(id));
                     }
                 }
             }
@@ -459,9 +472,9 @@ int main()
                 Color color = GetBlockColor(block_current);
                 for (Int2 pos : GetShape(block_current, rotation).off)
                 {
-                    int screenX = (pos.x + positionX) * boardScale;
-                    int screenY = (pos.y + positionY) * boardScale;
-                    DrawRectangle(screenX, screenY, boardScale, boardScale, color);
+                    size_t screenX = (pos.x + positionX) * boardScale;
+                    size_t screenY = (pos.y + positionY) * boardScale;
+                    DrawRectangle((int)screenX, (int)screenY, (int)boardScale, (int)boardScale, color);
                 }
             }
             // UI
@@ -472,7 +485,7 @@ int main()
                     for (size_t x = board.width(); x < board.width() + uiWidth; ++x)
                     {
                         size_t screenX = x * boardScale;
-                        DrawRectangle(screenX, screenY, boardScale, boardScale, GetBlockColor(BLOCK_BORDER));
+                        DrawRectangle((int)screenX, (int)screenY, (int)boardScale, (int)boardScale, GetBlockColor(BLOCK_BORDER));
                     }
                 }
                 IntRec elementRec;
@@ -499,13 +512,13 @@ int main()
                     ClearBackground(BLACK);
 
                     Color color = GetBlockColor(block_next);
-                    int offsetX = ((4 * boardScale) - (GetBlockWidth(block_next) * boardScale)) / 2;
-                    int offsetY = ((4 * boardScale) - (GetBlockHeight(block_next) * boardScale)) / 2;
+                    size_t offsetX = ((4ull * boardScale) - (GetBlockWidth(block_next) * boardScale)) / 2ull;
+                    size_t offsetY = ((4ull * boardScale) - (GetBlockHeight(block_next) * boardScale)) / 2ull;
                     for (Int2 pos : GetShape(block_next, 0).off)
                     {
-                        int screenX = pos.x * boardScale + elementRec.x + offsetX;
-                        int screenY = pos.y * boardScale + elementRec.y + offsetY;
-                        DrawRectangle(screenX, screenY, boardScale, boardScale, color);
+                        size_t screenX = pos.x * boardScale + (size_t)elementRec.x + offsetX;
+                        size_t screenY = pos.y * boardScale + (size_t)elementRec.y + offsetY;
+                        DrawRectangle((int)screenX, (int)screenY, (int)boardScale, (int)boardScale, color);
                     }
                 }
                 EndScissorMode();
