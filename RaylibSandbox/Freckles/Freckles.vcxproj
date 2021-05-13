@@ -167,13 +167,20 @@
     <ClCompile Include="Source.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="Freckle.png" />
-  </ItemGroup>
-  <ItemGroup>
+    <None Include="accumulate.frag" />
+    <None Include="bake.frag">
+      <SubType>
+      </SubType>
+    </None>
     <None Include="bloom.frag" />
     <None Include="bloom.vert" />
+    <None Include="grayscale.frag">
+      <SubType>
+      </SubType>
+    </None>
     <None Include="lighting.frag" />
     <None Include="lighting.vert" />
+    <None Include="unwrap.vert" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

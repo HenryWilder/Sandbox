@@ -71,41 +71,31 @@ int main()
     ******************************************/
     srand((unsigned int)clock());
 
-    Shader bloom = LoadShader(0,"bloom.frag");
-    
+    Shader bloom = LoadShader(0, "bloom.frag");
+
     int texture1024Scale = 4;
     int textureWidth = 1024 * texture1024Scale;
     int textureHeight = textureWidth * 2;
 
     float freckleRadiusMin = 1.0f;
     float freckleRadiusScale = 5.0f * (float)texture1024Scale;
-    int freckleCount = 4000;
+    int freckleCountPerFrame = 3;
 
-    RenderTexture2D tex_emis = LoadRenderTexture(textureWidth, textureHeight);
-    BeginTextureMode(tex_emis); {
+    RenderTexture2D tex_freckles = LoadRenderTexture(textureWidth, textureHeight);
+    BeginTextureMode(tex_freckles); {
 
         ClearBackground({ 0,0,0, 0 });
 
     } EndTextureMode();
+    RenderTexture2D tex_frecklesTemp = LoadRenderTexture(textureWidth, textureHeight);
 
-    // Spawn freckles
-    for (int i = 0; i < freckleCount; ++i)
-    {
-        double x = DistributedRand();
-        double y = DistributedRand();
-        double r = DistributedRand();
-        {
-            r *= r;
-            r = (1.0 - r);
-        }
-        float freckleRadius = r * freckleRadiusScale + freckleRadiusMin;
+    RenderTexture2D tex_lighting = LoadRenderTexture(textureWidth, textureHeight);
+    RenderTexture2D tex_accum = LoadRenderTexture(textureWidth, textureHeight);
+    BeginTextureMode(tex_accum); {
 
-        BeginTextureMode(tex_emis); {
+        ClearBackground(BLACK);
 
-            DrawCircleV({ (float)x * (float)tex_emis.texture.width, (float)y * (float)tex_emis.texture.height }, freckleRadius, WHITE);
-
-        } EndTextureMode();
-    }
+    } EndTextureMode();
 
     Camera3D camera;
     camera.fovy = 45.0f;
@@ -117,27 +107,48 @@ int main()
 
     Vector3 light;
 
-    Model body = LoadModelFromMesh(GenMeshSphere(1.0f, 64, 64));
-    
+    Mesh mesh0 = GenMeshSphere(1.0f, 64, 64);
+    Mesh mesh1 = GenMeshSphere(1.0f, 64, 64);
+    Model body = LoadModelFromMesh(mesh0);
+    Model lightCatcher = LoadModelFromMesh(mesh1);
+
     body.materials[0] = LoadMaterialDefault();
-    int uniformLoc_LightPos;
+    int uniformLoc_LightPos[2];
 
     {
-        Material& mat = body.materials[0];
-
-        mat.shader = LoadShader("lighting.vert", "lighting.frag");
-        uniformLoc_LightPos = GetShaderLocation(mat.shader, "lightPos");
+        body.materials[0].shader = LoadShader("lighting.vert", "lighting.frag");
+        uniformLoc_LightPos[0] = GetShaderLocation(body.materials[0].shader, "lightPos");
         {
-            float size[2] = { (float)tex_emis.texture.width, (float)tex_emis.texture.height };
-            SetShaderValue(mat.shader, GetShaderLocation(mat.shader, "size"), size, UNIFORM_VEC2);
+            float size[2] = { (float)tex_freckles.texture.width, (float)tex_freckles.texture.height };
+            SetShaderValue(body.materials[0].shader, GetShaderLocation(body.materials[0].shader, "size"), size, UNIFORM_VEC2);
         }
-        mat.shader.locs[LOC_MAP_EMISSION] = GetShaderLocation(mat.shader, "textureEmis");
 
-        mat.maps[MAP_EMISSION].texture = tex_emis.texture;
+        body.materials[0].shader.locs[LOC_MAP_ALBEDO] = GetShaderLocation(body.materials[0].shader, "lightAccum");
+        body.materials[0].shader.locs[LOC_MAP_EMISSION] = GetShaderLocation(body.materials[0].shader, "freckleMask");
+        body.materials[0].shader.locs[LOC_MAP_ROUGHNESS] = GetShaderLocation(body.materials[0].shader, "lightBake");
 
-        SetTextureFilter(mat.maps[MAP_DIFFUSE].texture, FILTER_BILINEAR);
-        SetTextureFilter(mat.maps[MAP_EMISSION].texture, FILTER_BILINEAR);
+        body.materials[0].maps[MAP_ALBEDO].texture = tex_accum.texture;
+        body.materials[0].maps[MAP_EMISSION].texture = tex_freckles.texture;
+        body.materials[0].maps[MAP_ROUGHNESS].texture = tex_lighting.texture;
+
+        SetTextureFilter(body.materials[0].maps[MAP_ALBEDO].texture, FILTER_BILINEAR);
+        SetTextureFilter(body.materials[0].maps[MAP_EMISSION].texture, FILTER_BILINEAR);
+        SetTextureFilter(body.materials[0].maps[MAP_ROUGHNESS].texture, FILTER_BILINEAR);
     }
+
+    lightCatcher.materials[0] = LoadMaterialDefault();
+
+    {
+        lightCatcher.materials[0].shader = LoadShader("unwrap.vert", "bake.frag");
+        uniformLoc_LightPos[1] = GetShaderLocation(lightCatcher.materials[0].shader, "lightPos");
+        {
+            float size[2] = { (float)tex_lighting.texture.width, (float)tex_lighting.texture.height };
+            SetShaderValue(lightCatcher.materials[0].shader, GetShaderLocation(lightCatcher.materials[0].shader, "size"), size, UNIFORM_VEC2);
+        }
+    }
+
+    Shader shd_accum = LoadShader(0, "accumulate.frag");
+    Shader shd_gray = LoadShader(0, "grayscale.frag");
 
     while (!WindowShouldClose())
     {
@@ -148,11 +159,13 @@ int main()
         // Move light source
         {
             float t = GetTime();
-            light.x = cosf(t) * 8.0f;
-            light.y = sinf(t / 3.0f) * 8.0f;
-            light.z = sinf(t) * 8.0f;
+            light.x = cosf(t) * 16.0f;
+            light.y = 0.0f;
+            //light.y = sinf(t) * 16.0f;
+            light.z = sinf(t) * 16.0f;
             float pos[3] = { light.x, light.y, light.z };
-            SetShaderValue(body.materials[0].shader, uniformLoc_LightPos, pos, UNIFORM_VEC3);
+            SetShaderValue(body.materials[0].shader, uniformLoc_LightPos[0], pos, UNIFORM_VEC3);
+            SetShaderValue(lightCatcher.materials[0].shader, uniformLoc_LightPos[1], pos, UNIFORM_VEC3);
         }
 
         UpdateCamera(&camera);
@@ -160,6 +173,86 @@ int main()
         /******************************************
         *   Draw the frame                        *
         ******************************************/
+
+        BeginTextureMode(tex_lighting); {
+
+            ClearBackground(BLACK);
+            DrawModel(lightCatcher, Vector3Zero(), 1.0f, WHITE);
+
+        } EndTextureMode();
+
+        BeginTextureMode(tex_accum); {
+
+            BeginBlendMode(BLEND_ADD_COLORS); {
+
+                DrawTexturePro(tex_lighting.texture,
+                               { 0.0f, 0.0f, (float)tex_lighting.texture.width, -(float)tex_lighting.texture.height },
+                               { 0.0f, 0.0f, (float)tex_accum.texture.width, (float)tex_accum.texture.height },
+                               { 0.0f, 0.0f },
+                               0.0f, { 0, 1, 2, 0 });
+
+            } EndBlendMode();
+
+        } EndTextureMode();
+
+        BeginTextureMode(tex_accum); {
+
+            BeginShaderMode(shd_accum); {
+
+                DrawTexturePro(tex_accum.texture,
+                               { 0.0f, 0.0f, (float)tex_accum.texture.width, -(float)tex_accum.texture.height },
+                               { 0.0f, 0.0f, (float)tex_accum.texture.width, (float)tex_accum.texture.height },
+                               { 0.0f, 0.0f },
+                               0.0f, WHITE);
+
+            } EndShaderMode();
+
+        } EndTextureMode();
+
+        double x = DistributedRand();
+        double y = DistributedRand();
+        double r = DistributedRand();
+        float freckleRadius = r * freckleRadiusScale + freckleRadiusMin;
+
+        BeginTextureMode(tex_frecklesTemp); {
+
+            BeginShaderMode(shd_gray); {
+
+                DrawTexturePro(tex_accum.texture,
+                               { 0.0f, 0.0f, (float)tex_accum.texture.width, -(float)tex_accum.texture.height },
+                               { 0.0f, 0.0f, (float)tex_accum.texture.width, (float)tex_accum.texture.height },
+                               { 0.0f, 0.0f },
+                               0.0f, WHITE);
+
+            } EndShaderMode();
+
+            BeginBlendMode(BLEND_MULTIPLIED); {
+
+                DrawTexturePro(tex_freckles.texture,
+                               { 0.0f, 0.0f, (float)tex_freckles.texture.width, -(float)tex_freckles.texture.height },
+                               { 0.0f, 0.0f, (float)tex_freckles.texture.width, (float)tex_freckles.texture.height },
+                               { 0.0f, 0.0f },
+                               0.0f, WHITE);
+
+            } EndBlendMode();
+            
+        } EndTextureMode();
+
+        BeginTextureMode(tex_freckles); {
+
+            BeginBlendMode(BLEND_ADD_COLORS); {
+
+                DrawTexturePro(tex_frecklesTemp.texture,
+                               { 0.0f, 0.0f, (float)tex_freckles.texture.width, -(float)tex_freckles.texture.height },
+                               { 0.0f, 0.0f, (float)tex_freckles.texture.width, (float)tex_freckles.texture.height },
+                               { 0.0f, 0.0f },
+                               0.0f, WHITE);
+
+            } EndBlendMode();
+
+            DrawCircleV({ (float)x * (float)tex_freckles.texture.width, (float)y * (float)tex_freckles.texture.height }, freckleRadius, { 255,255,255,3 });
+
+        } EndTextureMode();
 
         BeginDrawing(); {
 
@@ -177,7 +270,19 @@ int main()
 
             } EndShaderMode();
 
-            DrawFPS(0,0);
+#if 1
+            DrawTexturePro(tex_accum.texture,
+                           { 0.0f, 0.0f, (float)tex_accum.texture.width, -(float)tex_accum.texture.height },
+                           { 0.0f, 0.0f, (float)windowWidth * 0.125f, (float)windowHeight * 0.125f },
+                           { 0.0f, 0.0f },
+                           0.0f, WHITE);
+            DrawTexturePro(tex_freckles.texture,
+                           { 0.0f, 0.0f, (float)tex_freckles.texture.width, -(float)tex_freckles.texture.height },
+                           { (float)windowWidth * 0.125f, 0.0f, (float)windowWidth * 0.125f, (float)windowHeight * 0.125f },
+                           { 0.0f, 0.0f },
+                           0.0f, WHITE);
+#endif
+            DrawFPS(0, 0);
 
         } EndDrawing();
     }
@@ -186,12 +291,19 @@ int main()
     *   Unload and free memory                *
     ******************************************/
 
-    UnloadRenderTexture(tex_emis);
+    UnloadShader(shd_accum);
+    UnloadShader(shd_gray);
+    UnloadRenderTexture(tex_freckles);
+    UnloadRenderTexture(tex_frecklesTemp);
+    UnloadRenderTexture(tex_lighting);
+    UnloadRenderTexture(tex_accum);
     UnloadShader(bloom);
     UnloadShader(body.materials[0].shader);
+    UnloadShader(lightCatcher.materials[0].shader);
     UnloadModel(body);
+    UnloadModel(lightCatcher);
 
     CloseWindow();
 
-	return 0;
+    return 0;
 }

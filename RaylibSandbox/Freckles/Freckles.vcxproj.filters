@@ -20,11 +20,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="Freckle.png">
-      <Filter>Resource Files</Filter>
-    </Image>
-  </ItemGroup>
-  <ItemGroup>
     <None Include="lighting.vert">
       <Filter>Resource Files</Filter>
     </None>
@@ -35,6 +30,18 @@
       <Filter>Resource Files</Filter>
     </None>
     <None Include="bloom.vert">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="bake.frag">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="unwrap.vert">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="accumulate.frag">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="grayscale.frag">
       <Filter>Resource Files</Filter>
     </None>
   </ItemGroup>
