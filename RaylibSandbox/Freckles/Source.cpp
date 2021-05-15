@@ -107,10 +107,17 @@ int main()
 
     Vector3 light;
 
+    Model body;
+    Model lightCatcher;
+#if 0
+    body = LoadModel("torso.obj");
+    lightCatcher = LoadModel("torso.obj");
+#else
     Mesh mesh0 = GenMeshSphere(1.0f, 64, 64);
     Mesh mesh1 = GenMeshSphere(1.0f, 64, 64);
-    Model body = LoadModelFromMesh(mesh0);
-    Model lightCatcher = LoadModelFromMesh(mesh1);
+    body = LoadModelFromMesh(mesh0);
+    lightCatcher = LoadModelFromMesh(mesh1);
+#endif
 
     body.materials[0] = LoadMaterialDefault();
     int uniformLoc_LightPos[2];
@@ -160,8 +167,8 @@ int main()
         {
             float t = GetTime();
             light.x = cosf(t) * 16.0f;
-            light.y = 0.0f;
-            //light.y = sinf(t) * 16.0f;
+            //light.y = 0.0f;
+            light.y = sinf(t) * 16.0f;
             light.z = sinf(t) * 16.0f;
             float pos[3] = { light.x, light.y, light.z };
             SetShaderValue(body.materials[0].shader, uniformLoc_LightPos[0], pos, UNIFORM_VEC3);
@@ -170,17 +177,30 @@ int main()
 
         UpdateCamera(&camera);
 
-        /******************************************
-        *   Draw the frame                        *
-        ******************************************/
+        // Drawing
 
+        // Bake the dynamic lighting for this frame
         BeginTextureMode(tex_lighting); {
 
             ClearBackground(BLACK);
             DrawModel(lightCatcher, Vector3Zero(), 1.0f, WHITE);
 
         } EndTextureMode();
+        // Blur & reduce accumulated light
+        BeginTextureMode(tex_accum); {
 
+            BeginShaderMode(shd_accum); {
+
+                DrawTexturePro(tex_accum.texture,
+                               { 0.0f, 0.0f, (float)tex_accum.texture.width, -(float)tex_accum.texture.height },
+                               { 0.0f, 0.0f, (float)tex_accum.texture.width, (float)tex_accum.texture.height },
+                               { 0.0f, 0.0f },
+                               0.0f, GRAY);
+
+            } EndShaderMode();
+
+        } EndTextureMode();
+        // Accumulate baked lighting
         BeginTextureMode(tex_accum); {
 
             BeginBlendMode(BLEND_ADD_COLORS); {
@@ -195,25 +215,7 @@ int main()
 
         } EndTextureMode();
 
-        BeginTextureMode(tex_accum); {
-
-            BeginShaderMode(shd_accum); {
-
-                DrawTexturePro(tex_accum.texture,
-                               { 0.0f, 0.0f, (float)tex_accum.texture.width, -(float)tex_accum.texture.height },
-                               { 0.0f, 0.0f, (float)tex_accum.texture.width, (float)tex_accum.texture.height },
-                               { 0.0f, 0.0f },
-                               0.0f, WHITE);
-
-            } EndShaderMode();
-
-        } EndTextureMode();
-
-        double x = DistributedRand();
-        double y = DistributedRand();
-        double r = DistributedRand();
-        float freckleRadius = r * freckleRadiusScale + freckleRadiusMin;
-
+        // Blend freckles so that they strengthen in light and weaken in dark
         BeginTextureMode(tex_frecklesTemp); {
 
             BeginShaderMode(shd_gray); {
@@ -235,9 +237,8 @@ int main()
                                0.0f, WHITE);
 
             } EndBlendMode();
-            
-        } EndTextureMode();
 
+        } EndTextureMode();
         BeginTextureMode(tex_freckles); {
 
             BeginBlendMode(BLEND_ADD_COLORS); {
@@ -250,9 +251,25 @@ int main()
 
             } EndBlendMode();
 
-            DrawCircleV({ (float)x * (float)tex_freckles.texture.width, (float)y * (float)tex_freckles.texture.height }, freckleRadius, { 255,255,255,3 });
-
         } EndTextureMode();
+
+        // Spawn a freckle
+        {
+            double x = DistributedRand();
+            double y = DistributedRand();
+            double r = DistributedRand();
+            float freckleRadius = r * freckleRadiusScale + freckleRadiusMin;
+            BeginTextureMode(tex_freckles); {
+
+                DrawCircleV({ (float)x * (float)tex_freckles.texture.width, (float)y * (float)tex_freckles.texture.height }, freckleRadius, { 255,255,255,3 });
+
+            } EndTextureMode();
+        }
+
+
+        /******************************************
+        *   Draw the frame                        *
+        ******************************************/
 
         BeginDrawing(); {
 
@@ -262,15 +279,15 @@ int main()
 
                 BeginMode3D(camera); {
 
-                    DrawModel(body, Vector3Zero(), 1.0f, WHITE);
+                    DrawModel(body, Vector3Zero(), 1.0f, WHITE); // Draw the model
 
-                    DrawSphere(light, 0.2f, WHITE);
+                    DrawSphere(light, 0.2f, WHITE); // Draw the light source
 
                 } EndMode3D();
 
             } EndShaderMode();
 
-#if 1
+#if 1 // Debug
             DrawTexturePro(tex_accum.texture,
                            { 0.0f, 0.0f, (float)tex_accum.texture.width, -(float)tex_accum.texture.height },
                            { 0.0f, 0.0f, (float)windowWidth * 0.125f, (float)windowHeight * 0.125f },
@@ -281,8 +298,9 @@ int main()
                            { (float)windowWidth * 0.125f, 0.0f, (float)windowWidth * 0.125f, (float)windowHeight * 0.125f },
                            { 0.0f, 0.0f },
                            0.0f, WHITE);
-#endif
-            DrawFPS(0, 0);
+#endif // !Debug
+
+            DrawFPS(0,0);
 
         } EndDrawing();
     }

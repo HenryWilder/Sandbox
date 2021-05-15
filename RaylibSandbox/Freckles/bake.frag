@@ -53,9 +53,9 @@ void main()
         }
     }
 
-    float ambientBrightness = 0.1;
-    float diffuseBrightness = (lambertian * lightPower / dist);
-    float specularBrightness = (specular * lightPower / dist);
+    float ambientBrightness = clamp(0.2, 0.0, 1.0);
+    float diffuseBrightness = clamp(lambertian * lightPower / dist, 0.0, 1.0);
+    float specularBrightness = clamp(specular * lightPower / dist, 0.0, 1.0);
 
 	finalColor = vec4(vec3(ambientBrightness, diffuseBrightness, specularBrightness), 1.0);
 }
