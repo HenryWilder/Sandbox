@@ -5,35 +5,99 @@
 
 #define sign(x) (((x) > (decltype(x))(0)) - ((x) < (decltype(x))(0)))
 
+template<typename T1, typename T2>
+using LargerType_t = std::conditional_t<(sizeof(T1) > sizeof(T2)), T1, T2>;
+template<typename T1, typename T2>
+using LargerPrimativeType_t = std::conditional_t<(sizeof(std::remove_reference_t<T1>) > sizeof(std::remove_reference_t<T2>)), T1, T2>;
 
-template<typename T, bool VALID = std::is_arithmetic<T>::value>
-T Min(T a, T b) { }
+template<typename T1, typename T2>
+using BestFit_t =
+    std::conditional_t<
+        (std::is_floating_point_v<std::remove_reference_t<T1>>),
+        std::conditional_t<
+            (std::is_floating_point_v<std::remove_reference_t<T2>>),
+            LargerPrimativeType_t<T1, T2>, // double > float
+            T1 // float > int
+        >
+        std::conditional_t<
+            (std::is_floating_point_v<std::remove_reference_t<T2>>),
+            T2, // int < float
+            LargerPrimativeType_t<T1, T2> // long long > int
+        >
+    >;
+
 template<typename T>
-T Min<T, false>(T a, T b) { static_assert(false); }
-template<typename T>
-T Min<T, true>(T a, T b)
-{
+using remove_lvalue_reference_t = std::conditional_t<std::is_rvalue_reference_v<T>, T, std::remove_reference_t<T>>;
+
+template<typename T1, typename T2>
+constexpr bool is_same_primative_v = std::is_same_v<std::remove_reference_t<T1>, std::remove_reference_t<T2>>;
+
+template<typename T1, typename T2, std::enable_if_t<is_same_primative_v<T1, T2>, bool> = true>
+auto Min(T1 a, T2 b) {
     return (a < b ? a : b);
 }
-
-template<typename T, bool VALID = std::is_arithmetic<T>::value>
-T Max(T a, T b) { }
-template<typename T>
-T Max<T, false>(T a, T b) { static_assert(false); }
-template<typename T>
-T Max<T, true>(T a, T b)
-{
-    return (a > b ? a : b);
+template<typename T1, typename T2, std::enable_if_t<!is_same_primative_v<T1, T2> && is_same_primative_v<T1, BestFit_t<T1, T2>>, bool> = true>
+auto Min(T1 a, T2 b) {
+    using NonRefType_t = std::remove_reference_t<T1>;
+    NonRefType_t b1 = static_cast<NonRefType_t>(b1);
+    return static_cast<NonRefType_t>(a < b1 ? a : b1);
+}
+template<typename T1, typename T2, std::enable_if_t<!is_same_primative_v<T1, T2> && !is_same_primative_v<T1, BestFit_t<T1, T2>>, bool> = true>
+auto Min(T1 a, T2 b) {
+    using NonRefType_t = std::remove_reference_t<T2>;
+    NonRefType_t a1 = static_cast<NonRefType_t>(a);
+    return static_cast<NonRefType_t>(a1 < b ? a1 : b);
 }
 
-template<typename T, bool VALID = std::is_arithmetic<T>::value>
-T Clamp(T a, T min, T max) { }
-template<typename T>
-T Clamp<T, false>(T a, T min, T max) { static_assert(false); }
-template<typename T>
-T Clamp<T, true>(T a, T min, T max)
+template<typename T1, typename T2, std::enable_if_t<is_same_primative_v<T1, T2>, bool> = true>
+auto Max(T1 a, T2 b) {
+    return (a > b ? a : b);
+}
+template<typename T1, typename T2, std::enable_if_t<!is_same_primative_v<T1, T2>&& is_same_primative_v<T1, BestFit_t<T1, T2>>, bool> = true>
+auto Max(T1 a, T2 b) {
+    using NonRefType_t = std::remove_reference_t<T1>;
+    NonRefType_t b1 = static_cast<NonRefType_t>(b1);
+    return static_cast<NonRefType_t>(a > b1 ? a : b1);
+}
+template<typename T1, typename T2, std::enable_if_t<!is_same_primative_v<T1, T2> && !is_same_primative_v<T1, BestFit_t<T1, T2>>, bool> = true>
+auto Max(T1 a, T2 b) {
+    using NonRefType_t = std::remove_reference_t<T2>;
+    NonRefType_t a1 = static_cast<NonRefType_t>(a);
+    return static_cast<NonRefType_t>(a1 > b ? a1 : b);
+}
+
+template<typename T1, typename T2, std::enable_if_t<is_same_primative_v<T1, T2>, bool> = true>
+auto Clamp(T1 a, T2 b) {
+    auto b = (a < min ? min : a);
+    return (b > max ? max : b);
+}
+template<typename T1, typename T2, std::enable_if_t<!is_same_primative_v<T1, T2>&& is_same_primative_v<T1, BestFit_t<T1, T2>>, bool> = true>
+auto Clamp(T1 a, T2 b) {
+    using NonRefType_t = std::remove_reference_t<T1>;
+    NonRefType_t b1 = static_cast<NonRefType_t>(b1);
+    return static_cast<NonRefType_t>(a < b1 ? a : b1);
+}
+template<typename T1, typename T2, std::enable_if_t<!is_same_primative_v<T1, T2> && !is_same_primative_v<T1, BestFit_t<T1, T2>>, bool> = true>
+auto Clamp(T1 a, T2 b) {
+    using NonRefType_t = std::remove_reference_t<T2>;
+    NonRefType_t a1 = static_cast<NonRefType_t>(a);
+    return static_cast<NonRefType_t>(a1 < b ? a1 : b);
+}
+
+template<
+    typename T1,
+    typename T2,
+    typename T3,
+    std::enable_if_t<
+        std::is_arithmetic_v<std::remove_reference_t<T1>> &&
+        std::is_arithmetic_v<std::remove_reference_t<T2>> &&
+        std::is_arithmetic_v<std::remove_reference_t<T3>>,
+        bool
+    > = true
+>
+auto Clamp(T1 a, T2 min, T3 max)
 {
-    T b = (a < min ? min : a);
+    auto b = (a < min ? min : a);
     return (b > max ? max : b);
 }
 
