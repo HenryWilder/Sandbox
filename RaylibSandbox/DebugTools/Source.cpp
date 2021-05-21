@@ -2,6 +2,8 @@
 #include <raymath.h>
 #include <assert.h>
 #include <type_traits>
+#include <vector>
+#include "Slider.h"
 
 #pragma region Vector math
 
@@ -40,31 +42,6 @@ inline Vector3  operator/ (Vector3  a, Vector3 b) { return      Vector3Divide(a,
 inline Vector3& operator/=(Vector3& a, Vector3 b) { return (a = Vector3Divide(a, b));           }
 inline Vector3  operator/ (Vector3  a, float div) { return      Vector3Scale(a, 1.0f / div);    }
 inline Vector3& operator/=(Vector3& a, float div) { return (a = Vector3Scale(a, 1.0f / div));   }
-
-#pragma endregion
-
-#pragma region Range math
-
-float ScaleFromRange(float min, float max) { return max - min; }
-float RangeToScalar(float value, float from_min, float from_max) { return ((value - from_min) / ScaleFromRange(from_min, from_max)); }
-float RangeFromScalar(float value, float to_min, float to_max) { return (value * ScaleFromRange(to_min, to_max)) + to_min; }
-float RangeRemap(float value, float from_min, float from_max, float to_min, float to_max) { return (((value - from_min) / ScaleFromRange(from_min, from_max)) * ScaleFromRange(to_min, to_max)) + to_min; }
-
-Vector2 ScaleFromRangeVector2(Vector2 min, Vector2 max) { return max - min; }
-Vector2 RangeToScalarVector2(Vector2 value, Vector2 from_min, Vector2 from_max) { return ((value - from_min) / ScaleFromRangeVector2(from_min, from_max)); }
-Vector2 RangeFromScalarVector2(Vector2 value, Vector2 to_min, Vector2 to_max) { return (value * ScaleFromRangeVector2(to_min, to_max)) + to_min; }
-Vector2 RangeRemapVector2(Vector2 value, Vector2 from_min, Vector2 from_max, Vector2 to_min, Vector2 to_max) { return (((value - from_min) / ScaleFromRangeVector2(from_min, from_max)) * ScaleFromRangeVector2(to_min, to_max)) + to_min; }
-
-Vector3 ScaleFromRangeVector3(Vector3 min, Vector3 max) { return max - min; }
-Vector3 RangeToScalarVector3(Vector3 value, Vector3 from_min, Vector3 from_max) { return ((value - from_min) / ScaleFromRangeVector3(from_min, from_max)); }
-Vector3 RangeFromScalarVector3(Vector3 value, Vector3 to_min, Vector3 to_max) { return (value * ScaleFromRangeVector3(to_min, to_max)) + to_min; }
-Vector3 RangeRemapVector3(Vector3 value, Vector3 from_min, Vector3 from_max, Vector3 to_min, Vector3 to_max) { return (((value - from_min) / ScaleFromRangeVector3(from_min, from_max)) * ScaleFromRangeVector3(to_min, to_max)) + to_min; }
-
-struct Range { float min, max; };
-float ScaleFromRangeR(Range range) { return range.max - range.min; }
-float RangeToScalarR(float value, Range from) { return ((value - from.min) / ScaleFromRangeR(from)); }
-float RangeFromScalarR(float value, Range to) { return (value * ScaleFromRangeR(to)) + to.min; }
-float RangeRemapR(float value, Range from, Range to) { return (((value - from.min) / ScaleFromRangeR(from)) * ScaleFromRangeR(to)) + to.min; }
 
 #pragma endregion
 
@@ -235,137 +212,8 @@ void EnableDebugButton(Button* button)
 
 #pragma region Sliders
 
-//template<typename T>
-//struct Slider {};
 
 
-struct Slider
-{
-    Button handle;
-    float value;
-    Range valueRange;
-    float trackLength;
-    float lockX;
-    float snapGrid = 0.0f;
-};
-
-void CreateSlider(
-    Slider* slider,
-    float min, float max,
-    float trackLength,
-    float snap,
-    Vector2 position,
-    Vector2 handleExtents,
-    Color disabledColor, Color normalColor, Color hoveredColor, Color heldColor,
-    float defaultValue, bool startDisabled)
-{
-    *slider = {
-        {},
-        defaultValue,
-        { min, max },
-        trackLength,
-        position.x,
-        snap
-    };
-    slider->handle = Button{
-            { RangeRemapR(slider->value, slider->valueRange, { 0.0f, trackLength }), position.y, handleExtents.x, handleExtents.y },
-            { disabledColor, normalColor, hoveredColor, heldColor },
-            (startDisabled ? status_disabled : status_normal),
-            button_hold,
-            slider,
-            false, false
-    };
-}
-
-float Snap(float value, float grid)
-{
-    return roundf(value / grid) * grid;
-}
-
-void UpdateDebugSlider(Slider* slider)
-{
-    UpdateDebugButton(&slider->handle);
-    if (slider->handle.status == status_held)
-    {
-        float xPos = Clamp(GetMouseX() - slider->handle.shape.width * 0.5f, slider->lockX, slider->lockX + slider->trackLength);
-
-        if (slider->snapGrid > 0.0f)
-            xPos = Snap(xPos, RangeRemap(slider->snapGrid, slider->lockX, slider->lockX + slider->trackLength, slider->valueRange.min, slider->valueRange.max));
-
-        slider->value = DebugSliderTrackPositionToRange(slider, slider->handle.shape.x = xPos);
-    }
-}
-void UpdateDebugSliderArray(Slider* sliderArray, size_t count)
-{
-    Slider* heldSlider = nullptr;
-    for (size_t i = 0; i < count; ++i)
-    {
-        UpdateDebugButton(&sliderArray[i].handle);
-        if (sliderArray[i].handle.status == status_held)
-            heldSlider = sliderArray + i;
-    }
-    if (heldSlider)
-    {
-        float xPos = Clamp(GetMouseX(), heldSlider->lockX, heldSlider->lockX + heldSlider->trackLength);
-
-        if (heldSlider->snapGrid > 0.0f)
-            xPos = DebugSliderRangeToTrackPosition(heldSlider, Snap(DebugSliderTrackPositionToRange(heldSlider, xPos), heldSlider->snapGrid));
-
-        heldSlider->handle.shape.x = xPos - heldSlider->handle.shape.width * 0.5f;
-
-        heldSlider->value = DebugSliderTrackPositionToRange(heldSlider, xPos);
-    }
-}
-
-void DrawDebugSlider(Slider* slider)
-{
-    Vector2 center = Vector2{ slider->handle.shape.width, slider->handle.shape.height } *0.5f;
-    Vector2 start = Vector2{ slider->lockX, slider->handle.shape.y } + center;
-    Vector2 end = Vector2{ (slider->lockX + slider->trackLength), slider->handle.shape.y } + center;
-    DrawLineV(start, end, GRAY);
-    Vector2 capOffset = { 0.0f, slider->handle.shape.height * 0.25f };
-    DrawLineV(start + capOffset, start - capOffset, GRAY);
-    DrawLineV(end + capOffset, end - capOffset, GRAY);
-
-    DrawRectangleRec(slider->handle.shape, slider->handle.color[slider->handle.status]);
-}
-void DrawDebugSliderArray(Slider* sliderArray, size_t count)
-{
-    for (size_t i = 0; i < count; ++i)
-    {
-        Vector2 center = Vector2{ sliderArray[i].handle.shape.width, sliderArray[i].handle.shape.height } *0.5f;
-        Vector2 start = Vector2{ sliderArray[i].lockX, sliderArray[i].handle.shape.y } + center;
-        Vector2 end = Vector2{ (sliderArray[i].lockX + sliderArray[i].trackLength), sliderArray[i].handle.shape.y } + center;
-        DrawLineV(start, end, GRAY);
-        Vector2 capOffset = { 0.0f, sliderArray[i].handle.shape.height * 0.25f };
-        DrawLineV(start + capOffset, start - capOffset, GRAY);
-        DrawLineV(end + capOffset, end - capOffset, GRAY);
-
-        if (sliderArray[i].snapGrid > 0.0f)
-        {
-            Vector2 p;
-            for (p = start; p.x <= end.x; p.x += DebugSliderRangeToTrackScale(sliderArray + i, sliderArray[i].snapGrid))
-            {
-                if (p.x < start.x || p.x > end.x)
-                    continue;
-
-                DrawPixelV(p, LIGHTGRAY);
-            }
-        }
-
-        DrawRectangleRec(sliderArray[i].handle.shape, sliderArray[i].handle.color[sliderArray[i].handle.status]);
-        DrawText(TextFormat("%1.3f", sliderArray[i].value), (int)end.x + 8, (int)end.y - 4, 8, WHITE);
-    }
-}
-
-void DisableDebugSlider(Slider* slider)
-{
-    slider->handle.status = status_disabled;
-}
-void EnableDebugSlider(Slider* slider)
-{
-    slider->handle.status = status_normal;
-}
 
 #pragma endregion
 
@@ -382,15 +230,29 @@ int main()
 
     float value = 0.0f;
 
-    Button buttons[3];
-    CreateButton(buttons + 0, {  20, 20, 64, 32 }, GRAY, DARKBLUE,  BLUE,  SKYBLUE, button_toggle, false, false);
-    CreateButton(buttons + 1, { 104, 20, 64, 32 }, GRAY, DARKGREEN, LIME,   GREEN,  button_toggle, false, false);
-    CreateButton(buttons + 2, { 187, 20, 64, 32 }, GRAY, RED,       ORANGE, YELLOW, button_hold,   false, true);
+    std::vector<Slider> sliders;
+    sliders.reserve(3);
 
-    Slider sliders[3];
-    CreateSlider(sliders + 0,  0.0f, 1.0f, 100.0f, 0.0f, { 20, 100 }, { 6, 16 }, GRAY, DARKBLUE,  BLUE,   SKYBLUE, 0.5f,  false);
-    CreateSlider(sliders + 1, -2.0f, 3.0f, 120.0f, 1.0f, { 20, 124 }, { 6, 16 }, GRAY, DARKGREEN, LIME,   GREEN,   0.25f, false);
-    CreateSlider(sliders + 2, -5.0f, 5.0f, 120.0f, 1.0f, { 20, 148 }, { 6, 16 }, GRAY, RED,       ORANGE, YELLOW,  0.75f, true);
+    SliderData slider;
+
+    slider.position = { 20, 20 };
+    slider.min = -3.0f;
+    slider.max = 3.0f;
+    slider.increment = 0.0f;
+    sliders.push_back(Slider(slider));
+
+    slider.position.y = 40;
+    slider.min = -3.0f;
+    slider.max = 10.0f;
+    slider.increment = 1.0f;
+    sliders.push_back(Slider(slider));
+
+    slider.position.y = 60;
+    slider.min = 1.0f;
+    slider.max = 8.0f;
+    slider.increment = 0.0f;
+    slider.defaultValue = 2.0f;
+    sliders.push_back(Slider(slider));
 
     while (!WindowShouldClose())
     {
@@ -398,26 +260,7 @@ int main()
         *   Simulate frame and update variables   *
         ******************************************/
 
-        UpdateDebugButtonArray(buttons, _countof(buttons));
-
-        if (IsDebugButtonActivated(buttons + 0))
-        {
-            EnableDebugButton(buttons + 2);
-        }
-        else if (IsDebugButtonDeactivated(buttons + 0))
-        {
-            DisableDebugButton(buttons + 2);
-        }
-        if (IsDebugButtonActivated(buttons + 1))
-        {
-            EnableDebugSlider(sliders + 2);
-        }
-        else if (IsDebugButtonDeactivated(buttons + 1))
-        {
-            DisableDebugSlider(sliders + 2);
-        }
-        
-        UpdateDebugSliderArray(sliders, _countof(sliders));
+        Slider::Update(sliders);
 
         /******************************************
         *   Draw the frame                        *
@@ -427,8 +270,7 @@ int main()
 
             ClearBackground(BLACK);
 
-            DrawDebugButtonArray(buttons, _countof(buttons));
-            DrawDebugSliderArray(sliders, _countof(sliders));
+            Slider::Draw(sliders);
 
         } EndDrawing();
     }
