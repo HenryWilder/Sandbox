@@ -5,12 +5,20 @@
 #include "Slider.h"
 
 Slider::Slider(SliderData data) :
+    m_handleColor(data.handleColor),
+
     b_horizontal(data.horizontal),
     b_visible(data.visible),
     b_beingHeld(false),
     b_enabled(data.enabled),
 
-    m_value(((isnan(data.defaultValue)) ? ((data.min + data.max) / 2.0f) : (data.defaultValue))),
+    m_value(
+        isnan(data.defaultValue) ?
+        (isnan(data.initValue) ?
+            ((data.min + data.max) / 2.0f) :
+            data.initValue) :
+        data.defaultValue
+    ),
     m_default(data.defaultValue),
     m_min(data.min),
     m_max(data.max),
@@ -183,16 +191,17 @@ Vector2 Slider::GetTrackEndPosition() const {
 
 Color Slider::GetHandleColor() const {
     if (b_enabled)
-    {
-        if (b_beingHeld)
-            return s_heldColor;
-        else
-            return s_enabledColor;
-    }
+        return m_handleColor;
     else
-        return s_disabledColor;
+        return s_trackColor;
 }
-
+Color Slider::GetHandleOutlineColor() const {
+    Color ret = GetHandleColor();
+    ret.r /= 2;
+    ret.g /= 2;
+    ret.b /= 2;
+    return ret;
+}
 
 void Slider::UpdateDrag() {
     float mousePos = (IsHorizontal() ? GetMouseX() : GetMouseY());
@@ -307,8 +316,8 @@ void Slider::Draw() const {
 
     // Boundary markers
 #if 1
-    DrawLineV(GetTrackStartPosition() - offsetEnd, GetTrackStartPosition() + offsetEnd, s_markerColor);
-    DrawLineV(GetTrackEndPosition() - offsetEnd, GetTrackEndPosition() + offsetEnd, s_markerColor);
+    DrawLineV(GetTrackStartPosition() - offsetEnd, GetTrackStartPosition() + offsetEnd, s_trackColor);
+    DrawLineV(GetTrackEndPosition() - offsetEnd, GetTrackEndPosition() + offsetEnd, s_trackColor);
 #endif
 
     // Increment markers
@@ -317,13 +326,13 @@ void Slider::Draw() const {
         if (IsHorizontal()) {
             for (float f = GetRangeMin() + GetIncrementValue(); f < GetRangeMax(); f += GetIncrementValue()) {
                 p.x = RangeRemap(f, GetRangeMin(), GetRangeMax(), GetTrackStartX(), GetTrackEndX());
-                DrawLineV(p - offsetStart, p - offsetEnd, s_markerColor);
+                DrawLineV(p - offsetStart, p - offsetEnd, s_trackColor);
             }
         }
         else {
             for (float f = GetRangeMin() + GetIncrementValue(); f < GetRangeMax(); f += GetIncrementValue()) {
                 p.y = RangeRemap(f, GetRangeMin(), GetRangeMax(), GetTrackStartY(), GetTrackEndY());
-                DrawLineV(p - offsetStart, p - offsetEnd, s_markerColor);
+                DrawLineV(p - offsetStart, p - offsetEnd, s_trackColor);
             }
         }
     }
@@ -331,10 +340,10 @@ void Slider::Draw() const {
     // Default marker
     if (HasDefaultValue()) {
         Vector2 pos = GetDefaultValueTrackPosition();
-        DrawLineV(pos + offsetStart, pos + offsetEnd, s_markerColor);
+        DrawLineV(pos + offsetStart, pos + offsetEnd, s_trackColor);
     }
 
-    DrawRectangleRec(GetHandleRect(), s_disabledColor); // Outline
+    DrawRectangleRec(GetHandleRect(), GetHandleOutlineColor()); // Outline
     DrawRectangleRec(GetHandleInsetRect(), GetHandleColor()); // Inside
 }
 void Slider::Draw(Slider* array, size_t count) {
@@ -363,4 +372,59 @@ void Slider::Draw(std::vector<Slider*>& array) {
 
         slider->Draw();
     }
+}
+
+
+ColorSlider::ColorSlider(Vector2 position, Slider* _r, Slider* _g, Slider* _b) {
+    SliderData data;
+    data.min = 0.0f;
+    data.max = 255.0f;
+    data.initValue = 0.0f;
+
+    data.position = position;
+    data.handleColor = RED;
+    *_r = Slider(data);
+    r = _r;
+
+    data.position.y += Slider::GetHandleLength();
+    data.handleColor = GREEN;
+    *_g = Slider(data);
+    g = _g;
+
+    data.position.y += Slider::GetHandleLength();
+    data.handleColor = BLUE;
+    *_b = Slider(data);
+    b = _b;
+}
+ColorSlider::ColorSlider(Vector2 position, std::vector<Slider>& dest) {
+    dest.reserve(dest.size() + 3);
+
+    SliderData data;
+    data.min = 0.0f;
+    data.max = 255.0f;
+    data.initValue = 0.0f;
+
+    data.position = position;
+    data.handleColor = RED;
+    dest.push_back(Slider(data));
+    r = &dest.back();
+
+    data.position.y += Slider::GetHandleLength();
+    data.handleColor = GREEN;
+    dest.push_back(Slider(data));
+    g = &dest.back();
+
+    data.position.y += Slider::GetHandleLength();
+    data.handleColor = BLUE;
+    dest.push_back(Slider(data));
+    b = &dest.back();
+}
+
+Color ColorSlider::GetValue() const {
+    return Color{
+        (unsigned char)lroundf(r->GetValue()),
+        (unsigned char)lroundf(g->GetValue()),
+        (unsigned char)lroundf(b->GetValue()),
+        (unsigned char)255
+    };
 }

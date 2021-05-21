@@ -164,12 +164,18 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Button.cpp" />
+    <ClCompile Include="InputUI.cpp" />
     <ClCompile Include="Math.cpp" />
+    <ClCompile Include="Picker.cpp" />
     <ClCompile Include="Slider.cpp" />
     <ClCompile Include="Source.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Button.h" />
+    <ClInclude Include="InputUI.h" />
     <ClInclude Include="Math.h" />
+    <ClInclude Include="Picker.h" />
     <ClInclude Include="Slider.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

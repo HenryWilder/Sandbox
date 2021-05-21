@@ -1,4 +1,5 @@
 #pragma once
+#include <raylib.h>
 #include <cmath>
 
 namespace std {
@@ -6,9 +7,6 @@ namespace std {
     template<class _Ty, class _Alloc = _Ty>
     class vector;
 }
-
-struct Vector2;
-struct Rectangle;
 
 struct SliderData {
     // Display
@@ -19,17 +17,22 @@ struct SliderData {
     float min; // The minimum value when clamping
     float max; // The maximum value when clamping
 
+    float initValue = NAN; // Starts at midpoint when constructed if both this and defaultValue are NaN -- defaultValue takes priority as the construction value if applicable
+
     float increment = 0.0f; // 0.0f for continuous
-    float defaultValue = NAN; // NaN to disable default value - starts at midpoint when constructed if this is the case.
+    float defaultValue = NAN; // NaN to disable default value. Uses initValue if this is the case.
 
     // Flags
     bool horizontal = true; // Whether the slider is horizontal
     bool visible = true; // Whether the slider is displayed (also disables interaction with the slider when false)
     bool enabled = true; // Whether the slider can be interacted with
+
+    Color handleColor = LIGHTGRAY;
 };
 
 class Slider {
 public:
+    Slider() = default;
     Slider(SliderData data);
 
     // Controller
@@ -88,6 +91,7 @@ public:
     Vector2 GetTrackEndPosition() const;
 
     Color GetHandleColor() const;
+    Color GetHandleOutlineColor() const;
 
 public:
 
@@ -107,11 +111,8 @@ private:
 
     static constexpr int s_handleWidth = 6; // The width of the slider handle -- parallel to the track
     static constexpr int s_handleLength = 16; // The length of the slider handle -- perpendicular to the track
-    static constexpr Color s_trackColor = GRAY; // Color of the markings on the track
-    static constexpr Color s_markerColor = GRAY; // Color of the markings on the track
-    static constexpr Color s_disabledColor = GRAY; // Color of the handle when disabled
-    static constexpr Color s_enabledColor = LIGHTGRAY; // Color of the handle when enabled
-    static constexpr Color s_heldColor = LIGHTGRAY; // Color of the handle when being dragged
+    static constexpr Color s_trackColor = GRAY; // Color of the track
+    Color m_handleColor; // Color of the handle
 
     // Flags
 
@@ -131,4 +132,16 @@ private:
 
     Vector2 m_position; // Start position of the slider track
     float m_length; // Length of the track on the screen
+};
+
+class ColorSlider {
+public:
+
+    ColorSlider(Vector2 position, Slider* _r, Slider* _g, Slider* _b);
+    ColorSlider(Vector2 position, std::vector<Slider>& dest);
+
+    Color GetValue() const;
+
+private:
+    Slider *r, *g, *b;
 };
