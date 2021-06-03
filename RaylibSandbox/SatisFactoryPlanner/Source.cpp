@@ -58,6 +58,9 @@ struct ItemSlot
     unsigned int count = 0u;
 };
 
+enum class Side : unsigned char { null, input, output };
+enum class Shape : bool { part, fluid };
+
 struct Building;
 struct Port;
 struct Port
@@ -66,99 +69,98 @@ struct Port
     static constexpr int s_length = 4;
 
     Building* of; // Back pointer
+    unsigned int offset; // Position in respective array
+    Side side; // Which array it is in
+    Shape takes = Shape::part; // Whether this takes fluids or solids
     Port* to = nullptr; // Simply a connector, not at all owned by this object
     Rectangle shape = Rectangle{};
+
+    Vector2 Center() const
+    {
+        return {
+            shape.x + s_width / 2,
+            shape.y + s_length / 2
+        };
+    }
 };
 struct Building
 {
-    enum Type
+    enum class Type : unsigned short
     {
         miner,
-        storage,
-        splitter,
-        merger,
         constructor,
         assembler,
+        merger,
         manufacturer,
-        refinery,
 
-        COUNT
+        refinery,
+        coal_burner,
+        storage,
+        splitter,
     };
     Building(Type type)
     {
         switch (type)
         {
-        case Building::miner:
-            o.push_back(new Port);
-            inv.resize(1);
+        case Type::miner:
             break;
-        case Building::storage:
-            i.push_back(new Port);
-            o.push_back(new Port);
+
+        default:
+            i.resize(1); break;
+
+        case Type::refinery:
+            i.resize(2); o.resize(2);
+            i[1].takes = o[1].takes = Shape::fluid;
+            break;
+
+        case Type::coal_burner:
+            i.resize(2); i[1].takes = Shape::fluid;  break;
+
+        case Type::constructor:
+        case Type::assembler:
+        case Type::merger:
+        case Type::manufacturer:
+            i.resize((size_t)type); break;
+        }
+        switch (type)
+        {
+        case Type::refinery:
+        case Type::coal_burner:
+            break;
+
+        default:
+            o.resize(1); break;
+
+        case Type::splitter:
+            o.resize(3); break;
+        }
+
+        // Inventory
+        if (type == Type::storage)
             inv.resize(24);
-            break;
-        case Building::splitter:
-            i.push_back(new Port);
-            o.reserve(3);
-            o.push_back(new Port);
-            o.push_back(new Port);
-            o.push_back(new Port);
-            inv.resize(1);
-            break;
-        case Building::merger:
-            i.reserve(3);
-            i.push_back(new Port);
-            i.push_back(new Port);
-            i.push_back(new Port);
-            o.push_back(new Port);
-            inv.resize(1);
-            break;
-        case Building::constructor:
-            i.push_back(new Port);
-            o.push_back(new Port);
-            inv.resize(2);
-            break;
-        case Building::assembler:
-            i.reserve(2);
-            i.push_back(new Port);
-            i.push_back(new Port);
-            o.push_back(new Port);
-            inv.resize(3);
-            break;
-        case Building::manufacturer:
-            i.reserve(4);
-            i.push_back(new Port);
-            i.push_back(new Port);
-            i.push_back(new Port);
-            i.push_back(new Port);
-            o.push_back(new Port);
-            inv.resize(5);
-            break;
-        case Building::refinery:
-            i.reserve(2);
-            i.push_back(new Port);
-            i.push_back(new Port);
-            o.reserve(2);
-            o.push_back(new Port);
-            o.push_back(new Port);
-            inv.resize(4);
-            break;
-        }
-        for (Port* port : i)
+        else if (type != Type::merger && type != Type::splitter)
+            inv.resize((size_t)(i.size() + o.size()));
+        
+        // Initializing
+        for (int n = 0; n < i.size(); ++n)
         {
-            port->of = this;
+            i[n].of = this;
+            i[n].offset = n;
+            i[n].side = Side::input;
         }
-        for (Port* port : o)
+        for (int n = 0; n < o.size(); ++n)
         {
-            port->of = this;
+            o[n].of = this;
+            o[n].offset = n;
+            o[n].side = Side::output;
         }
     }
 
     static constexpr int s_padding = 4;
     static constexpr int s_length = 32;
 
-    std::vector<Port*> i; // Created and owned by this object
-    std::vector<Port*> o; // Created and owned by this object
+    std::vector<Port> i;
+    std::vector<Port> o;
     std::vector<ItemSlot> inv;
     Rectangle shape = Rectangle{};
 };
@@ -166,19 +168,22 @@ struct Building
 
 // Returns true on success (will not connect if connections are full)
 // src must be on output side, dest must be on input side
-bool Connect(Building* src, int portID_src, Building* dest, int portID_dest)
+bool Connect(Port* a, Port* b)
 {
-    if ((src && dest) &&
-        ((src->o.size() > portID_src) && (dest->i.size() > portID_dest)) &&
-        (src->o[portID_src] && dest->i[portID_dest]) &&
-        (!src->o[portID_src]->to && !dest->i[portID_dest]->to))
-    {
-        src->o[portID_src]->to = dest->i[portID_dest];
-        dest->i[portID_dest]->to = src->o[portID_src];
-        return true;
-    }
-    else
+    if (!a || !b || a->to || b->to)
         return false;
+
+    a->to = b;
+    b->to = a;
+    return true;
+}
+void Disconnect(Port* port)
+{
+    if (port && port->to)
+    {
+        port->to->to = nullptr;
+        port->to = nullptr;
+    }
 }
 
 float Pad(float n, float size, float padding)
@@ -215,24 +220,24 @@ void MoveBuilding(Building* building, Vector2 center)
 
     for (int i = 0; i < building->i.size(); ++i)
     {
-        building->i[i]->shape = PortRectangleAtPosition(building->shape.x + PadPort(i + (!inputHeavy * sidesDifference)) + Port::s_width / 2, building->shape.y);
+        building->i[i].shape = PortRectangleAtPosition(building->shape.x + PadPort(i + (!inputHeavy * sidesDifference)) + Port::s_width / 2, building->shape.y);
     }
     for (int o = 0; o < building->o.size(); ++o)
     {
-        building->o[o]->shape = PortRectangleAtPosition(building->shape.x + PadPort(o + (inputHeavy * sidesDifference)) + Port::s_width / 2, building->shape.y + Building::s_length);
+        building->o[o].shape = PortRectangleAtPosition(building->shape.x + PadPort(o + (inputHeavy * sidesDifference)) + Port::s_width / 2, building->shape.y + Building::s_length);
     }
 }
 void DrawBuilding(Building* building)
 {
     DrawRectangleRec(building->shape, DARKGRAY);
 
-    for (Port* i : building->i)
+    for (Port& i : building->i)
     {
-        DrawRectangleRec(i->shape, ORANGE);
+        DrawRectangleRec(i.shape, ORANGE);
     }
-    for (Port* o : building->o)
+    for (Port& o : building->o)
     {
-        DrawRectangleRec(o->shape, LIME);
+        DrawRectangleRec(o.shape, LIME);
     }
 }
 void DrawConnection(Port* a, Port* b)
@@ -248,20 +253,56 @@ void DrawConnection(Port* connection)
 struct Hover
 {
     Building* building = nullptr;
-    enum class Side { null, input, output } side;
-    int port;
+    Side side = Side::null;
+    int port = -1;
+
+    void Reset()
+    {
+        building = nullptr;
+        side = Side::null;
+        port = -1;
+    }
 
     Port* GetPort()
     {
         switch (side)
         {
-        case Hover::Side::null:
+        case Side::null:
             return nullptr;
-        case Hover::Side::input:
-            return building->i[port];
-        case Hover::Side::output:
-            return building->o[port];
+        case Side::input:
+            return &building->i[port];
+        case Side::output:
+            return &building->o[port];
         }
+    }
+
+    bool BuildingEmpty()
+    {
+        return !building;
+    }
+    bool PortEmpty()
+    {
+        return (side == Side::null) || (port == -1);
+    }
+
+    void SetAsInput(int n)
+    {
+        side = Side::input;
+        port = n;
+    }
+    void SetAsOutput(int n)
+    {
+        side = Side::output;
+        port = n;
+    }
+
+    bool IsInput()
+    {
+        return side == Side::input;
+    }
+    bool IsOutput()
+    {
+        return side == Side::output;
     }
 };
 
@@ -271,21 +312,29 @@ void DrawBuildingHighlighted(Hover* hover)
     {
         DrawRectangleRec(hover->building->shape, GRAY);
 
-        for (Port* i : hover->building->i)
+        for (Port& i : hover->building->i)
         {
-            DrawRectangleRec(i->shape, ORANGE);
+            DrawRectangleRec(i.shape, ORANGE);
         }
-        for (Port* o : hover->building->o)
+        for (Port& o : hover->building->o)
         {
-            DrawRectangleRec(o->shape, LIME);
+            DrawRectangleRec(o.shape, LIME);
         }
-        if (hover->side == Hover::Side::input)
-            DrawRectangleRec(hover->building->i[hover->port]->shape, YELLOW);
-        else if (hover->side == Hover::Side::output)
-            DrawRectangleRec(hover->building->o[hover->port]->shape, GREEN);
+        if (hover->IsInput())
+            DrawRectangleRec(hover->building->i[hover->port].shape, YELLOW);
+        else if (hover->IsOutput())
+            DrawRectangleRec(hover->building->o[hover->port].shape, GREEN);
     }
 }
 
+bool CheckCollisionPointLine(Vector2 point, Vector2 startPos, Vector2 endPos, int lineWidth)
+{
+    Vector2 perpendicular = startPos - endPos;
+    perpendicular = Vector2Normalize(perpendicular);
+    perpendicular = Vector2Rotate(perpendicular, 90.0f);
+    perpendicular *= (float)(lineWidth / 2);
+    return CheckCollisionLines(startPos, endPos, point - perpendicular, point + perpendicular, &point);
+}
 
 int main()
 {
@@ -302,15 +351,8 @@ int main()
     int clickNumber = 0;
 
     Hover hovering;
-    Hover start, end;
-
-    enum class State
-    {
-        normal,
-        select_start,
-        select_end,
-        dragging,
-    } state = State::normal;
+    Hover connectBuff;
+    Building::Type buildingType = Building::Type::assembler;
 
     while (!WindowShouldClose())
     {
@@ -318,93 +360,118 @@ int main()
         *   Simulate frame and update variables   *
         ******************************************/
 
-        hovering = { nullptr, Hover::Side::null, -1 };
+        hovering.Reset();
+        // Locate hovered building
         for (Building* building : buildings)
         {
-            if (CheckCollisionPointRec(GetMousePosition(), Rectangle{ building->shape.x, building->shape.y - Port::s_length / 2, building->shape.width, building->shape.height + Port::s_length }))
+            Rectangle paddedCollision{
+                building->shape.x,
+                building->shape.y - Port::s_length / 2,
+                building->shape.width,
+                building->shape.height + Port::s_length
+            };
+            if (CheckCollisionPointRec(GetMousePosition(), paddedCollision))
             {
                 hovering.building = building;
-
-                for (int i = 0; i < building->i.size(); ++i)
-                {
-                    if (CheckCollisionPointRec(GetMousePosition(), building->i[i]->shape))
-                    {
-                        hovering.port = i;
-                        hovering.side = Hover::Side::input;
-                        break;
-                    }
-                }
-                if (hovering.side != Hover::Side::null)
-                    break;
-
-                for (int i = 0; i < building->o.size(); ++i)
-                {
-                    if (CheckCollisionPointRec(GetMousePosition(), building->o[i]->shape))
-                    {
-                        hovering.port = i;
-                        hovering.side = Hover::Side::output;
-                        break;
-                    }
-                }
                 break;
             }
         }
+        // Locate hovered port
+        if (!hovering.BuildingEmpty())
+        {
+            for (int i = 0; hovering.PortEmpty() && i < hovering.building->i.size(); ++i)
+            {
+                if (CheckCollisionPointRec(GetMousePosition(), hovering.building->i[i].shape))
+                {
+                    hovering.SetAsInput(i);
+                    break;
+                }
+            }
 
+            for (int i = 0; hovering.PortEmpty() && i < hovering.building->o.size(); ++i)
+            {
+                if (CheckCollisionPointRec(GetMousePosition(), hovering.building->o[i].shape))
+                {
+                    hovering.SetAsOutput(i);
+                    break;
+                }
+            }
+        }
+
+        // Locate hovered wire
+        if (hovering.BuildingEmpty())
+        {
+            for (Building* building : buildings)
+            {
+                for (const Port& port : building->o)
+                {
+                    if (!port.to)
+                        continue;
+
+                    if (CheckCollisionPointLine(GetMousePosition(), port.Center(), port.to->Center(), 3))
+                    {
+                        printf("hovering wire"); // todo
+                        break;
+                    }
+                }
+            }
+        }
+
+        // Left click
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
         {
-            if (hovering.side != Hover::Side::null)
+            if (!hovering.PortEmpty())
             {
-                switch (state)
+                if (!connectBuff.PortEmpty())
                 {
-                case State::normal:         state = State::select_start; break;
-                case State::select_start:   state = State::select_end;   break;
-                case State::select_end:     state = State::normal;       break;
+                    if (!connectBuff.PortEmpty() && !hovering.PortEmpty())
+                        Connect(connectBuff.GetPort(), hovering.GetPort());
+
+                    connectBuff.Reset();
+                }
+                else
+                {
+                    connectBuff = hovering;
                 }
             }
             else
             {
-                if (hovering.building)
-                    state = State::dragging;
-                else
-                    state = State::normal;
-            }
-
-            switch (state)
-            {
-            case State::normal: {
-                Building* newBuild = new Building(Building::Type(clickNumber % Building::COUNT));
+                Building* newBuild = new Building(buildingType);
                 MoveBuilding(newBuild, GetMousePosition());
                 buildings.push_back(newBuild);
                 clickNumber++;
-                }
-                break;
-            case State::select_start:
-                if (hovering.side == Hover::Side::input)
-                    end = hovering;
-                else if (hovering.side == Hover::Side::output)
-                    start = hovering;
-                break;
-            case State::select_end:
-                if (hovering.side == Hover::Side::input)
-                    end = hovering;
-                else if (hovering.side == Hover::Side::output)
-                    start = hovering;
-
-                if (start.side != Hover::Side::null && end.side != Hover::Side::null)
-                {
-                    Connect(start.building, start.port, end.building, end.port);
-                }
-                start.side = end.side = Hover::Side::null;
-                state = State::normal;
-                break;
-            case State::dragging:
-                // todo
-                break;
             }
         }
-        else if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && state == State::dragging)
+        // Right click
+        else if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) // Destroy building
         {
-            state = State::normal;
+            if (hovering.building)
+            {
+                for (size_t i = 0; i < buildings.size(); ++i)
+                {
+                    if (buildings[i] == hovering.building)
+                    {
+                        for (Port& port : hovering.building->i)
+                        {
+                            Disconnect(&port);
+                        }
+                        for (Port& port : hovering.building->o)
+                        {
+                            Disconnect(&port);
+                        }
+                        buildings.erase(buildings.begin() + i);
+                        delete hovering.building;
+                        hovering.building = nullptr;
+                        break;
+                    }
+                }
+            }
+        }
+        // Hotkey
+        if (int key = GetKeyPressed())
+        {
+            if (key >= KEY_ZERO && key <= KEY_NINE)
+                buildingType = Building::Type(key - KEY_ZERO);
         }
 
         /******************************************
@@ -420,17 +487,16 @@ int main()
                 DrawBuilding(building);
             }
             DrawBuildingHighlighted(&hovering);
-            if (state == State::select_start)
+            if (!connectBuff.PortEmpty())
             {
-                DrawBuildingHighlighted(&start);
-                Port* port = start.GetPort();
-                DrawLineV({ port->shape.x + port->s_width / 2, port->shape.y + port->s_length / 2 }, GetMousePosition(), BLUE);
+                DrawBuildingHighlighted(&connectBuff);
+                DrawLineV(connectBuff.GetPort()->Center(), GetMousePosition(), BLUE);
             }
             for (Building* building : buildings)
             {
-                for (Port* port : building->o)
+                for (Port& port : building->o)
                 {
-                    DrawConnection(port);
+                    DrawConnection(&port);
                 }
             }
 
@@ -443,14 +509,6 @@ int main()
 
     for (Building* building : buildings)
     {
-        for (Port* port : building->i)
-        {
-            delete port;
-        }
-        for (Port* port : building->o)
-        {
-            delete port;
-        }
         delete building;
     }
 
