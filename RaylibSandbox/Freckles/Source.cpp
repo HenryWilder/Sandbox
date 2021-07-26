@@ -1,7 +1,9 @@
 #include <time.h>
 #include <stdlib.h>
 #include <raylib.h>
+#include <rlgl.h>
 #include <raymath.h>
+#include <vector>
 
 using Vector1 = float;
 
@@ -58,6 +60,67 @@ Color ColorHSVBlend(Color y0, Color y1, float t)
     return ColorFromHSV(lerp_result.x, lerp_result.y, lerp_result.z);
 }
 
+struct ModelLighting
+{
+    RenderTexture2D tex_freckles;
+    RenderTexture2D tex_frecklesTemp;
+    RenderTexture2D tex_lighting;
+    RenderTexture2D tex_accum;
+    Model body;
+    Model lightBake;
+};
+std::vector<ModelLighting*> models;
+void SetupModel(Model model, int texW, int texH)
+{
+    RenderTexture2D tex_freckles = LoadRenderTexture(texW, texH);
+    BeginTextureMode(tex_freckles); {
+
+        ClearBackground({ 0,0,0, 0 });
+
+    } EndTextureMode();
+    RenderTexture2D tex_frecklesTemp = LoadRenderTexture(texW, texH);
+
+    RenderTexture2D tex_lighting = LoadRenderTexture(texW, texH);
+    RenderTexture2D tex_accum = LoadRenderTexture(texW, texH);
+    BeginTextureMode(tex_accum); {
+
+        ClearBackground(BLACK);
+
+    } EndTextureMode();
+
+    {
+        model.materials[0].shader = LoadShader("lighting.vert", "lighting.frag");
+
+        model.materials[0].shader.locs[LOC_MAP_ALBEDO] = GetShaderLocation(model.materials[0].shader, "lightAccum");
+        model.materials[0].shader.locs[LOC_MAP_EMISSION] = GetShaderLocation(model.materials[0].shader, "freckleMask");
+        model.materials[0].shader.locs[LOC_MAP_ROUGHNESS] = GetShaderLocation(model.materials[0].shader, "lightBake");
+
+        model.materials[0].maps[MAP_ALBEDO].texture = tex_accum.texture;
+        model.materials[0].maps[MAP_EMISSION].texture = tex_freckles.texture;
+        model.materials[0].maps[MAP_ROUGHNESS].texture = tex_lighting.texture;
+
+        SetTextureFilter(model.materials[0].maps[MAP_ALBEDO].texture, FILTER_BILINEAR);
+        SetTextureFilter(model.materials[0].maps[MAP_EMISSION].texture, FILTER_BILINEAR);
+        SetTextureFilter(model.materials[0].maps[MAP_ROUGHNESS].texture, FILTER_BILINEAR);
+    }
+
+    Material mat_lightBake = LoadMaterialDefault();
+
+    {
+        mat_lightBake.shader = LoadShader("unwrap.vert", "bake.frag");
+        model.materials[0] = GetShaderLocation(mat_lightBake.shader, "lightPos");
+        {
+            float size[2] = { (float)tex_lighting.texture.width, (float)tex_lighting.texture.height };
+            int loc = GetShaderLocation(mat_lightBake.shader, "size");
+            SetShaderValue(mat_lightBake.shader, loc, size, UNIFORM_VEC2);
+        }
+    }
+}
+void CleanupModel()
+{
+
+}
+
 int main()
 {
     int windowWidth = 1280;
@@ -79,23 +142,7 @@ int main()
 
     float freckleRadiusMin = 1.0f;
     float freckleRadiusScale = 5.0f * (float)texture1024Scale;
-    int freckleCountPerFrame = 3;
-
-    RenderTexture2D tex_freckles = LoadRenderTexture(textureWidth, textureHeight);
-    BeginTextureMode(tex_freckles); {
-
-        ClearBackground({ 0,0,0, 0 });
-
-    } EndTextureMode();
-    RenderTexture2D tex_frecklesTemp = LoadRenderTexture(textureWidth, textureHeight);
-
-    RenderTexture2D tex_lighting = LoadRenderTexture(textureWidth, textureHeight);
-    RenderTexture2D tex_accum = LoadRenderTexture(textureWidth, textureHeight);
-    BeginTextureMode(tex_accum); {
-
-        ClearBackground(BLACK);
-
-    } EndTextureMode();
+    int freckleCountPerFrame = 3;    
 
     Camera3D camera;
     camera.fovy = 45.0f;
@@ -107,52 +154,54 @@ int main()
 
     Vector3 light;
 
-    Model body;
-    Model lightCatcher;
-#if 0
-    body = LoadModel("torso.obj");
-    lightCatcher = LoadModel("torso.obj");
-#else
-    Mesh mesh0 = GenMeshSphere(1.0f, 64, 64);
-    Mesh mesh1 = GenMeshSphere(1.0f, 64, 64);
-    body = LoadModelFromMesh(mesh0);
-    lightCatcher = LoadModelFromMesh(mesh1);
-#endif
-
-    body.materials[0] = LoadMaterialDefault();
-    int uniformLoc_LightPos[2];
-
+    Model bodies[2];
+    Model lightCatchers[2];
+    bodies[0] = LoadModel("torso.obj");
+    lightCatchers[0] = LoadModel("torso.obj");
     {
-        body.materials[0].shader = LoadShader("lighting.vert", "lighting.frag");
-        uniformLoc_LightPos[0] = GetShaderLocation(body.materials[0].shader, "lightPos");
+        Mesh meshes[2];
+        for (int i = 0; i < 2; ++i)
         {
-            float size[2] = { (float)tex_freckles.texture.width, (float)tex_freckles.texture.height };
-            SetShaderValue(body.materials[0].shader, GetShaderLocation(body.materials[0].shader, "size"), size, UNIFORM_VEC2);
+            meshes[i] = GenMeshSphere(1.0f, 64, 64); // Both must be identical
         }
-
-        body.materials[0].shader.locs[LOC_MAP_ALBEDO] = GetShaderLocation(body.materials[0].shader, "lightAccum");
-        body.materials[0].shader.locs[LOC_MAP_EMISSION] = GetShaderLocation(body.materials[0].shader, "freckleMask");
-        body.materials[0].shader.locs[LOC_MAP_ROUGHNESS] = GetShaderLocation(body.materials[0].shader, "lightBake");
-
-        body.materials[0].maps[MAP_ALBEDO].texture = tex_accum.texture;
-        body.materials[0].maps[MAP_EMISSION].texture = tex_freckles.texture;
-        body.materials[0].maps[MAP_ROUGHNESS].texture = tex_lighting.texture;
-
-        SetTextureFilter(body.materials[0].maps[MAP_ALBEDO].texture, FILTER_BILINEAR);
-        SetTextureFilter(body.materials[0].maps[MAP_EMISSION].texture, FILTER_BILINEAR);
-        SetTextureFilter(body.materials[0].maps[MAP_ROUGHNESS].texture, FILTER_BILINEAR);
+        bodies[1] = LoadModelFromMesh(meshes[0]);
+        lightCatchers[1] = LoadModelFromMesh(meshes[1]);
     }
 
-    lightCatcher.materials[0] = LoadMaterialDefault();
+    Material mat_body = LoadMaterialDefault();
+    int uniformLoc_LightPos;
 
     {
-        lightCatcher.materials[0].shader = LoadShader("unwrap.vert", "bake.frag");
-        uniformLoc_LightPos[1] = GetShaderLocation(lightCatcher.materials[0].shader, "lightPos");
+        mat_body.shader = LoadShader("lighting.vert", "lighting.frag");
+
+        mat_body.shader.locs[LOC_MAP_ALBEDO] = GetShaderLocation(mat_body.shader, "lightAccum");
+        mat_body.shader.locs[LOC_MAP_EMISSION] = GetShaderLocation(mat_body.shader, "freckleMask");
+        mat_body.shader.locs[LOC_MAP_ROUGHNESS] = GetShaderLocation(mat_body.shader, "lightBake");
+        
+        mat_body.maps[MAP_ALBEDO].texture = tex_accum.texture;
+        mat_body.maps[MAP_EMISSION].texture = tex_freckles.texture;
+        mat_body.maps[MAP_ROUGHNESS].texture = tex_lighting.texture;
+
+        SetTextureFilter(mat_body.maps[MAP_ALBEDO].texture, FILTER_BILINEAR);
+        SetTextureFilter(mat_body.maps[MAP_EMISSION].texture, FILTER_BILINEAR);
+        SetTextureFilter(mat_body.maps[MAP_ROUGHNESS].texture, FILTER_BILINEAR);
+    }
+    for (Model& body : bodies)
+        body.materials[0] = mat_body;
+
+    Material mat_lightBake = LoadMaterialDefault();
+
+    {
+        mat_lightBake.shader = LoadShader("unwrap.vert", "bake.frag");
+        uniformLoc_LightPos = GetShaderLocation(mat_lightBake.shader, "lightPos");
         {
             float size[2] = { (float)tex_lighting.texture.width, (float)tex_lighting.texture.height };
-            SetShaderValue(lightCatcher.materials[0].shader, GetShaderLocation(lightCatcher.materials[0].shader, "size"), size, UNIFORM_VEC2);
+            int loc = GetShaderLocation(mat_lightBake.shader, "size");
+            SetShaderValue(mat_lightBake.shader, loc, size, UNIFORM_VEC2);
         }
     }
+    for (Model& lc : lightCatchers)
+        lc.materials[0] = mat_lightBake;
 
     Shader shd_accum = LoadShader(0, "accumulate.frag");
     Shader shd_gray = LoadShader(0, "grayscale.frag");
@@ -165,14 +214,14 @@ int main()
 
         // Move light source
         {
+            constexpr float distance = 16.0f; // 16.0f
             float t = GetTime();
-            light.x = cosf(t) * 16.0f;
+            light.x = cosf(t) * distance;
             //light.y = 0.0f;
-            light.y = sinf(t) * 16.0f;
-            light.z = sinf(t) * 16.0f;
+            light.y = sinf(t) * distance;
+            light.z = sinf(t) * distance;
             float pos[3] = { light.x, light.y, light.z };
-            SetShaderValue(body.materials[0].shader, uniformLoc_LightPos[0], pos, UNIFORM_VEC3);
-            SetShaderValue(lightCatcher.materials[0].shader, uniformLoc_LightPos[1], pos, UNIFORM_VEC3);
+            SetShaderValue(mat_lightBake.shader, uniformLoc_LightPos, pos, UNIFORM_VEC3);
         }
 
         UpdateCamera(&camera);
@@ -183,7 +232,8 @@ int main()
         BeginTextureMode(tex_lighting); {
 
             ClearBackground(BLACK);
-            DrawModel(lightCatcher, Vector3Zero(), 1.0f, WHITE);
+            for (Model& lc : lightCatchers)
+                DrawModel(lc, Vector3Zero(), 1.0f, WHITE);
 
         } EndTextureMode();
         // Blur & reduce accumulated light
@@ -316,8 +366,8 @@ int main()
     UnloadRenderTexture(tex_lighting);
     UnloadRenderTexture(tex_accum);
     UnloadShader(bloom);
-    UnloadShader(body.materials[0].shader);
-    UnloadShader(lightCatcher.materials[0].shader);
+    UnloadShader(mat_body.shader);
+    UnloadShader(mat_lightBake.shader);
     UnloadModel(body);
     UnloadModel(lightCatcher);
 

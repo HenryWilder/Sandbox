@@ -44,5 +44,8 @@
     <None Include="grayscale.frag">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="EyeShader.frag">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

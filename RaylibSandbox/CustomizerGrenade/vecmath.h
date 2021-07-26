@@ -42,14 +42,6 @@ inline Vector2& operator/=(Vector2& a, Vector2 b) noexcept { return (a = Vector2
 inline Vector2  operator/ (Vector2  a, float div) noexcept { return      Vector2Scale(a, 1.0f / div);    }
 inline Vector2& operator/=(Vector2& a, float div) noexcept { return (a = Vector2Scale(a, 1.0f / div));   }
 
-inline Vector2 Vector2Lerp(Vector2 a, Vector2 b, float t)
-{
-	return {
-		_VECM _lerp(a.x, b.x, t),
-		_VECM _lerp(a.x, b.x, t)
-	};
-}
-
 struct Flt2Ref {
 	Flt2Ref(Vector2& vec)
 		: x(&vec.x), y(&vec.y) {}
@@ -61,24 +53,23 @@ struct Flt2Ref {
 	float* const x;
 	float* const y;
 
-	operator Vector2() {
-		return { *x,*y };
-	}
+	operator Vector2() const { return { *x,*y }; }
 
 	Flt2Ref& operator=(Vector2 v) {
 		*x = v.x;
 		*y = v.y;
 		return *this;
 	}
+
+	Flt2Ref& operator+=(Vector2 b) { return (*this = (*this + b)); }
+	Flt2Ref& operator+=(float v)   { return (*this = (*this + v)); }
+	Flt2Ref& operator-=(Vector2 b) { return (*this = (*this - b)); }
+	Flt2Ref& operator-=(float v)   { return (*this = (*this - v)); }
+	Flt2Ref& operator*=(Vector2 b) { return (*this = (*this * b)); }
+	Flt2Ref& operator*=(float s)   { return (*this = (*this * s)); }
+	Flt2Ref& operator/=(Vector2 b) { return (*this = (*this / b)); }
+	Flt2Ref& operator/=(float d)   { return (*this = (*this / d)); }
 };
-inline Flt2Ref& operator+=(Flt2Ref& a, Vector2 b) noexcept { return (a = (a + b));		}
-inline Flt2Ref& operator+=(Flt2Ref& a, float val) noexcept { return (a = (a + val));	}
-inline Flt2Ref& operator-=(Flt2Ref& a, Vector2 b) noexcept { return (a = (a - b));		}
-inline Flt2Ref& operator-=(Flt2Ref& a, float val) noexcept { return (a = (a - val));	}
-inline Flt2Ref& operator*=(Flt2Ref& a, Vector2 b) noexcept { return (a = (a * b));		}
-inline Flt2Ref& operator*=(Flt2Ref& a, float scl) noexcept { return (a = (a * scl));	}
-inline Flt2Ref& operator/=(Flt2Ref& a, Vector2 b) noexcept { return (a = (a / b));		}
-inline Flt2Ref& operator/=(Flt2Ref& a, float div) noexcept { return (a = (a / div));	}
 
 // Vector3
 
@@ -122,9 +113,7 @@ struct Flt3Ref {
 	float* const y;
 	float* const z;
 
-	operator Vector3() {
-		return { *x,*y,*z };
-	}
+	operator Vector3() { return { *x,*y,*z }; }
 
 	Flt3Ref& operator=(Vector3 v) {
 		*x = v.x;
@@ -132,22 +121,22 @@ struct Flt3Ref {
 		*z = v.z;
 		return *this;
 	}
+	Flt3Ref& operator+=(Vector3 b) { return (*this = (*this + b)); }
+	Flt3Ref& operator+=(float v)   { return (*this = (*this + v)); }
+	Flt3Ref& operator-=(Vector3 b) { return (*this = (*this - b)); }
+	Flt3Ref& operator-=(float v)   { return (*this = (*this - v)); }
+	Flt3Ref& operator*=(Vector3 b) { return (*this = (*this * b)); }
+	Flt3Ref& operator*=(float s)   { return (*this = (*this * s)); }
+	Flt3Ref& operator/=(Vector3 b) { return (*this = (*this / b)); }
+	Flt3Ref& operator/=(float d)   { return (*this = (*this / d)); }
 };
-inline Flt3Ref& operator+=(Flt3Ref& a, Vector3 b) noexcept { return (a = (a + b));		}
-inline Flt3Ref& operator+=(Flt3Ref& a, float val) noexcept { return (a = (a + val));	}
-inline Flt3Ref& operator-=(Flt3Ref& a, Vector3 b) noexcept { return (a = (a - b));		}
-inline Flt3Ref& operator-=(Flt3Ref& a, float val) noexcept { return (a = (a - val));	}
-inline Flt3Ref& operator*=(Flt3Ref& a, Vector3 b) noexcept { return (a = (a * b));		}
-inline Flt3Ref& operator*=(Flt3Ref& a, float scl) noexcept { return (a = (a * scl));	}
-inline Flt3Ref& operator/=(Flt3Ref& a, Vector3 b) noexcept { return (a = (a / b));		}
-inline Flt3Ref& operator/=(Flt3Ref& a, float div) noexcept { return (a = (a / div));	}
 
 #pragma endregion
 
 #pragma region Rectangle math
 
-inline Flt2Ref RecSize(Rectangle& rec) noexcept { return { rec.width, rec.height }; }
-inline Flt2Ref RecPos (Rectangle& rec) noexcept { return { rec.x,		rec.y };	}
+inline Flt2Ref RecSize(Rectangle& rec) noexcept { return Flt2Ref{ rec.width, rec.height };	}
+inline Flt2Ref RecPos (Rectangle& rec) noexcept { return Flt2Ref{ rec.x,		rec.y };	}
 
 inline float   RecLeft			(Rectangle rec) noexcept { return rec.x;								}
 inline float   RecRight			(Rectangle rec) noexcept { return rec.x + rec.width;					}
@@ -183,7 +172,8 @@ _VECM_END
 
 // Interpolates between two colors
 inline Color ColorCombine(Color a, Color b, float t) noexcept {
-#ifdef _FVEC_H_INCLUDED
+	Color out;
+#if defined _FVEC_H_INCLUDED && 0
 	const F32vec4 scale{ _VECM scaleFactor };
 	const F32vec4 scaleInv{ 1.0f / _VECM scaleFactor };
 	F32vec4 a1{ (float)(a.r), (float)(a.g), (float)(a.b), (float)(a.a) }; a1 *= scaleInv;
@@ -191,20 +181,21 @@ inline Color ColorCombine(Color a, Color b, float t) noexcept {
 	F32vec4 t1 = F32vec4{ t };
 	a1 += t1 * (b1 - a1); // Lerp
 	a1 *= scale;
-	return Color{
+	out = {
 		static_cast<unsigned char>(roundf(_VECM _saturate(a1[0]))),
 		static_cast<unsigned char>(roundf(_VECM _saturate(a1[1]))),
 		static_cast<unsigned char>(roundf(_VECM _saturate(a1[2]))),
 		static_cast<unsigned char>(roundf(_VECM _saturate(a1[3])))
 	};
 #else // !_FVEC_H_INCLUDED
-	return Color{
+	out = {
 		_VECM _toComponent(_VECM _lerp(_VECM _toFlt(a.r), _VECM _toFlt(b.r), t)),
 		_VECM _toComponent(_VECM _lerp(_VECM _toFlt(a.g), _VECM _toFlt(b.g), t)),
 		_VECM _toComponent(_VECM _lerp(_VECM _toFlt(a.b), _VECM _toFlt(b.b), t)),
 		_VECM _toComponent(_VECM _lerp(_VECM _toFlt(a.a), _VECM _toFlt(b.a), t))
 	};
 #endif
+	return out;
 }
 
 inline Color HueShift(Color color, float amount) {

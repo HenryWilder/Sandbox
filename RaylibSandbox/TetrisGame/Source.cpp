@@ -1,6 +1,7 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <memory.h>
 
 #define sign(x) (((x) > (decltype(x))(0)) - ((x) < (decltype(x))(0)))
@@ -184,7 +185,7 @@ const Piece g_pieces[] =
     }
 };
 
-Color& GetBlockColor(BlockID id)
+const Color& GetBlockColor(BlockID id)
 {
     return g_pallet[id];
 }
@@ -210,6 +211,35 @@ struct Board
     }
 
     T spaces[size()];
+
+    void Log()
+    {
+        size_t i = 0;
+        for (size_t y = 0; y < _height; ++y)
+        {
+            for (size_t y = 0; y < _width; ++y)
+            {
+                char c;
+                switch (spaces[i])
+                {
+                case BLOCK_NULL: c = ' '; break;
+                case BLOCK_BORDER: c = '#'; break;
+                case BLOCK_I: c = 'I'; break;
+                case BLOCK_J: c = 'J'; break;
+                case BLOCK_L: c = 'L'; break;
+                case BLOCK_O: c = 'O'; break;
+                case BLOCK_S: c = 'S'; break;
+                case BLOCK_T: c = 'T'; break;
+                case BLOCK_Z: c = 'Z'; break;
+                default: c = '?'; break;
+                }
+                putchar(c);
+                ++i;
+            }
+            puts("");
+        }
+        puts("");
+    }
 
     T& operator[](int i)
     {
@@ -237,7 +267,7 @@ struct Board
         }
     }
 
-    bool CheckCollisionShape(BlockID id, size_t rotation, size_t x, size_t y)
+    bool CheckCollisionShape(BlockID id, size_t rotation, size_t x, size_t y) const
     {
         const Shape& shape = GetShape(id,rotation);
         const Int2 baseOffset = { x,y };
@@ -287,8 +317,12 @@ struct Board
         const size_t copySize = chunkSize - borderOffsetTop;    // Size from A to D
         T* const offsetPos = guts + chunkSize;                  // Where the memory from the chunk A..D is getting moved to (which is A + the size of the dashed area)
 
+        Log();
+
         // Move (copy) the entire board starting at the top border and ending at the line being destroyed down a block, overwriting the lines being destroyed.
         memmove((void*)offsetPos, (void*)guts, copySize);
+
+        Log();
 
         // Now that the memory has been moved (copied), we need to reset the spaces that were originally at the top
         T* clearLine = guts;
@@ -296,6 +330,8 @@ struct Board
         {
             memset((void*)clearLine, clearValue, gutsWidth);
         }
+
+        Log();
     }
 };
 
@@ -324,6 +360,8 @@ int main()
     constexpr size_t boardMiddle = (GameBoard::width() - 2 * borderWidth) / 2ull + borderWidth;
     size_t positionX;
     size_t positionY;
+    size_t predictionY;
+    bool simulationDirty = true;
 
     auto SpawnPiece = [&]
     {
@@ -344,7 +382,7 @@ int main()
 
     bool win = false;
 
-    constexpr size_t boardScale = 8;
+    constexpr size_t boardScale = 32;
     constexpr size_t uiWidth = 6;
     constexpr size_t windowWidth = (board.width() + uiWidth) * boardScale;
     constexpr size_t windowHeight = board.height() * boardScale;
@@ -358,6 +396,8 @@ int main()
     Texture2D blockTexture = LoadTexture("block.png");
     SetShapesTexture(blockTexture, { 0,0,32,32 });
 
+    SpawnPiece();
+
     while (!WindowShouldClose())
     {
         /******************************************
@@ -367,27 +407,14 @@ int main()
         int pXD = (int)IsKeyPressed(KEY_RIGHT) - (int)IsKeyPressed(KEY_LEFT);
         size_t pX = (size_t)((long long)positionX + (long long)pXD);
         bool canMoveX = !board.CheckCollisionShape(block_current, rotation, pX, positionY);
-        pXD *= canMoveX;
-        positionX = (size_t)((long long)positionX + (long long)pXD);
+        positionX = (size_t)((long long)positionX + (long long)(pXD * canMoveX));
+        simulationDirty |= canMoveX;
 
-        if (IsKeyPressed(KEY_UP))
-        {
-            int pRotation = (rotation - 1) % 4;
-            bool canRotatePos = !board.CheckCollisionShape(block_current, pRotation, positionX, positionY);
-            if (canRotatePos)
-            {
-                rotation = pRotation;
-            }
-        }
-        else if (IsKeyPressed(KEY_DOWN))
-        {
-            int pRotation = (rotation + 1) % 4;
-            bool canRotateNeg = !board.CheckCollisionShape(block_current, pRotation, positionX, positionY);
-            if (canRotateNeg)
-            {
-                rotation = pRotation;
-            }
-        }
+        int pRotationD = (int)IsKeyPressed(KEY_DOWN) - (int)IsKeyPressed(KEY_UP);
+        bool canRotate = !board.CheckCollisionShape(block_current, (rotation + pRotationD) % 4, positionX, positionY);
+        rotation = (rotation + (pRotationD * canRotate)) % 4;
+        simulationDirty |= canRotate;
+
         if (IsKeyPressed(KEY_RIGHT_SHIFT))
         {
             shift = level;
@@ -408,33 +435,28 @@ int main()
                 SpawnPiece();
                 if (board.CheckCollisionShape(block_current, rotation, positionX, positionY + 1)) win = true; // TODO: Needs work.
                 ++level;
+                simulationDirty = true;
             }
             else
             {
                 ++positionY;
             }
 
-            size_t startClear;
-            size_t clearSize = 0;
-            bool clearLine = false;
             for (size_t y = 1; y < board.height() - 1; ++y)
             {
-                if (!clearLine) startClear = y;
                 bool clearLine = true;
                 for (size_t x = 1; x < board.width() - 1; ++x)
                 {
-                    if (!board.at(x, y))
+                    if (board.at(x, y) == BLOCK_NULL)
                     {
                         clearLine = false;
                         break;
                     }
                 }
-                if (clearLine) ++clearSize;
-                else if (clearSize > 0) // There are lines to clear
+                if (clearLine)
                 {
-                    board.ClearChunk(startClear, clearSize, BLOCK_NULL, 1);
+                    board.ClearChunk(y, 1, BLOCK_NULL, 1);
                     score += 10;
-                    clearSize = 0;
                 }
             }
 
@@ -443,6 +465,16 @@ int main()
         else
         {
             --timer;
+        }
+
+        if (simulationDirty)
+        {
+            predictionY = positionY;
+            while (!board.CheckCollisionShape(block_current, rotation, positionX, predictionY + 1))
+            {
+                ++predictionY;
+            }
+            simulationDirty = false;
         }
 
         /******************************************
@@ -470,11 +502,15 @@ int main()
             // In-play
             {
                 Color color = GetBlockColor(block_current);
+                Color ghost = color;
+                ghost.a /= 4; // Make ghost transparent
                 for (Int2 pos : GetShape(block_current, rotation).off)
                 {
                     size_t screenX = (pos.x + positionX) * boardScale;
                     size_t screenY = (pos.y + positionY) * boardScale;
-                    DrawRectangle((int)screenX, (int)screenY, (int)boardScale, (int)boardScale, color);
+                    size_t screenYp = (pos.y + predictionY) * boardScale;
+                    DrawRectangle((int)screenX, (int)screenY,  (int)boardScale, (int)boardScale, color);
+                    DrawRectangle((int)screenX, (int)screenYp, (int)boardScale, (int)boardScale, ghost);
                 }
             }
             // UI

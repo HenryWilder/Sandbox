@@ -1,7 +1,14 @@
 #include <raylib.h>
 #include <raymath.h>
+#include <physac.h>
 #include <vector>
 #include <array>
+
+#ifdef _DEBUG
+#define _EDITOR 1
+#else
+#define _EDITOR 0
+#endif
 
 Texture g_spritesheet;
 
@@ -9,6 +16,8 @@ enum class TileType
 {
     Air,
     Grass,
+
+    Number
 };
 
 void DrawTiled(int offsetx, int offsety, int x, int y, int width, int height)
@@ -106,12 +115,18 @@ void DrawTileRegion(TileType material, Rectangle shape)
 
 struct Block
 {
-    Block() {}
-    Block(TileType _material) : material(_material) {}
-    Block(TileType _material, Slice _side) : material(_material), side(_side) {}
+    Block()                                 : material(TileType::Air),  side(Slice::MidMid) {}
+    Block(TileType _material)               : material(_material),      side(Slice::MidMid) {}
+    Block(TileType _material, Slice _side)  : material(_material),      side(_side)         {}
 
-    TileType material = TileType::Air;
-    Slice side = Slice::MidMid;
+    TileType material;
+    Slice side;
+
+#ifdef _EDITOR
+
+
+
+#endif
 };
 #define B(...) Block(__VA_ARGS__)
 std::array<Block, 32 * 32> g_world{
@@ -160,6 +175,23 @@ bool CheckCollisionWorld(Rectangle rec)
     return (int)g_world.at((int)truncf(rec.y * 32.0f + rec.x)).material;
 }
 
+// Turns a worldspace position into a block index
+size_t WorldPosToBlockIndex(Vector2 pos)
+{
+    int x = (int)pos.x;
+    int y = (int)pos.y;
+    long long int* temp = reinterpret_cast<long long int*>(&x); // Reinterpret the x and y ints (32 bits each) as a single long long int (64 bits) so the math can be applied to both simultaniously
+    *temp >>= 4; // Divide by 16 but cheaper because it's a bitwise shift. Only possible because 16 is a power of two.
+    *temp = ~((~*temp) | 0b0000000000000000000000000000000011110000000000000000000000000000); // clean the 4 bits from the shift, since the two values were sharing a register in the calculation.
+
+    // Example: We want to set the middle two bits to zero always.
+    // ~1100       -> 0011 (invert the bits)
+    // 0011 | 0110 -> 0111 (turn the middle bits into 1s whether they're 1 or 0)
+    // ~0111       -> 1000 (re-invert the bits back to normal)
+
+    return ((y) * 32) + (x); // Make the position into an index in the 32x32 array
+}
+
 int main()
 {
     int windowWidth = 1280;
@@ -181,15 +213,25 @@ int main()
     Vector2 playerPos = {0,0};
     Vector2 playerVelocity = { 0, 0.1f };
     Rectangle playerCollision = { 0, 0, 16, 16 };
-    std::vector<Rectangle> worldCollision = { { 0, 8 * 16, 8 * 16, 4 * 16 }, { 12 * 16, 7 * 16, 10 * 16, 2 * 16 } };
 
-    auto TestWorldCollision = [&playerCollision, &worldCollision]()
+    auto TestWorldCollision = [&playerPos, &playerCollision]()
     {
-        for (Rectangle& coll : worldCollision)
+        int playerBlockY = ((int)playerPos.y / 16);
+        int playerBlockX = ((int)playerPos.x / 16);
+
+        for (int y = ((int)playerPos.y > 0 ? -1 : 0); y <= ((int)playerPos.y < 31 ? 1 : 0); ++y)
         {
-            if (CheckCollisionRecs(playerCollision, coll)) return &coll;
+            for (int x = ((int)playerPos.x > 0 ? -1 : 0); x <= ((int)playerPos.x < 31 ? 1 : 0); ++x)
+            {
+                Block& block = g_world[WorldPosToBlockIndex({ (int)truncf(x),(int)truncf(y) })];
+                if (block.material != TileType::Air)
+                {
+                    Rectangle rec{ ((int)playerPos.x + x), ((int)playerPos.y + y), 16, 16 };
+                    if (CheckCollisionRecs(playerCollision, rec)) return rec;
+                }
+            }
         }
-        return (Rectangle*)nullptr;
+        return Rectangle{ 0,0,0,0 };
     };
 
     while (!WindowShouldClose() && playerPos.y < windowHeight)
@@ -224,10 +266,11 @@ int main()
         playerCollision.y = playerPos.y;
 
         // Collisions
-        if (Rectangle* rec = TestWorldCollision())
+        Rectangle rec = TestWorldCollision();
+        if (rec.x)
         {
             playerVelocity.y = 0.0f;
-            playerCollision.y = rec->y - playerCollision.height;
+            playerCollision.y = rec.y - playerCollision.height;
             playerPos.x = playerCollision.x;
             playerPos.y = playerCollision.y;
 
@@ -238,6 +281,18 @@ int main()
                 playerCollision.y = playerPos.y += playerVelocity.y;
             }
         }
+
+#ifdef _EDITOR
+
+        Vector2 mousePos = GetMousePosition();
+        Block& selection = g_world[((int)mousePos.y / 16) * 32 + ((int)mousePos.x / 16)];
+
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+        {
+            selection.material = (TileType)(((int)selection.material + 1) % (int)TileType::Number);
+        }
+
+#endif
 
         /******************************************
         *   Draw the frame

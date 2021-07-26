@@ -15,8 +15,8 @@ uniform vec4 colDiffuse;
 out vec4 finalColor;
 
 // NOTE: Add here your custom variables
-uniform vec2 size = vec2(1024,2048);  // render size
-uniform vec3 lightPos = vec3(-5.0,5.0,5.0);
+uniform vec2 size = vec2(2048,2048);  // render size (1024,2048)
+uniform vec3 lightPos = vec3(-16.0,16.0,16.0);
 
 const float shininess = 16.0;
 
@@ -58,4 +58,5 @@ void main()
     float specularBrightness = clamp(specular * lightPower / dist, 0.0, 1.0);
 
 	finalColor = vec4(vec3(ambientBrightness, diffuseBrightness, specularBrightness), 1.0);
+    //finalColor = vec4(1.0);
 }

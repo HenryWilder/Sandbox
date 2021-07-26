@@ -165,11 +165,14 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="interp.cpp" />
+    <ClCompile Include="particles.cpp" />
+    <ClCompile Include="Random.cpp" />
     <ClCompile Include="Source.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="interp.h" />
     <ClInclude Include="particles.h" />
+    <ClInclude Include="random.h" />
     <ClInclude Include="vecmath.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

@@ -1,4 +1,5 @@
 #pragma once
+#if 0
 #include <array>
 struct Pos {
 	Pos() : x(), y() {};
@@ -190,3 +191,4 @@ private:
 struct Vector2D
 {
 };
+#endif

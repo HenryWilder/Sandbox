@@ -87,11 +87,3 @@ struct InterpDelegate {
 private:
 	InterpDelegate_Const f;
 };
-
-template<typename T, int NUM>
-struct InterpDelegateV : public InterpDelegate {
-	T[NUM] operator()(T a[NUM], T b[NUM], double t) const {
-
-		return (f(a, b, t));
-	}
-};

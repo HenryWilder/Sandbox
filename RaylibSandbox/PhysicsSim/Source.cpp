@@ -221,6 +221,21 @@ using MassPoint2D = Math2D::MassPoint;
 using Spring2D = Math2D::Spring;
 using Triangle2D = Math2D::Triangle;
 
+
+struct RigidBody
+{
+    RigidBody(Vector2 pos, float mass, float bounce) : x(pos), v(Vector2Zero()), F(Vector2Zero()), Fc(Vector2Zero()), m(mass), b(bounce) {}
+
+    Vector2 x; // Position
+    Vector2 com; // Center of mass
+    Vector2 v; // Velocity
+    Vector2 F; // Force
+    Vector2 Fc; // Cumulative spring force
+    float m; // Mass
+    float r; // Rotation
+    float b; // Bounciness
+};
+
 int main()
 {
     int windowWidth = 1280;
@@ -234,9 +249,28 @@ int main()
 
     // TODO: Load persistent assets & variables
 
-    MassPoint2D points[]{ MassPoint2D({ 32.0f, 14.0f }, 1.0f, 0.2f), MassPoint2D({ 5.0f, 10.0f }, 1.0f, 0.2f) };
-    Spring2D springs[]{ Spring2D(points + 0, points + 1, 0.6f, 3.0f, 0.1f) };
-    Triangle2D world[]{ Triangle2D{ { 3.0f, 54.0f }, { 64.0f, 54.0f }, { 3.0f, 32.0f } }, Triangle2D{ { 48.0f, 72.0f }, { 64.0f, 75.0f }, { 66.0f, 32.0f } } };
+    //MassPoint2D points[]
+    //{
+    //    MassPoint2D({ 32.0f, 16.0f }, 1.0f, 0.2f),
+    //    MassPoint2D({ 32.0f, 32.0f }, 1.0f, 0.2f),
+    //    MassPoint2D({ 16.0f, 32.0f }, 1.0f, 0.2f),
+    //    MassPoint2D({ 16.0f, 16.0f }, 1.0f, 0.2f),
+    //};
+    //Spring2D springs[]
+    //{
+    //    Spring2D(points + 0, points + 1, 0.9f, 3.0f, 0.5f),
+    //    Spring2D(points + 1, points + 2, 0.9f, 3.0f, 0.5f),
+    //    Spring2D(points + 2, points + 3, 0.9f, 3.0f, 0.5f),
+    //    Spring2D(points + 3, points + 0, 0.9f, 3.0f, 0.5f),
+    //
+    //    Spring2D(points + 0, points + 2, 0.9f, 5.0f, 0.5f),
+    //    Spring2D(points + 1, points + 3, 0.9f, 5.0f, 0.5f),
+    //};
+    Triangle2D world[]
+    {
+        Triangle2D{ { 3.0f, 54.0f }, { 64.0f, 54.0f }, { 3.0f, 32.0f } },
+        Triangle2D{ { 48.0f, 72.0f }, { 64.0f, 75.0f }, { 66.0f, 32.0f } },
+    };
 
     Vector2 gravity = { 0.0f, 9.8f };
 
