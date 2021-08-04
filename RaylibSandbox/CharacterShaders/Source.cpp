@@ -173,6 +173,98 @@ void main()
     return lightPosLoc;
 }
 
+
+struct CircleSlider
+{
+    bool beingDragged = false;
+    float value;
+    float radius;
+    Vector2 center;
+
+    constexpr float GetHandleRadius()
+    {
+        return 5.0f;
+    }
+    Vector2 GetHandleCenter()
+    {
+        return {
+            center.x + cosf(value * 2.0f * PI) * radius,
+            center.y + sinf(value * 2.0f * PI) * radius
+        };
+    }
+    bool OnRail(Vector2 pt)
+    {
+        return abs(Vector2Distance(center, pt) - radius) < GetHandleRadius();
+    }
+    bool OnHandle(Vector2 pt)
+    {
+        return Vector2Distance(GetHandleCenter(), pt) < GetHandleRadius();
+    }
+    void Update(Vector2 pt)
+    {
+        value = Vector2Angle(center, pt) / 360.0f;
+    }
+    void DrawRail(Color color)
+    {
+        DrawCircleV(center, radius + 1.0f, color);
+        DrawCircleV(center, radius - 1.0f, BLACK);
+    }
+    void DrawFacingArrow(float turns, Color color)
+    {
+        static float r2o2 = sqrtf(2.0f) / 2.0f;
+        Vector2 a, b, c;
+
+        a = { 1.0f, 0.0f };
+        b = { -r2o2, r2o2 };
+        c = { -r2o2, -r2o2 };
+
+        a = Vector2Rotate(a, turns * 360.0f);
+        b = Vector2Rotate(b, turns * 360.0f);
+        c = Vector2Rotate(c, turns * 360.0f);
+
+        a = center + (a * 20.0f);
+        b = center + (b * 20.0f);
+        c = center + (c * 20.0f);
+
+        DrawTriangle(a, c, b, color);
+    }
+    void DrawBearingArrow(float turns, Color color)
+    {
+        static float r2o2 = sqrtf(2.0f) / 2.0f;
+        Vector2 a, b, c;
+
+        float cosX = cosf(turns * 2.0f * PI);
+
+        a = { cosX, 0.0f };
+        b = { -cosX, r2o2 };
+        c = { -cosX, -r2o2 };
+
+        a = center + (a * 20.0f);
+        b = center + (b * 20.0f);
+        c = center + (c * 20.0f);
+
+        if (cosX > 0.0f)
+            DrawTriangle(a, c, b, color);
+        else {
+            DrawTriangle(a, b, c, {
+                (unsigned char)(255 - color.r),
+                (unsigned char)(255 - color.g),
+                (unsigned char)(255 - color.b),
+                color.a });
+        }
+    }
+    void DrawHandle(Color color)
+    {
+        DrawCircleV(GetHandleCenter(), GetHandleRadius(), color);
+    }
+    void DrawHandleAt(Vector2 pt, Color color)
+    {
+        DrawCircleV(center + (Vector2Normalize(pt - center) * radius), GetHandleRadius(), color);
+    }
+};
+
+// TODO: Make slider for light distance & brightness
+
 int main()
 {
     int windowWidth = 1280;
@@ -218,10 +310,13 @@ R"txt(
     
     float brightness = (ambientBrightness + diffuseBrightness * 0.5 + specularBrightness * 0.3) * 0.15;
 
-    float facing = (dot(normalize(fragPosition), normalize(lightPos)) + dot(fragNormal, normalize(lightPos))) * 0.5;
+    float facing = dot(fragNormal, normalize(lightPos - fragPosition));
     vec3 diffuseColor = mix(skin, skinShade, clamp(facing, -0.125, 0.0) * -8.0);
 
     diffuseColor = mix(diffuseColor, skinShine, max(facing - 0.9, 0.0) / (1.0 - 0.9));
+
+    if (facing > 0.99)
+        diffuseColor += (facing - 0.99) * 20.0;
 
     finalColor = vec4(mix(diffuseColor, emissiveColor, freckle), 1.0);
 )txt"
@@ -238,9 +333,9 @@ R"txt(
 
     vec3 color = mix(glow, shine, clamp(((fragPosition.y + 1.0) * 0.5 * clamp(fragBrightness, 0.0, 1.0) * 1.5) - 0.25, 0.0, 1.0));
 
-    float facing = dot(normalize(fragPosition.xyz), normalize(lightPos.xyz));
+    float facing = dot(fragNormal, normalize(lightPos - fragPosition));
     if (facing > 0.995)
-        color += vec3(0.1);
+        color += vec3(0.1) * 0.5 * (1.0 + cos(fragTexCoord.y * radians(360.0 * 200.0)));
 
     finalColor = vec4(color, 1.0);
 )txt"
@@ -258,9 +353,13 @@ finalColor = vec4(vec3(ambientBrightness + diffuseBrightness + specularBrightnes
     };
     size_t shader_id = 0;
 
-    Model matBall = LoadModelFromMesh(GenMeshSphere(1.0f, 64, 64));
-    matBall.materials[0] = LoadMaterialDefault();
-    int lightPosLoc = UpdateModelShader(matBall, shaders[shader_id]);
+#if 1
+    Model model = LoadModel("torso.obj");
+#else
+    Model model = LoadModelFromMesh(GenMeshSphere(1.0f, 64, 64));
+#endif
+    model.materials[0] = LoadMaterialDefault();
+    int lightPosLoc = UpdateModelShader(model, shaders[shader_id]);
 
     Vector3 lightPos;
     float lightDist = 16.0f;
@@ -273,24 +372,51 @@ finalColor = vec4(vec3(ambientBrightness + diffuseBrightness + specularBrightnes
     camera.type = CAMERA_PERSPECTIVE;
     SetCameraMode(camera, CAMERA_FREE);
 
+    CircleSlider lightOrbitSlider_Y{ false, 0, 50, { 100, 100 } };
+    CircleSlider lightOrbitSlider_Z{ false, 0, 50, { 250, 100 } };
+
     while (!WindowShouldClose())
     {
         /******************************************
         *   Simulate frame and update variables   *
         ******************************************/
 
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && lightOrbitSlider_Y.OnRail(GetMousePosition()))
+            lightOrbitSlider_Y.beingDragged = true;
+        else if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+            lightOrbitSlider_Y.beingDragged = false;
+
+        if (lightOrbitSlider_Y.beingDragged)
+            lightOrbitSlider_Y.Update(GetMousePosition());
+
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && lightOrbitSlider_Z.OnRail(GetMousePosition()))
+            lightOrbitSlider_Z.beingDragged = true;
+        else if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+            lightOrbitSlider_Z.beingDragged = false;
+
+        if (lightOrbitSlider_Z.beingDragged)
+            lightOrbitSlider_Z.Update(GetMousePosition());
+
         if (IsKeyPressed(KEY_ENTER))
         {
             shader_id = (shader_id + 1) % (sizeof(shaders) / sizeof(shaders[0]));
-            lightPosLoc = UpdateModelShader(matBall, shaders[shader_id]);
+            lightPosLoc = UpdateModelShader(model, shaders[shader_id]);
         }
 
-        lightPos.x = lightDist * 0.5f * cosf(GetTime());
-        lightPos.y = lightDist * 0.5f;
-        lightPos.z = lightDist * 0.5f * sinf(GetTime());
+        float cosY = cosf(lightOrbitSlider_Y.value * 2.0f * PI);
+        float sinY = sinf(lightOrbitSlider_Y.value * 2.0f * PI);
+        float cosZ = cosf(-lightOrbitSlider_Z.value * 2.0f * PI);
+        float sinZ = sinf(-lightOrbitSlider_Z.value * 2.0f * PI);
+
+        lightOrbitSlider_Y.radius = 50.0f * abs(cosZ);
+
+
+        lightPos.x = lightDist * 0.5f * (cosY * cosZ);
+        lightPos.y = lightDist * 0.5f * (sinZ);
+        lightPos.z = lightDist * 0.5f * (sinY * cosZ);
         {
             float pos[3] = { lightPos.x, lightPos.y, lightPos.z };
-            SetShaderValue(matBall.materials[0].shader, lightPosLoc, pos, UNIFORM_VEC3);
+            SetShaderValue(model.materials[0].shader, lightPosLoc, pos, UNIFORM_VEC3);
         }
 
         UpdateCamera(&camera);
@@ -305,11 +431,23 @@ finalColor = vec4(vec3(ambientBrightness + diffuseBrightness + specularBrightnes
 
             BeginMode3D(camera); {
 
-                DrawModel(matBall, Vector3Zero(), 1.0f, WHITE);
+                DrawModel(model, Vector3Zero(), 1.0f, WHITE);
 
                 DrawSphere(lightPos, 0.2f, WHITE);
 
             } EndMode3D();
+
+            lightOrbitSlider_Y.DrawRail(DARKGREEN);
+            lightOrbitSlider_Y.DrawFacingArrow(0.0f, GRAY);
+            lightOrbitSlider_Y.DrawHandle(lightOrbitSlider_Y.beingDragged ? GREEN : (lightOrbitSlider_Y.OnRail(GetMousePosition()) ? LIME : DARKGREEN));
+            if (lightOrbitSlider_Y.OnRail(GetMousePosition()) && !lightOrbitSlider_Y.beingDragged && !lightOrbitSlider_Y.OnHandle(GetMousePosition()))
+                lightOrbitSlider_Y.DrawHandleAt(GetMousePosition(), { 255,255,255,127 });
+
+            lightOrbitSlider_Z.DrawRail(DARKBLUE);
+            lightOrbitSlider_Z.DrawBearingArrow(-lightOrbitSlider_Y.value, LIGHTGRAY);
+            lightOrbitSlider_Z.DrawHandle(lightOrbitSlider_Z.beingDragged ? SKYBLUE : (lightOrbitSlider_Z.OnRail(GetMousePosition()) ? BLUE : DARKBLUE));
+            if (lightOrbitSlider_Z.OnRail(GetMousePosition()) && !lightOrbitSlider_Z.beingDragged && !lightOrbitSlider_Z.OnHandle(GetMousePosition()))
+                lightOrbitSlider_Z.DrawHandleAt(GetMousePosition(), { 255,255,255,127 });
 
         } EndDrawing();
     }
@@ -318,11 +456,11 @@ finalColor = vec4(vec3(ambientBrightness + diffuseBrightness + specularBrightnes
     *   Unload and free memory                *
     ******************************************/
 
-    UnloadShader(matBall.materials[0].shader);
+    UnloadShader(model.materials[0].shader);
 
-    UnloadModel(matBall);
+    UnloadModel(model);
 
-    for (Texture tex : textures)
+    for (Texture& tex : textures)
     {
         UnloadTexture(tex);
     }
