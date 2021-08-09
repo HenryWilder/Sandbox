@@ -59,13 +59,22 @@ int main()
     Shader raytrace = LoadShader(0,"RayTrace.frag");
     RenderTexture2D placeholder = LoadRenderTexture(windowWidth, windowHeight);
 
+    int cameraPositionLoc = GetShaderLocation(raytrace, "cameraPosition");
+    int cameraTargetLoc = GetShaderLocation(raytrace, "cameraTarget");
+
+    Camera3D camera = { { -50.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, 45.0f, CAMERA_PERSPECTIVE };
+    SetCameraMode(camera, CAMERA_FREE);
+
     while (!WindowShouldClose())
     {
         /******************************************
         *   Simulate frame and update variables   *
         ******************************************/
 
-        // @TODO: simulate frame
+        UpdateCamera(&camera);
+
+        SetShaderValue(raytrace, cameraPositionLoc, &camera.position, UNIFORM_VEC3);
+        SetShaderValue(raytrace, cameraTargetLoc, &camera.target, UNIFORM_VEC3);
 
         /******************************************
         *   Draw the frame                        *
