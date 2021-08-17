@@ -216,7 +216,7 @@ Component*& ComponentAtPort(Port port)
 */
 constexpr int c_portCountX = 14;
 constexpr int c_portCountY = 30;
-constexpr int c_portSize = 10;
+constexpr int c_portSize = 20;
 constexpr int c_gutterSize = 1;
 constexpr int c_deadspaceX = 10;
 constexpr int c_deadspaceY = 10;
@@ -242,6 +242,17 @@ Port BoardToScreen(int x, int y)
 }
 Port BoardToScreen(Port port) { return BoardToScreen(port.column, port.row); }
 
+Vector2 PortCenter(int x, int y)
+{
+    Port pos = BoardToScreen(x,y);
+    return (Vector2)pos + (float)c_portSize / 2.0f;
+}
+Vector2 PortCenter(Port port)
+{
+    Port pos = BoardToScreen(port);
+    return (Vector2)pos + (float)c_portSize / 2.0f;
+}
+
 void DrawPortBox(int x, int y, Color color)
 {
     Port pos = BoardToScreen(x,y);
@@ -253,13 +264,11 @@ void DrawPortBox(Port pos, Color color)
 }
 void DrawPortLine(int x1, int y1, int x2, int y2, float thickness, Color color)
 {
-    Port p1 = BoardToScreen(x1,y1);
-    Port p2 = BoardToScreen(x2,y2);
-    DrawLineEx((Vector2)p1 + (float)c_portSize / 2.0f, (Vector2)p2 + (float)c_portSize / 2.0f, thickness, color);
+    DrawLineEx(PortCenter(x1,y1), PortCenter(x2, y2), thickness, color);
 }
 void DrawPortLine(Port p1, Port p2, float thickness, Color color)
 {
-    DrawPortLine(p1.column, p1.row, p2.column, p2.row, thickness, color);
+    DrawLineEx(PortCenter(p1), PortCenter(p2), thickness, color);
 }
 
 enum class Mode
@@ -269,6 +278,111 @@ enum class Mode
     wire,
     resistor,
 };
+
+struct Section
+{
+    Section(int _x, int _y)
+    {
+        if (_x == -1 || _y == -1)
+        {
+            x = -1;
+            y = -1;
+            width = 0;
+            height = 0;
+        }
+        else if (_x < 2 || _x >= 12)
+        {
+            x = _x;
+            y = 0;
+            width = 0;
+            height = 28;
+        }
+        else if (_x >= 2 && _x < 7)
+        {
+            x = 2;
+            y = _y;
+            width = 4;
+            height = 0;
+        }
+        else if (_x >= 7 && _x < 12)
+        {
+            x = 7;
+            y = _y;
+            width = 4;
+            height = 0;
+        }
+    }
+    int x, y, width, height;
+
+    void Power(float thickness, Color color)
+    {
+        DrawPortLine(x, y, x + width, y + height, thickness, color);
+    }
+};
+void DrawBreadLine(int x, int y, Color color)
+{
+    if (x < 7)
+        DrawPortLine(2, y, 6, y, 2.0f, color);
+    else if (x < 12)
+        DrawPortLine(7, y, 11, y, 2.0f, color);
+    else
+        DrawPortLine(x, 0, x, 28, 2.0f, color);
+}
+
+void DrawWire(Wire* wire)
+{
+    Vector2 start = PortCenter(wire->start);
+    Vector2 end = PortCenter(wire->end);
+
+    DrawLineEx(start, end, 2.0f, LIGHTGRAY);
+    int wireLength = roundf(Vector2Distance(start, end)) / (float)c_portSize;
+    if (wireLength > 1)
+    {
+        Vector2 jacketStartv = start + Vector2Normalize(end - start) * 4.0f;
+        Vector2 jacketEndv = end + Vector2Normalize(start - end) * 4.0f;
+        Color jacketColor;
+        switch (wireLength)
+        {
+        case 2:  jacketColor = RED;         break;
+        case 3:  jacketColor = ORANGE;      break;
+        case 4:  jacketColor = YELLOW;      break;
+        case 5:  jacketColor = LIME;        break;
+        case 6:  jacketColor = DARKBLUE;    break;
+        case 7:  jacketColor = DARKGRAY;    break;
+        case 8:  jacketColor = LIME;        break;
+        case 9:  jacketColor = DARKBLUE;    break;
+        case 10: jacketColor = WHITE;       break;
+        default: jacketColor = LIME;        break;
+        }
+        DrawLineEx(jacketStartv, jacketEndv, 4.0f, jacketColor);
+    }
+}
+
+void Flow(int xmin, int xmax, int ymin, int ymax)
+{
+    for (int y = ymin; y < ymax; ++y)
+    {
+        for (int x = xmin; x < xmax; ++x)
+        {
+            if (Component* comp = g_breadBoard[y][x])
+            {
+                if (Wire* wire = dynamic_cast<Wire*>(comp))
+                {
+                    if (wire->start.column < 2 || wire->start.column > 11)
+                    {
+                        Color color = (wire->start.column == 0 || wire->start.column == 12) ? RED : BLACK;
+                        DrawBreadLine(wire->end.column, wire->end.row, color);
+                    }
+                    else if (wire->end.column < 2 || wire->end.column > 11)
+                    {
+                        Color color = (wire->end.column == 0 || wire->end.column == 12) ? RED : BLACK;
+                        DrawBreadLine(wire->start.column, wire->start.row, color);
+                    }
+                }
+            }
+        }
+    }
+}
 
 int main()
 {
@@ -309,7 +423,10 @@ int main()
                     if (comp == 0)
                     {
                         if (selectedPort.column != hoveredPort.column || selectedPort.row != hoveredPort.row)
+                        {
                             comp = new Wire(selectedPort, hoveredPort);
+                            ComponentAtPort(hoveredPort) = comp;
+                        }
                     }
                     else
                     {
@@ -353,62 +470,7 @@ int main()
                 DrawPortLine(0,0,0,28,2.0f,RED);
                 DrawPortLine(1,0,1,28,2.0f,BLACK);
 
-                for (int y = 0; y < 30; ++y)
-                {
-                    for (int x = 0; x < 14; ++x)
-                    {
-                        if (Component* comp = g_breadBoard[y][x])
-                        {
-                            if (Wire* wire = dynamic_cast<Wire*>(comp))
-                            {
-                                if (wire->start.column == 0 || wire->start.column == 12)
-                                {
-                                    if (wire->end.column < 7)
-                                    {
-                                        DrawPortLine(2, wire->end.row, 6, wire->end.row, 2.0f, RED);
-                                    }
-                                    else
-                                    {
-                                        DrawPortLine(7, wire->end.row, 11, wire->end.row, 2.0f, RED);
-                                    }
-                                }
-                                else if (wire->end.column == 0 || wire->end.column == 12)
-                                {
-                                    if (wire->start.column < 7)
-                                    {
-                                        DrawPortLine(2, wire->start.row, 6, wire->start.row, 2.0f, RED);
-                                    }
-                                    else
-                                    {
-                                        DrawPortLine(7, wire->start.row, 11, wire->start.row, 2.0f, RED);
-                                    }
-                                }
-                                else if (wire->start.column == 1 || wire->start.column == 13)
-                                {
-                                    if (wire->end.column < 7)
-                                    {
-                                        DrawPortLine(2, wire->end.row, 6, wire->end.row, 2.0f, BLACK);
-                                    }
-                                    else
-                                    {
-                                        DrawPortLine(7, wire->end.row, 11, wire->end.row, 2.0f, BLACK);
-                                    }
-                                }
-                                else if (wire->end.column == 1 || wire->end.column == 13)
-                                {
-                                    if (wire->start.column < 7)
-                                    {
-                                        DrawPortLine(2, wire->start.row, 6, wire->start.row, 2.0f, BLACK);
-                                    }
-                                    else
-                                    {
-                                        DrawPortLine(7, wire->start.row, 11, wire->start.row, 2.0f, BLACK);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
+                Flow(0,14,0,30);
             }
 
             // Draw components
@@ -427,40 +489,12 @@ int main()
                         {
                         case Component::Type::source:
                             if (Source* source = dynamic_cast<Source*>(comp))
-                            {
                                 DrawRectangle(start.column + c_gutterSize, start.row + c_gutterSize, c_portSize - 2 * c_gutterSize, c_portSize - 2 * c_gutterSize, (source->power < 0 ? BLACK : RED));
-                            }
                             break;
 
                         case Component::Type::wire:
                             if (Wire* wire = dynamic_cast<Wire*>(comp))
-                            {
-                                Port end = BoardToScreen(wire->end.column, wire->end.row);
-                                Vector2 startv = { (float)start.column + (float)c_portSize / 2.0f, (float)start.row + (float)c_portSize / 2.0f };
-                                Vector2 endv = { (float)end.column + (float)c_portSize / 2.0f, (float)end.row + (float)c_portSize / 2.0f };
-                                DrawLineEx(startv, endv, 2.0f, LIGHTGRAY);
-                                int wireLength = roundf(Vector2Distance(startv, endv)) / (float)c_portSize;
-                                if (wireLength > 1)
-                                {
-                                    Vector2 jacketStartv = startv + Vector2Normalize(endv - startv) * 4.0f;
-                                    Vector2 jacketEndv = endv + Vector2Normalize(startv - endv) * 4.0f;
-                                    Color jacketColor;
-                                    switch (wireLength)
-                                    {
-                                    case 2: jacketColor = RED; break;
-                                    case 3: jacketColor = ORANGE; break;
-                                    case 4: jacketColor = YELLOW; break;
-                                    case 5: jacketColor = LIME; break;
-                                    case 6: jacketColor = DARKBLUE; break;
-                                    case 7: jacketColor = DARKGRAY; break;
-                                    case 8: jacketColor = LIME; break;
-                                    case 9: jacketColor = DARKBLUE; break;
-                                    case 10: jacketColor = WHITE; break;
-                                    default: jacketColor = LIME; break;
-                                    }
-                                    DrawLineEx(jacketStartv, jacketEndv, 4.0f, jacketColor);
-                                }
-                            }
+                                DrawWire(wire);
                             break;
 
                         case Component::Type::resistor:
