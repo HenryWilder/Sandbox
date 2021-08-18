@@ -1,6 +1,7 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <map>
+#include <unordered_set>
 
 #define sign(x) (((x) > (decltype(x))(0)) - ((x) < (decltype(x))(0)))
 
@@ -86,15 +87,30 @@ struct Port
     Port() = default;
     Port(int x, int y) : column(x), row(y) {}
     Port(Vector2 vec) : column(vec.x), row(vec.y) {}
+    Port(Port& port) : column(port.column), row(port.row) {}
 
     int column, row; // First & last 2 columns connect vertically; columns 3-7 (a-e) and 8-12 (f-j) connect horizontally, but not to each other
 
-    bool OnBoard()
+    bool OnBoard() const
     {
         return column != -1;
     }
 
-    operator Vector2()
+    Port& operator=(Port other)
+    {
+        column = other.column;
+        row = other.row;
+        return *this;
+    }
+    bool operator==(Port other) const
+    {
+        return other.column == column && other.row == row;
+    }
+    bool operator!=(Port other) const
+    {
+        return other.column != column || other.row != row;
+    }
+    operator Vector2() const
     {
         return { (float)column, (float)row };
     }
@@ -216,7 +232,7 @@ Component*& ComponentAtPort(Port port)
 */
 constexpr int c_portCountX = 14;
 constexpr int c_portCountY = 30;
-constexpr int c_portSize = 20;
+constexpr int c_portSize = 10;
 constexpr int c_gutterSize = 1;
 constexpr int c_deadspaceX = 10;
 constexpr int c_deadspaceY = 10;
@@ -283,40 +299,54 @@ struct Section
 {
     Section(int _x, int _y)
     {
-        if (_x == -1 || _y == -1)
+        if ((_x >= 0 && _x < 2) || (_x >= 12 && _x < 14))
+        {
+            x = _x;
+            y = 0;
+            width = 1;
+            height = 29;
+        }
+        else if (_x >= 2 && _x < 7)
+        {
+            x = 2;
+            y = _y;
+            width = 5;
+            height = 1;
+        }
+        else  if (_x >= 7 && _x < 12)
+        {
+            x = 7;
+            y = _y;
+            width = 5;
+            height = 1;
+        }
+        else
         {
             x = -1;
             y = -1;
             width = 0;
             height = 0;
         }
-        else if (_x < 2 || _x >= 12)
-        {
-            x = _x;
-            y = 0;
-            width = 0;
-            height = 28;
-        }
-        else if (_x >= 2 && _x < 7)
-        {
-            x = 2;
-            y = _y;
-            width = 4;
-            height = 0;
-        }
-        else if (_x >= 7 && _x < 12)
-        {
-            x = 7;
-            y = _y;
-            width = 4;
-            height = 0;
-        }
     }
+    Section(Port port)
+    {
+        *this = Section(port.column, port.row);
+    }
+
     int x, y, width, height;
 
-    void Power(float thickness, Color color)
+    void Power(float thickness, bool power) // true = + false = -
     {
-        DrawPortLine(x, y, x + width, y + height, thickness, color);
+        Vector2 p1 = PortCenter(x,y);
+        Vector2 p2 = PortCenter(x + width - 1, y + height - 1);
+
+        Vector2 offset;
+        if (power)
+            offset = { 1,1 };
+        else
+            offset = { -1,-1 };
+
+        DrawLineEx(p1 + offset, p2 + offset, thickness, (power ? RED : BLACK));
     }
 };
 void DrawBreadLine(int x, int y, Color color)
@@ -355,6 +385,38 @@ void DrawWire(Wire* wire)
         default: jacketColor = LIME;        break;
         }
         DrawLineEx(jacketStartv, jacketEndv, 4.0f, jacketColor);
+    }
+}
+
+std::unordered_set<size_t> g_avoid;
+size_t SerializePort(Port port)
+{
+    return 0ull | (((size_t)port.column << 040) | (size_t)port.row);
+}
+void FindConnections(Port from, bool power)
+{
+    g_avoid.insert(SerializePort(from));
+    Section sect(from);
+    sect.Power(2.0f, power);
+    for (int y = sect.y; y < (sect.y + sect.height); ++y)
+    {
+        for (int x = sect.x; x < (sect.x + sect.width); ++x)
+        {
+            Port pos = { x,y };
+
+            if (g_avoid.find(SerializePort(pos)) != g_avoid.end())
+                continue;
+
+            if (Component* comp = ComponentAtPort(pos))
+            {
+                if (Wire* wire = dynamic_cast<Wire*>(comp))
+                {
+                    g_avoid.insert(SerializePort(wire->start));
+                    g_avoid.insert(SerializePort(wire->end));
+                    FindConnections((wire->start == pos ? wire->end : wire->start), power);
+                }
+            }
+        }
     }
 }
 
@@ -430,8 +492,17 @@ int main()
                     }
                     else
                     {
-                        delete comp;
-                        comp = 0;
+                        if (Wire* wire = dynamic_cast<Wire*>(comp))
+                        {
+                            ComponentAtPort(wire->start) = 0;
+                            ComponentAtPort(wire->end) = 0;
+                            delete wire;
+                        }
+                        else
+                        {
+                            delete comp;
+                            comp = 0;
+                        }
                     }
                     selectedPort = { -1,-1 };
                 }
@@ -467,10 +538,11 @@ int main()
             // Draw power flow
             {
                 constexpr int halfway = c_portSize / 2;
-                DrawPortLine(0,0,0,28,2.0f,RED);
-                DrawPortLine(1,0,1,28,2.0f,BLACK);
 
-                Flow(0,14,0,30);
+                g_avoid.clear();
+                FindConnections({ 1,1 }, false);
+                g_avoid.clear();
+                FindConnections({ 0,0 }, true);
             }
 
             // Draw components
@@ -536,7 +608,16 @@ int main()
         for (int x = 0; x < 14; ++x)
         {
             if (g_breadBoard[y][x] != 0)
-                delete g_breadBoard[y][x];
+            {
+                if (Wire* wire = dynamic_cast<Wire*>(g_breadBoard[y][x])) // Has two points sharing a wire pointer
+                {
+                    ComponentAtPort(wire->start) = 0;
+                    ComponentAtPort(wire->end) = 0;
+                    delete wire;
+                }
+                else // Only has one point
+                    delete g_breadBoard[y][x];
+            }
         }
     }
 
