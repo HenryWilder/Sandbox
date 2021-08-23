@@ -3,6 +3,8 @@
 #include <map>
 #include <unordered_set>
 
+#define NO_COLOR { 0,0,0,0 }
+
 #define sign(x) (((x) > (decltype(x))(0)) - ((x) < (decltype(x))(0)))
 
 using Vector1 = float;
@@ -125,18 +127,21 @@ struct Component
         source,
         wire,
         resistor,
+        LED,
     };
     virtual Type GetType() = 0;
+    virtual void Draw() = 0;
 };
 struct Source : public Component
 {
     Source(Port _start, int _power) : Component(_start), power(_power) {}
-    int power; // Negative or positive * amount
+    float power; // Negative or positive * amount
 
     Type GetType() override
     {
         return Type::source;
     }
+    virtual void Draw() override;
 };
 struct Wire : public Component
 {
@@ -147,16 +152,30 @@ struct Wire : public Component
     {
         return Type::wire;
     }
+    virtual void Draw() override;
 };
 struct Resistor : public Wire
 {
-    Resistor(Port _start, Port _end, int _resistance) : Wire(_start, _end), resistance(_resistance) {}
-    int resistance;
+    Resistor(Port _start, Port _end, float _resistance) : Wire(_start, _end), resistance(_resistance) {}
+    float resistance;
 
     Type GetType() override
     {
         return Type::resistor;
     }
+    virtual void Draw() override;
+};
+struct LED : public Wire
+{
+    LED(Port _start, Port _end, Color _color) : Wire(_start, _end), color(_color) {}
+
+    Color color; // Color of the light when on
+
+    Type GetType() override
+    {
+        return Type::LED;
+    }
+    virtual void Draw() override;
 };
 Component* g_breadBoard[30][14] =
 {
@@ -191,48 +210,14 @@ Component* g_breadBoard[30][14] =
     { 00,00, 0,0,0,0,0, 0,0,0,0,0, 00,00 },
     {  0,0,  0,0,0,0,0, 0,0,0,0,0,  0,0  },
 };
-Component*& ComponentAtPort(Port port)
+Component*& GetComponentAtPort(Port port)
 {
     return g_breadBoard[port.row][port.column];
 }
 
-/*
-* 
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 00000000000000    00 00000 00000 00
-* 
-*/
 constexpr int c_portCountX = 14;
 constexpr int c_portCountY = 30;
-constexpr int c_portSize = 10;
+constexpr int c_portSize = 20;
 constexpr int c_gutterSize = 1;
 constexpr int c_deadspaceX = 10;
 constexpr int c_deadspaceY = 10;
@@ -278,6 +263,10 @@ void DrawPortBox(Port pos, Color color)
 {
     DrawPortBox(pos.column, pos.row, color);
 }
+void Source::Draw()
+{
+    DrawPortBox(start, (power > 0.0f ? RED : BLACK));
+}
 void DrawPortLine(int x1, int y1, int x2, int y2, float thickness, Color color)
 {
     DrawLineEx(PortCenter(x1,y1), PortCenter(x2, y2), thickness, color);
@@ -286,14 +275,6 @@ void DrawPortLine(Port p1, Port p2, float thickness, Color color)
 {
     DrawLineEx(PortCenter(p1), PortCenter(p2), thickness, color);
 }
-
-enum class Mode
-{
-    none,
-    source,
-    wire,
-    resistor,
-};
 
 struct Section
 {
@@ -335,20 +316,133 @@ struct Section
 
     int x, y, width, height;
 
-    void Power(float thickness, bool power) // true = + false = -
+    void Power(float power) const;
+    void DrawPowerLine(float thick) const;
+};
+const Section g_allSections[] =
+{
+    Section(0,0), Section(1,0), Section(2, 0), Section(7, 0),
+                                Section(2, 1), Section(7, 1),
+                                Section(2, 2), Section(7, 2),
+                                Section(2, 3), Section(7, 3),
+                                Section(2, 4), Section(7, 4),
+                                Section(2, 5), Section(7, 5),
+                                Section(2, 6), Section(7, 6),
+                                Section(2, 7), Section(7, 7),
+                                Section(2, 8), Section(7, 8),
+                                Section(2, 9), Section(7, 9),
+                                Section(2,10), Section(7,10),
+                                Section(2,11), Section(7,11),
+                                Section(2,12), Section(7,12),
+                                Section(2,13), Section(7,13),
+                                Section(2,14), Section(7,14),
+                                Section(2,15), Section(7,15),
+                                Section(2,16), Section(7,16),
+                                Section(2,17), Section(7,17),
+                                Section(2,18), Section(7,18),
+                                Section(2,19), Section(7,19),
+                                Section(2,20), Section(7,20),
+                                Section(2,21), Section(7,21),
+                                Section(2,22), Section(7,22),
+                                Section(2,23), Section(7,23),
+                                Section(2,24), Section(7,24),
+                                Section(2,25), Section(7,25),
+                                Section(2,26), Section(7,26),
+                                Section(2,27), Section(7,27),
+                                Section(2,28), Section(7,28),
+                                Section(2,29), Section(7,29), Section(12,0), Section(13,0),
+};
+
+struct BreadBoardPower
+{
+private:
+    float v[4];
+    float h[2][30];
+
+public:
+    void ClearPower()
     {
-        Vector2 p1 = PortCenter(x,y);
+        for (float& p : v)
+        {
+            p = 0.0f;
+        }
+        for (int i = 0; i < 2; ++i)
+        {
+            for (float& p : h[i])
+            {
+                p = 0.0f;
+            }
+        }
+    }
+    float SamplePower(Port at) const
+    {
+        Section sect(at);
+
+        if (sect.x == 0)
+            return v[0];
+        else if (sect.x == 1)
+            return v[1];
+        else if (sect.x == 12)
+            return v[2];
+        else if (sect.x == 13)
+            return v[3];
+
+        else if (sect.x == 2)
+            return h[0][sect.y];
+        else if (sect.x == 7)
+            return h[1][sect.y];
+    }
+    void AddPower(Port at, float amt)
+    {
+        Section sect(at);
+
+        if (sect.x == 0)
+            v[0] += amt;
+        else if (sect.x == 1)
+            v[1] += amt;
+        else if (sect.x == 12)
+            v[2] += amt;
+        else if (sect.x == 13)
+            v[3] += amt;
+
+        else if (sect.x == 2)
+            h[0][sect.y] += amt;
+        else if (sect.x == 7)
+            h[1][sect.y] += amt;
+    }
+} g_power;
+
+void Section::Power(float power) const // true = + false = -
+{
+    g_power.AddPower({ x,y }, power);
+}
+void Section::DrawPowerLine(float thick) const
+{
+    float val = g_power.SamplePower({ x,y });
+    if (val)
+    {
+        Vector2 p1 = PortCenter(x, y);
         Vector2 p2 = PortCenter(x + width - 1, y + height - 1);
 
-        Vector2 offset;
-        if (power)
-            offset = { 1,1 };
-        else
-            offset = { -1,-1 };
+        DrawLineEx(p1, p2, thick, ColorAlpha(BLACK, abs(val)));
 
-        DrawLineEx(p1 + offset, p2 + offset, thickness, (power ? RED : BLACK));
+        /*
+        Vector2 direction = Vector2Normalize(p2 - p1);
+
+        if ((long)(GetTime() * 2.0f) & 1)
+            p1 += direction * 2.0f;
+
+        Vector2 size = Vector2{ thick, thick };
+        Vector2 halfsize = size * 0.5f;
+
+        for (float i = 0.0f; i < Vector2Distance(p1, p2); i += 4.0f)
+        {
+            DrawRectangleV(p1 + direction * i - halfsize, size, YELLOW);
+        }
+        */
     }
-};
+}
+
 void DrawBreadLine(int x, int y, Color color)
 {
     if (x < 7)
@@ -361,6 +455,21 @@ void DrawBreadLine(int x, int y, Color color)
 
 void DrawWire(Wire* wire)
 {
+    static Color jacketColors[] = {
+        NO_COLOR,
+        NO_COLOR,
+        RED,
+        ORANGE,
+        YELLOW,
+        LIME,
+        DARKBLUE,
+        DARKGRAY,
+        LIME,
+        DARKBLUE,
+        WHITE,
+        LIME,
+    };
+
     Vector2 start = PortCenter(wire->start);
     Vector2 end = PortCenter(wire->end);
 
@@ -370,22 +479,45 @@ void DrawWire(Wire* wire)
     {
         Vector2 jacketStartv = start + Vector2Normalize(end - start) * 4.0f;
         Vector2 jacketEndv = end + Vector2Normalize(start - end) * 4.0f;
-        Color jacketColor;
-        switch (wireLength)
-        {
-        case 2:  jacketColor = RED;         break;
-        case 3:  jacketColor = ORANGE;      break;
-        case 4:  jacketColor = YELLOW;      break;
-        case 5:  jacketColor = LIME;        break;
-        case 6:  jacketColor = DARKBLUE;    break;
-        case 7:  jacketColor = DARKGRAY;    break;
-        case 8:  jacketColor = LIME;        break;
-        case 9:  jacketColor = DARKBLUE;    break;
-        case 10: jacketColor = WHITE;       break;
-        default: jacketColor = LIME;        break;
-        }
-        DrawLineEx(jacketStartv, jacketEndv, 4.0f, jacketColor);
+        DrawLineEx(jacketStartv, jacketEndv, 4.0f, jacketColors[std::min(wireLength, 11)]);
     }
+}
+void Wire::Draw()
+{
+    DrawWire(this);
+}
+
+void DrawResistor(Resistor* resistor)
+{
+    Vector2 start = PortCenter(resistor->start);
+    Vector2 end = PortCenter(resistor->end);
+
+    DrawLineEx(start, end, 2.0f, LIGHTGRAY);
+    int wireLength = roundf(Vector2Distance(start, end)) / (float)c_portSize;
+    if (wireLength > 1)
+    {
+        Vector2 midpoint = (start + end) / 2.0f;
+        Vector2 resistStart = midpoint + Vector2Normalize(end - start) * 4.0f;
+        Vector2 resistEnd = midpoint + Vector2Normalize(start - end) * 4.0f;
+        DrawLineEx(resistStart, resistEnd, 6.0f, BROWN);
+    }
+}
+void Resistor::Draw()
+{
+    DrawResistor(this);
+}
+
+void DrawLED(LED* led)
+{
+    Vector2 start = PortCenter(led->start);
+    Vector2 end = PortCenter(led->end);
+    Vector2 midpoint = (start + end) / 2.0f;
+    DrawCircleV(midpoint, c_portSize / 2.0f, LIGHTGRAY);
+    DrawCircleV(midpoint, c_portSize / 2.0f, ColorAlpha(led->color, g_power.SamplePower(led->start) > 0.0 ? 0.9f : 0.25f));
+}
+void LED::Draw()
+{
+    DrawLED(this);
 }
 
 std::unordered_set<size_t> g_avoid;
@@ -393,11 +525,11 @@ size_t SerializePort(Port port)
 {
     return 0ull | (((size_t)port.column << 040) | (size_t)port.row);
 }
-void FindConnections(Port from, bool power)
+
+bool FindConnections(Port from, float power)
 {
-    g_avoid.insert(SerializePort(from));
     Section sect(from);
-    sect.Power(2.0f, power);
+    sect.Power(power);
     for (int y = sect.y; y < (sect.y + sect.height); ++y)
     {
         for (int x = sect.x; x < (sect.x + sect.width); ++x)
@@ -407,39 +539,25 @@ void FindConnections(Port from, bool power)
             if (g_avoid.find(SerializePort(pos)) != g_avoid.end())
                 continue;
 
-            if (Component* comp = ComponentAtPort(pos))
+            if (Component* comp = GetComponentAtPort(pos))
             {
                 if (Wire* wire = dynamic_cast<Wire*>(comp))
                 {
                     g_avoid.insert(SerializePort(wire->start));
                     g_avoid.insert(SerializePort(wire->end));
-                    FindConnections((wire->start == pos ? wire->end : wire->start), power);
-                }
-            }
-        }
-    }
-}
 
-void Flow(int xmin, int xmax, int ymin, int ymax)
-{
-    for (int y = ymin; y < ymax; ++y)
-    {
-        for (int x = xmin; x < xmax; ++x)
-        {
-            if (Component* comp = g_breadBoard[y][x])
-            {
-                if (Wire* wire = dynamic_cast<Wire*>(comp))
+                    if (Resistor* resistor = dynamic_cast<Resistor*>(wire))
+                        power *= resistor->resistance;
+
+                    return FindConnections((wire->start == pos ? wire->end : wire->start), power);
+                }
+                else if (Source* source = dynamic_cast<Source*>(comp))
                 {
-                    if (wire->start.column < 2 || wire->start.column > 11)
+                    if (sign(source->power) != sign(power))
                     {
-                        Color color = (wire->start.column == 0 || wire->start.column == 12) ? RED : BLACK;
-                        DrawBreadLine(wire->end.column, wire->end.row, color);
+                        return true;
                     }
-                    else if (wire->end.column < 2 || wire->end.column > 11)
-                    {
-                        Color color = (wire->end.column == 0 || wire->end.column == 12) ? RED : BLACK;
-                        DrawBreadLine(wire->start.column, wire->start.row, color);
-                    }
+                    else return false;
                 }
             }
         }
@@ -458,7 +576,14 @@ int main()
     ******************************************/
 
     Port selectedPort = { -1,-1 };
-    Mode mode = Mode::wire;
+
+    enum class Mode {
+        none,
+        source,
+        wire,
+        resistor,
+        LED,
+    } mode = Mode::wire;
 
     g_breadBoard[0][0] = new Source({0,0}, 1);
     g_breadBoard[1][1] = new Source({1,1}, -1);
@@ -475,45 +600,100 @@ int main()
             hoveredPort = BoardFromScreen((int)truncf(mouse.x), (int)truncf(mouse.y));
         }
 
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+        if (IsKeyPressed(KEY_ONE))
+            mode = Mode::source;
+        if (IsKeyPressed(KEY_TWO))
+            mode = Mode::wire;
+        if (IsKeyPressed(KEY_THREE))
+            mode = Mode::resistor;
+        if (IsKeyPressed(KEY_FOUR))
+            mode = Mode::LED;
+
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) // On left click
         {
-            if (hoveredPort.OnBoard())
+            if (hoveredPort.OnBoard()) // If the mouse is on a valid position
             {
-                if (selectedPort.OnBoard() && (mode == Mode::wire))
+                if ((mode == Mode::wire || mode == Mode::resistor || mode == Mode::LED) && selectedPort.OnBoard()) // If currently creating a wire & the wire's start point is valid
                 {
-                    Component*& comp = ComponentAtPort(selectedPort);
-                    if (comp == 0)
+                    Component*& fcomp = GetComponentAtPort(selectedPort); // Start
+                    Component*& scomp = GetComponentAtPort(hoveredPort); // End
+
+                    if (!fcomp && !scomp) // If both spaces are free
                     {
                         if (selectedPort.column != hoveredPort.column || selectedPort.row != hoveredPort.row)
                         {
-                            comp = new Wire(selectedPort, hoveredPort);
-                            ComponentAtPort(hoveredPort) = comp;
+                            switch (mode)
+                            {
+                            case Mode::none:
+                                fcomp = 0;
+                                break;
+                            case Mode::source:
+                                break;
+                            case Mode::wire:
+                                fcomp = new Wire(selectedPort, hoveredPort);
+                                break;
+                            case Mode::resistor:
+                                fcomp = new Resistor(selectedPort, hoveredPort, 0.5f);
+                                break;
+                            case Mode::LED:
+                                fcomp = new LED(selectedPort, hoveredPort, RED);
+                                break;
+                            default:
+                                break;
+                            }
+                            GetComponentAtPort(hoveredPort) = fcomp;
                         }
                     }
-                    else
+                    else if (selectedPort == hoveredPort)
                     {
-                        if (Wire* wire = dynamic_cast<Wire*>(comp))
+                        if (fcomp)
                         {
-                            ComponentAtPort(wire->start) = 0;
-                            ComponentAtPort(wire->end) = 0;
-                            delete wire;
+                            if (Wire* wire = dynamic_cast<Wire*>(fcomp))
+                            {
+                                GetComponentAtPort(wire->start) = 0;
+                                GetComponentAtPort(wire->end) = 0;
+                                delete wire;
+                            }
+                            else
+                            {
+                                delete fcomp;
+                                fcomp = 0;
+                            }
                         }
-                        else
+                        if (scomp)
                         {
-                            delete comp;
-                            comp = 0;
+                            if (Wire* wire = dynamic_cast<Wire*>(scomp))
+                            {
+                                GetComponentAtPort(wire->start) = 0;
+                                GetComponentAtPort(wire->end) = 0;
+                                delete wire;
+                            }
+                            else
+                            {
+                                delete scomp;
+                                scomp = 0;
+                            }
                         }
                     }
                     selectedPort = { -1,-1 };
                 }
+                // a) Not currently creating a wire
+                // b) Wire start point is invalid
+                // c) Both a and b
                 else
                 {
                     selectedPort = hoveredPort;
                 }
             }
-            else
+            else // The mouse is outside of the board
+            {
                 selectedPort = { -1,-1 };
+            }
         }
+
+        g_power.ClearPower();
+        g_avoid.clear();
+        FindConnections({ 1,1 }, -1.0f);
 
         /******************************************
         *   Draw the frame                        *
@@ -535,14 +715,20 @@ int main()
                 }
             }
 
-            // Draw power flow
+            if (selectedPort.OnBoard())
             {
-                constexpr int halfway = c_portSize / 2;
+                DrawPortBox(selectedPort, BLUE);
+            }
+            if (hoveredPort.OnBoard())
+            {
+                DrawPortBox(hoveredPort, SKYBLUE);
+            }
+            if (selectedPort.OnBoard() && hoveredPort.OnBoard())
+                DrawPortLine(selectedPort, hoveredPort, 4.0f, ColorAlpha(LIGHTGRAY, 0.5));
 
-                g_avoid.clear();
-                FindConnections({ 1,1 }, false);
-                g_avoid.clear();
-                FindConnections({ 0,0 }, true);
+            for (Section sect : g_allSections)
+            {
+                sect.DrawPowerLine(2.0f);
             }
 
             // Draw components
@@ -571,9 +757,13 @@ int main()
 
                         case Component::Type::resistor:
                             if (Resistor* resistor = dynamic_cast<Resistor*>(comp))
+                                DrawResistor(resistor);
+                            break;
+
+                        case Component::Type::LED:
+                            if (LED* led = dynamic_cast<LED*>(comp))
                             {
-                                Port end = BoardToScreen(resistor->end.column, resistor->end.row);
-                                DrawLine(start.column + c_portSize / 2, start.row + c_portSize / 2, end.column + c_portSize / 2, end.row + c_portSize / 2, ORANGE);
+                                DrawLED(led);
                             }
                             break;
 
@@ -585,16 +775,17 @@ int main()
                 }
             }
 
-            if (selectedPort.OnBoard())
+            const char* modeString;
+            switch (mode)
             {
-                Port pos = BoardToScreen(selectedPort.column, selectedPort.row);
-                DrawRectangle(pos.column + c_gutterSize, pos.row + c_gutterSize, c_portSize - 2 * c_gutterSize, c_portSize - 2 * c_gutterSize, BLUE);
+            default:
+            case Mode::none: modeString = ""; break;
+            case Mode::source: modeString = "source"; break;
+            case Mode::wire: modeString = "wire"; break;
+            case Mode::resistor: modeString = "resistor"; break;
+            case Mode::LED: modeString = "LED"; break;
             }
-            if (hoveredPort.OnBoard())
-            {
-                Port pos = BoardToScreen(hoveredPort.column, hoveredPort.row);
-                DrawRectangle(pos.column + c_gutterSize, pos.row + c_gutterSize, c_portSize - 2 * c_gutterSize, c_portSize - 2 * c_gutterSize, SKYBLUE);
-            }
+            DrawText(modeString, 0,0,18,MAGENTA);
 
         } EndDrawing();
     }
@@ -611,8 +802,8 @@ int main()
             {
                 if (Wire* wire = dynamic_cast<Wire*>(g_breadBoard[y][x])) // Has two points sharing a wire pointer
                 {
-                    ComponentAtPort(wire->start) = 0;
-                    ComponentAtPort(wire->end) = 0;
+                    GetComponentAtPort(wire->start) = 0;
+                    GetComponentAtPort(wire->end) = 0;
                     delete wire;
                 }
                 else // Only has one point
