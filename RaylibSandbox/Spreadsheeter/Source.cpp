@@ -1,7 +1,24 @@
 #include <string>
 #include <vector>
+#include <math.h>
 #include <raylib.h>
 #include <raymath.h>
+
+int Min(int a, int b)
+{
+    if (a > b)
+        return b;
+    else
+        return a;
+}
+int Max(int a, int b)
+{
+
+    if (a < b)
+        return b;
+    else
+        return a;
+}
 
 constexpr Color ColorFromHex(unsigned int value)
 {
@@ -105,23 +122,61 @@ inline Vector3& operator/=(Vector3& a, float div) { return (a = Vector3Scale(a, 
 
 #pragma endregion
 
-struct Value
-{
-    bool isString;
-    union Data
-    {
-        float num;
-        std::string str;
-    };
-};
-struct Reference
-{
-    int start_x, start_y, end_x, end_y;
-    bool start_x_locked, start_y_locked, end_x_locked, end_y_locked;
-};
-
 std::vector<int> g_ColumnWidths = { 120, 220, 320, 420, 520, 620, 720, 820, };
 std::vector<int> g_RowHeights = { 41, 62, 83, 104, 125, 146, 167, 188, 209, 230, 251, 272, 293, 314, 335, 356, };
+
+struct Cell
+{
+    int x, y;
+};
+struct Range
+{
+    Cell start, end;
+};
+std::vector<Range> g_selection = {};
+
+int PreviousRowHeight(int row)
+{
+    if (row > 0)
+        return g_RowHeights[(size_t)row - 1];
+    else
+        return 20;
+}
+int CellHeight(int row)
+{
+    return g_RowHeights[row] - PreviousRowHeight(row);
+}
+int PreviousColumnWidth(int column)
+{
+    if (column > 0)
+        return g_ColumnWidths[(size_t)column - 1];
+    else
+        return 20;
+}
+int CellWidth(int column)
+{
+    return g_ColumnWidths[column] - PreviousColumnWidth(column);
+}
+
+void DrawResizeBar(int x, int y, Color color)
+{
+    if (x > 0) // Vertical
+    {
+        DrawRectangle(x - 3, y, 5, 21, color);
+        DrawLine(x, 21, x, g_RowHeights.back(), color);
+    }
+    else // Horizontal
+    {
+        DrawRectangle(x, y - 2, 20, 5, color);
+        DrawLine(20, y, g_ColumnWidths.back(), y, color);
+    }
+}
+void HighlightRange(Range range, Color color)
+{
+    int startX = PreviousColumnWidth(range.start.x);
+    int startY = PreviousRowHeight(range.start.y);
+    DrawRectangle(startX, startY, g_ColumnWidths[range.end.x] - startX, g_RowHeights[range.end.y] - startY, color);
+}
 
 int main()
 {
@@ -140,6 +195,7 @@ int main()
         Hovering,
         Dragging,
     } mouseMode = MouseMode::None;
+
     enum class Region
     {
         Outside,
@@ -152,6 +208,8 @@ int main()
     int cell_y = -1;
     int drag_offset = 0;
     int drag_distance = 0;
+
+    Cell startOfSelection;
 
     while (!WindowShouldClose())
     {
@@ -200,8 +258,6 @@ int main()
                             region = Region::Edge;
                             drag_offset = GetMouseX() - g_ColumnWidths[i];
                         }
-                        else
-                            region = Region::Cell;
                         break;
                     }
                 }
@@ -220,12 +276,13 @@ int main()
                             region = Region::Edge;
                             drag_offset = GetMouseY() - g_RowHeights[i];
                         }
-                        else
-                            region = Region::Cell;
                         break;
                     }
                 }
             }
+
+            if (cell_x >= 0 && cell_y >= 0)
+                region = Region::Cell;
 
             if (region == Region::Edge)
             {
@@ -237,9 +294,38 @@ int main()
             else
                 SetMouseCursor(MOUSE_CURSOR_DEFAULT);
 
-            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && cell_x != cell_y)
+            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
             {
-                mouseMode = MouseMode::Dragging;
+                if (!(IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT) || IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)))
+                    g_selection.clear();
+
+                if (region == Region::Edge)
+                    mouseMode = MouseMode::Dragging;
+
+                else if (region == Region::Cell)
+                {
+                    Cell cell = { cell_x, cell_y };
+
+                    if (!g_selection.empty() && (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)))
+                    {
+                        Range& range = g_selection.back();
+                        range.start.x = Min(cell_x, startOfSelection.x);
+                        range.end.x = Max(cell_x, startOfSelection.x);
+                        range.start.y = Min(cell_y, startOfSelection.y);
+                        range.end.y = Max(cell_y, startOfSelection.y);
+                    }
+                    else
+                    {
+                        startOfSelection = cell;
+
+                        if (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL))
+                        {
+                            g_selection.push_back({ cell, cell }); // todo
+                        }
+                        else
+                            g_selection.push_back({ cell, cell });
+                    }
+                }
             }
         }
 
@@ -247,18 +333,20 @@ int main()
         {
             if (region == Region::Edge)
             {
-                if (cell_x != -1 && cell_y == -1)
+                if (cell_x != -1) // Vertical
                 {
                     drag_distance = GetMouseX() - g_ColumnWidths[cell_x];
-                    if (drag_distance < 0 && (g_ColumnWidths[cell_x] + drag_distance) < ((cell_x > 0 ? g_ColumnWidths[cell_x - 1] : 20) + 6))
-                        drag_distance = ((cell_x > 0 ? g_ColumnWidths[cell_x - 1] : 20) - g_ColumnWidths[cell_x] + 6);
+                    // Clamp
+                    if (drag_distance < 0 && (g_ColumnWidths[cell_x] + drag_distance) < (PreviousColumnWidth(cell_x) + 6))
+                        drag_distance = PreviousColumnWidth(cell_x) - g_ColumnWidths[cell_x] + 6;
                     
                 }
-                else if (cell_x == -1 && cell_y != -1)
+                else // Horizontal
                 {
                     drag_distance = GetMouseY() - g_RowHeights[cell_y];
-                    if (drag_distance < 0 && (g_RowHeights[cell_y] + drag_distance) < ((cell_y > 0 ? g_RowHeights[cell_y - 1] : 20) + 6))
-                        drag_distance = ((cell_y > 0 ? g_RowHeights[cell_y - 1] : 20) - g_RowHeights[cell_y] + 6);
+                    // Clamp
+                    if (drag_distance < 0 && (g_RowHeights[cell_y] + drag_distance) < (PreviousRowHeight(cell_y) + 6))
+                        drag_distance = PreviousRowHeight(cell_y) - g_RowHeights[cell_y] + 6;
                     
                 }
             }
@@ -272,6 +360,11 @@ int main()
 
             ClearBackground(WHITE);
 
+            for (size_t i = 0; i < g_selection.size(); ++i)
+            {
+                HighlightRange(g_selection[i], CORNFLOWER_BLUE);
+            }
+
             DrawRectangle(0, 0, 20, g_RowHeights.back(), RAYWHITE);
             DrawRectangle(0, 0, g_ColumnWidths.back(), 20, RAYWHITE);
             DrawLine(20, 0, 20, g_RowHeights.back(), DARKGRAY1);
@@ -280,30 +373,36 @@ int main()
             {
                 DrawLine(g_ColumnWidths[i], 0, g_ColumnWidths[i], 20, DARKGRAY1);
                 DrawLine(g_ColumnWidths[i], 21, g_ColumnWidths[i], g_RowHeights.back(), LIGHTGRAY1);
-                DrawText((i > 26 ? TextFormat("%c%c", 'A' + i / 26, 'A' + i % 26) : TextFormat("%c",'A' + i)), (g_ColumnWidths[i] + (i > 0 ? g_ColumnWidths[i - 1] : 20)) / 2 - 3.5f, 5, 10, DARKGRAY3);
+                DrawText((i > 26 ? TextFormat("%c%c", 'A' + i / 26, 'A' + i % 26) : TextFormat("%c",'A' + i)), (g_ColumnWidths[i] + PreviousColumnWidth(i)) / 2 - 3.5f, 5, 10, DARKGRAY3);
             }
             for (int i = 0; i < g_RowHeights.size(); ++i)
             {
                 DrawLine(0, g_RowHeights[i], 20, g_RowHeights[i], DARKGRAY1);
                 DrawLine(20, g_RowHeights[i], g_ColumnWidths.back(), g_RowHeights[i], LIGHTGRAY1);
-                DrawText(TextFormat("%i", i), 10 - 3.5f, (g_RowHeights[i] + (i > 0 ? g_RowHeights[i - 1] : 20)) / 2 - 2.5f, 10, DARKGRAY3);
+                DrawText(TextFormat("%i", i), 10 - 3.5f, (g_RowHeights[i] + PreviousRowHeight(i)) / 2 - 2.5f, 10, DARKGRAY3);
             }
 
             if (region == Region::Edge)
             {
                 if (cell_x != -1)
                 {
-                    DrawRectangle(g_ColumnWidths[cell_x] - 5 + (mouseMode == MouseMode::Dragging ? drag_offset : 0), 0, 5, 21, CORNFLOWER_BLUE);
-                    if ((mouseMode == MouseMode::Dragging))
-                        DrawLine(g_ColumnWidths[cell_x] - 2 + (mouseMode == MouseMode::Dragging ? drag_offset : 0), 21, g_ColumnWidths[cell_x] - 2 + (mouseMode == MouseMode::Dragging ? drag_offset : 0), g_RowHeights.back(), CORNFLOWER_BLUE);
+                    if (mouseMode == MouseMode::Dragging)
+                        DrawResizeBar(g_ColumnWidths[cell_x] + drag_distance, 0, CORNFLOWER_BLUE);
+                    else
+                        DrawRectangle(g_ColumnWidths[cell_x] - 5, 0, 5, 21, CORNFLOWER_BLUE);
                 }
                 else if (cell_y != -1)
                 {
-                    DrawRectangle(0, g_RowHeights[cell_y] - 4 + (mouseMode == MouseMode::Dragging ? drag_offset : 0), 20, 5, CORNFLOWER_BLUE);
-                    if ((mouseMode == MouseMode::Dragging))
-                        DrawLine(20, g_RowHeights[cell_y] - 2 + (mouseMode == MouseMode::Dragging ? drag_offset : 0), g_ColumnWidths.back(), g_RowHeights[cell_y] - 2 + (mouseMode == MouseMode::Dragging ? drag_offset : 0), CORNFLOWER_BLUE);
+                    if (mouseMode == MouseMode::Dragging)
+                        DrawResizeBar(0, g_RowHeights[cell_y] + drag_distance, CORNFLOWER_BLUE);
+                    else
+                        DrawRectangle(0, g_RowHeights[cell_y] - 4, 20, 5, CORNFLOWER_BLUE);
                 }
             }
+            //else if (region == Region::Cell)
+            //{
+            //    DrawRectangle(PreviousColumnWidth(cell_x), PreviousRowHeight(cell_y), CellWidth(cell_x), CellHeight(cell_y), CORNFLOWER_BLUE);
+            //}
 
         } EndDrawing();
     }
