@@ -19,20 +19,4 @@
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
-  <ItemGroup>
-    <None Include="shader_Amity_skin.frag">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="lighting.vert">
-      <Filter>Resource Files</Filter>
-    </None>
-    <None Include="Shadow.frag">
-      <Filter>Resource Files</Filter>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <Image Include="freckles.png">
-      <Filter>Resource Files</Filter>
-    </Image>
-  </ItemGroup>
 </Project>

@@ -45,8 +45,31 @@ inline Vector3& operator/=(Vector3& a, float div) { return (a = Vector3Scale(a, 
 
 #pragma endregion
 
-int main(){
-    int windowWidth = 720;
+struct Body
+{
+    Vector3 position;
+    float radius;
+    Color color;
+    Color emissive;
+    float mass;
+};
+struct Photon
+{
+    Vector3 position;
+    Vector3 velocity;
+    float mass;
+};
+
+float Gravity(Vector3 p1, Vector3 p2, float m1, float m2)
+{
+    const static float G = 0.00000000006673f;  // Gravitational constant
+    float d = Vector3Distance(p1, p2);
+    return G * m1 * m2 / (d * d);
+}
+
+int main()
+{
+    int windowWidth = 1280;
     int windowHeight = 720;
     InitWindow(windowWidth, windowHeight, "My Raylib Program");
     SetTargetFPS(60);
@@ -55,14 +78,31 @@ int main(){
     *   Load textures, shaders, and meshes    *
     ******************************************/
 
-    Shader raytrace = LoadShader(0,"RayTrace.frag");
-    RenderTexture2D placeholder = LoadRenderTexture(windowWidth, windowHeight);
+    int ticksPerFrame = 1000;
+    float dtPerTick = 10.0f;
 
-    int cameraPositionLoc = GetShaderLocation(raytrace, "cameraPosition");
-    int cameraTargetLoc = GetShaderLocation(raytrace, "cameraTarget");
+    Camera3D camera;
+    camera.position = {-50.0f,0,0};
+    camera.target = {0,0,0};
+    camera.up = {0,1,0};
+    camera.fovy = 45;
+    camera.type = CAMERA_FREE;
 
-    Camera3D camera = { { -50.0f, 0.0f, 0.0f }, { 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f, 0.0f }, 45.0f, CAMERA_PERSPECTIVE };
-    SetCameraMode(camera, CAMERA_ORBITAL);
+    Body bodies[] =
+    {
+        { { 0.0f, 0.0f, 0.0f}, 10.0f, WHITE, BLACK, 10.0f },
+    };
+
+    int x = 0;
+    int y = 0;
+
+    RenderTexture2D render = LoadRenderTexture(windowWidth, windowHeight);
+
+    BeginTextureMode(render); {
+
+        ClearBackground(BLACK);
+
+    } EndTextureMode();
 
     while (!WindowShouldClose())
     {
@@ -70,34 +110,73 @@ int main(){
         *   Simulate frame and update variables   *
         ******************************************/
 
-        UpdateCamera(&camera);
+        Color pixelColor = MAGENTA;
 
-        SetShaderValue(raytrace, cameraPositionLoc, &camera.position, UNIFORM_VEC3);
-        SetShaderValue(raytrace, cameraTargetLoc, &camera.target, UNIFORM_VEC3);
+        float yPos = (float)y / (float)windowHeight;
+        float xPos = (float)x / (float)windowWidth;
+
+        Photon pixel;
+        pixel.mass = 0.0000000001f;
+        pixel.position = camera.position;
+        {
+            Vector3 forward = Vector3Normalize(camera.target - camera.position);
+            Vector3 right = Vector3CrossProduct(forward, { 0.0f, -1.0f, 0.0f });
+            Vector3 up = Vector3CrossProduct(right, forward);
+            pixel.velocity = Vector3Normalize(forward + right * (xPos - 0.5) + up * (yPos - 0.5));
+        }
+        for (int t = 0; t < ticksPerFrame; ++t)
+        {
+            for (int i = 0; i < (sizeof(bodies) / sizeof(Body)); ++i)
+            {
+                Vector3 force = Vector3Normalize(bodies[i].position - pixel.position) * Gravity(pixel.position, bodies[i].position, pixel.mass, bodies[i].mass);
+                pixel.velocity += (force / pixel.mass) * dtPerTick;
+            }
+            pixel.position += pixel.velocity;
+            for (int i = 0; i < (sizeof(bodies) / sizeof(Body)); ++i)
+            {
+                if (Vector3Distance(pixel.position, bodies[i].position) <= bodies[i].radius)
+                {
+                    pixelColor = bodies[i].color;
+                    goto NEXT;
+                }
+            }
+        }
+
+        NEXT:
 
         /******************************************
         *   Draw the frame                        *
         ******************************************/
 
+        BeginTextureMode(render); {
+
+            DrawPixel(x, y, pixelColor);
+
+        } EndTextureMode();
+
         BeginDrawing(); {
 
             ClearBackground(BLACK);
 
-            BeginShaderMode(raytrace); {
-
-                DrawTexture(placeholder.texture, 0, 0, WHITE);
-
-            } EndShaderMode();
+            DrawTexture(render.texture, 0, 0, WHITE);
 
         } EndDrawing();
+
+        ++x;
+        if (x == windowWidth)
+        {
+            x = 0;
+            ++y;
+            if (y == windowHeight)
+                y = 0;
+        }
     }
 
     /******************************************
     *   Unload and free memory                *
     ******************************************/
 
-    UnloadRenderTexture(placeholder);
-    UnloadShader(raytrace);
+    UnloadRenderTexture(render);
 
     CloseWindow();
 
