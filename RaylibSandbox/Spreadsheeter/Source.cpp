@@ -333,13 +333,13 @@ void OutlineRange(Range range, Color color, int thick = 1)
     int startY = PreviousRowHeight(range.start.y);
     for (int i = 0; i < thick; ++i)
     {
-        DrawRectangleLines(startX + i, startY + i, g_ColumnWidths[range.end.x] - startX - i * 2, g_RowHeights[range.end.y] - startY - i * 2, color);
+        DrawRectangleLines(startX + i - 1, startY + i, g_ColumnWidths[range.end.x] - startX - i * 2 + 1, g_RowHeights[range.end.y] - startY - i * 2 + 1, color);
     }
 }
 void DrawHandle(Cell cell, Color color)
 {
-    DrawRectangle(g_ColumnWidths[cell.x] - 5, g_RowHeights[cell.y] - 5, 7, 7, WHITE);
-    DrawRectangle(g_ColumnWidths[cell.x] - 4, g_RowHeights[cell.y] - 4, 6, 6, color);
+    DrawRectangle(g_ColumnWidths[cell.x] - 5, g_RowHeights[cell.y] - 4, 7, 7, WHITE);
+    DrawRectangle(g_ColumnWidths[cell.x] - 4, g_RowHeights[cell.y] - 3, 6, 6, color);
 }
 
 int main()
@@ -421,7 +421,10 @@ int main()
                 }
             }
             else
+            {
+                region = Region::Cell;
                 cell_x = -1;
+            }
 
             // Find row
             if (GetMouseY() > 20)
@@ -438,9 +441,13 @@ int main()
                 }
             }
             else
+            {
+                if (region != Region::Edge)
+                    region = Region::Cell;
                 cell_y = -1;
+            }
 
-            if (cell_x != -1 == cell_y != -1)
+            if (cell_x != -1 && cell_y != -1)
                 region = Region::Cell;
 
             if (region == Region::Edge)
@@ -498,9 +505,13 @@ int main()
                         {
                             startOfSelection = cell;
                             g_selection.clear();
+
+                            if (cell_x == -1 || cell_y == -1)
+                                mouseMode = MouseMode::Hovering;
+
                             if (cell_x == -1 && cell_y == -1)
                                 g_selection.push_back({ { 0,0 }, { (int)g_ColumnWidths.size() - 1, (int)g_RowHeights.size() - 1 } });
-                            if (cell_x == -1)
+                            else if (cell_x == -1)
                                 g_selection.push_back({ { 0,cell_y }, { (int)g_ColumnWidths.size() - 1, cell_y } });
                             else if (cell_y == -1)
                                 g_selection.push_back({ { cell_x,0 }, { cell_x, (int)g_RowHeights.size() - 1 } });
@@ -577,14 +588,6 @@ int main()
 
             ClearBackground(WHITE);
 
-            if (!(g_selection.size() == 1 && g_selection.back().start.x == g_selection.back().end.x && g_selection.back().start.y == g_selection.back().end.y))
-            {
-                for (size_t i = 0; i < g_selection.size(); ++i)
-                {
-                    HighlightRange(g_selection[i], SELECTION_BLUE);
-                }
-            }
-
             DrawRectangle(0, 0, 20, g_RowHeights.back(), RAYWHITE);
             DrawRectangle(0, 0, g_ColumnWidths.back(), 20, RAYWHITE);
             DrawLine(20, 0, 20, g_RowHeights.back(), DARKGRAY1);
@@ -620,6 +623,13 @@ int main()
                 }
             }
 
+            if (!(g_selection.size() == 1 && g_selection.back().start.x == g_selection.back().end.x && g_selection.back().start.y == g_selection.back().end.y))
+            {
+                for (size_t i = 0; i < g_selection.size(); ++i)
+                {
+                    HighlightRange(g_selection[i], SELECTION_BLUE);
+                }
+            }
             for (size_t i = 0; i < g_selection.size() - (mouseMode == MouseMode::Dragging ? 1 : 0); ++i)
             {
                 OutlineRange(g_selection[i], CORNFLOWER_BLUE);
@@ -633,8 +643,8 @@ int main()
             }
 
 
-            if (!g_selection.empty())
-                DrawText(TextFormat("$%c$%i:$%c$%i",'A' + g_selection.back().start.x, g_selection.back().start.y, 'A' + g_selection.back().end.x, g_selection.back().end.y),0,0,8,RED);
+            //if (!g_selection.empty())
+            //    DrawText(TextFormat("$%c$%i:$%c$%i",'A' + g_selection.back().start.x, g_selection.back().start.y, 'A' + g_selection.back().end.x, g_selection.back().end.y),0,0,8,RED);
 
         } EndDrawing();
     }
