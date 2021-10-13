@@ -124,8 +124,8 @@ inline Vector3& operator/=(Vector3& a, float div) { return (a = Vector3Scale(a, 
 
 #pragma endregion
 
-std::vector<int> g_ColumnWidths = { 120, 220, 320, 420, 520, 620, 720, 820, };
-std::vector<int> g_RowHeights = { 41, 62, 83, 104, 125, 146, 167, 188, 209, 230, 251, 272, 293, 314, 335, 356, };
+std::vector<int> g_ColumnWidths;
+std::vector<int> g_RowHeights;
 
 struct Cell
 {
@@ -352,6 +352,15 @@ int main()
     /******************************************
     *   Load textures, shaders, and meshes    *
     ******************************************/
+
+    for (int i = 0; i < 26; ++i)
+    {
+        g_ColumnWidths.push_back(120 + 100 * i);
+    }
+    for (int i = 0; i < 100; ++i)
+    {
+        g_RowHeights.push_back(41 + 21 * i);
+    }
 
     enum class MouseMode
     {
