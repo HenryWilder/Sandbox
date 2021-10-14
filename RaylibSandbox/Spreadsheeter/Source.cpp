@@ -83,59 +83,195 @@ constexpr Color g_palette[] =
 
 #define sign(x) (((x) > (decltype(x))(0)) - ((x) < (decltype(x))(0)))
 
-using Vector1 = float;
+struct Context
+{
+    enum class Section
+    {
+        NA,
+        Ribbon,
+        Menu,
+        FormulaBar,
+        Frozen,
+        WorkArea,
+        // todo: add more
+    } sect = Section::NA;
 
-#pragma region Vector math
+    union Subsection
+    {
+        enum class Subsection_NA { NA } na; // todo
+        enum class Subsection_Ribbon { NA } rib; // todo
+        enum class Subsection_Menu { NA } menu; // todo
+        enum class Subsection_FormulaBar { NA, TextBox } fbar; // todo
+        enum class Subsection_Frozen { NA, Cell, Edge } froz;
+        enum class Subsection_WorkArea { NA, Cell, Edge, Handle } work;
+    } sub;
 
-inline Vector2  operator- (Vector2  vec)          { return      Vector2Negate(vec);             }
-inline Vector2  operator+ (Vector2  a, Vector2 b) { return      Vector2Add(a, b);               }
-inline Vector2& operator+=(Vector2& a, Vector2 b) { return (a = Vector2Add(a, b));              }
-inline Vector2  operator+ (Vector2  a, float val) { return      Vector2AddValue(a, val);        }
-inline Vector2& operator+=(Vector2& a, float val) { return (a = Vector2AddValue(a, val));       }
-inline Vector2  operator- (Vector2  a, Vector2 b) { return      Vector2Subtract(a, b);          }
-inline Vector2& operator-=(Vector2& a, Vector2 b) { return (a = Vector2Subtract(a, b));         }
-inline Vector2  operator- (Vector2  a, float val) { return      Vector2SubtractValue(a, val);   }
-inline Vector2& operator-=(Vector2& a, float val) { return (a = Vector2SubtractValue(a, val));  }
-inline Vector2  operator* (Vector2  a, Vector2 b) { return      Vector2Multiply(a, b);          }
-inline Vector2& operator*=(Vector2& a, Vector2 b) { return (a = Vector2Multiply(a, b));         }
-inline Vector2  operator* (Vector2  a, float scl) { return      Vector2Scale(a, scl);           }
-inline Vector2& operator*=(Vector2& a, float scl) { return (a = Vector2Scale(a, scl));          }
-inline Vector2  operator/ (Vector2  a, Vector2 b) { return      Vector2Divide(a, b);            }
-inline Vector2& operator/=(Vector2& a, Vector2 b) { return (a = Vector2Divide(a, b));           }
-inline Vector2  operator/ (Vector2  a, float div) { return      Vector2Scale(a, 1.0f / div);    }
-inline Vector2& operator/=(Vector2& a, float div) { return (a = Vector2Scale(a, 1.0f / div));   }
+    bool IsNA() { return sect == Section::NA; }
+    bool IsRibbon() { return sect == Section::Ribbon; }
+    bool IsMenu() { return sect == Section::Menu; }
+    bool IsFormulaBar() { return sect == Section::FormulaBar; }
+    bool IsFrozen() { return sect == Section::Frozen; }
+    bool IsWorkArea() { return sect == Section::WorkArea; }
 
-inline Vector3  operator- (Vector3  vec)          { return      Vector3Negate(vec);             }
-inline Vector3  operator+ (Vector3  a, Vector3 b) { return      Vector3Add(a, b);               }
-inline Vector3& operator+=(Vector3& a, Vector3 b) { return (a = Vector3Add(a, b));              }
-inline Vector3  operator+ (Vector3  a, float val) { return      Vector3AddValue(a, val);        }
-inline Vector3& operator+=(Vector3& a, float val) { return (a = Vector3AddValue(a, val));       }
-inline Vector3  operator- (Vector3  a, Vector3 b) { return      Vector3Subtract(a, b);          }
-inline Vector3& operator-=(Vector3& a, Vector3 b) { return (a = Vector3Subtract(a, b));         }
-inline Vector3  operator- (Vector3  a, float val) { return      Vector3SubtractValue(a, val);   }
-inline Vector3& operator-=(Vector3& a, float val) { return (a = Vector3SubtractValue(a, val));  }
-inline Vector3  operator* (Vector3  a, Vector3 b) { return      Vector3Multiply(a, b);          }
-inline Vector3& operator*=(Vector3& a, Vector3 b) { return (a = Vector3Multiply(a, b));         }
-inline Vector3  operator* (Vector3  a, float scl) { return      Vector3Scale(a, scl);           }
-inline Vector3& operator*=(Vector3& a, float scl) { return (a = Vector3Scale(a, scl));          }
-inline Vector3  operator/ (Vector3  a, Vector3 b) { return      Vector3Divide(a, b);            }
-inline Vector3& operator/=(Vector3& a, Vector3 b) { return (a = Vector3Divide(a, b));           }
-inline Vector3  operator/ (Vector3  a, float div) { return      Vector3Scale(a, 1.0f / div);    }
-inline Vector3& operator/=(Vector3& a, float div) { return (a = Vector3Scale(a, 1.0f / div));   }
 
-#pragma endregion
+    bool IsFormula_TextBox() { return IsFormulaBar() && sub.fbar == Subsection::Subsection_FormulaBar::TextBox; }
+
+    bool IsFrozen_Cell() { return IsFrozen() && sub.froz == Subsection::Subsection_Frozen::Cell; }
+    bool IsWorkArea_Cell() { return IsWorkArea() && sub.work == Subsection::Subsection_WorkArea::Cell; }
+    bool IsCell() { return IsFrozen_Cell() || IsWorkArea_Cell(); }
+
+    bool IsFrozen_Edge() { return IsFrozen() && sub.froz == Subsection::Subsection_Frozen::Edge; }
+    bool IsWorkArea_Edge() { return IsWorkArea() && sub.work == Subsection::Subsection_WorkArea::Edge; }
+    bool IsEdge() { return IsFrozen_Edge() || IsWorkArea_Edge(); }
+
+    bool IsWorkArea_Handle() { return IsWorkArea() && sub.work == Subsection::Subsection_WorkArea::Handle; }
+
+
+    void Set_NA() { sect = Section::NA; sub.na = Subsection::Subsection_NA::NA; }
+
+    void Set_Ribbon() { sect = Section::Ribbon; sub.rib = Subsection::Subsection_Ribbon::NA; }
+
+    void Set_Menu() { sect = Section::Menu; sub.menu = Subsection::Subsection_Menu::NA; }
+
+    void Set_FormulaBar() { sect = Section::FormulaBar; sub.fbar = Subsection::Subsection_FormulaBar::NA; }
+    void Set_FormulaBar_TextBox() { sect = Section::FormulaBar; sub.fbar = Subsection::Subsection_FormulaBar::TextBox; }
+
+    void Set_Frozen() { sect = Section::Frozen; sub.froz = Subsection::Subsection_Frozen::NA; }
+    void Set_Frozen_Cell() { sect = Section::Frozen; sub.froz = Subsection::Subsection_Frozen::Cell; }
+    void Set_Frozen_Edge() { sect = Section::Frozen; sub.froz = Subsection::Subsection_Frozen::Edge; }
+
+    void Set_WorkArea() { sect = Section::WorkArea; sub.work = Subsection::Subsection_WorkArea::NA; }
+    void Set_WorkArea_Cell() { sect = Section::WorkArea; sub.work = Subsection::Subsection_WorkArea::Cell; }
+    void Set_WorkArea_Edge() { sect = Section::WorkArea; sub.work = Subsection::Subsection_WorkArea::Edge; }
+    void Set_WorkArea_Handle() { sect = Section::WorkArea; sub.work = Subsection::Subsection_WorkArea::Handle; }
+
+    // Returns success
+    bool Set_Cell(Section fallback = Section::NA)
+    {
+        switch (sect)
+        {
+        case Section::Frozen: sub.froz = Subsection::Subsection_Frozen::Cell; return true;
+        case Section::WorkArea: sub.work = Subsection::Subsection_WorkArea::Cell; return true;
+        default:
+            if (fallback == Section::Frozen || fallback == Section::WorkArea)
+            {
+                sect = fallback;
+                return Set_Cell();
+            }
+            else
+                return false;
+        }
+    }
+    // Returns success
+    bool Set_Edge(Section fallback = Section::NA)
+    {
+        switch (sect)
+        {
+        case Section::Frozen: sub.froz = Subsection::Subsection_Frozen::Edge; return true;
+        case Section::WorkArea: sub.work = Subsection::Subsection_WorkArea::Edge; return true;
+        default:
+            if (fallback == Section::Frozen || fallback == Section::WorkArea)
+            {
+                sect = fallback;
+                return Set_Edge();
+            }
+            else
+                return false;
+        }
+    }
+};
+
+struct CellStyle
+{
+    int fontSize;
+    Color fontColor = BLACK;
+
+    // top, right, bottom, left
+    bool border[4];
+    bool background;
+    Color borderColor[4]; // Gray if !border[i]
+    Color backgroundColor; // White if !background
+};
+std::vector<CellStyle> g_Styles;
 
 std::vector<int> g_ColumnWidths;
 std::vector<int> g_RowHeights;
 
-struct Cell
+namespace UI
+{
+    namespace Ribbon
+    {
+        constexpr uint32_t g_height = 20;
+    }
+    namespace Menu
+    {
+        bool g_IsCollapsed = false;
+        constexpr uint32_t g_height = 200;
+        constexpr uint32_t g_height_Collapsed = 50;
+        uint32_t MenuHeight()
+        {
+            if (g_IsCollapsed)
+                return g_height_Collapsed;
+            else
+                return g_height;
+        }
+    }
+    namespace FormulaBar
+    {
+        constexpr uint32_t g_height = 21;
+    }
+    namespace Frozen
+    {
+        constexpr uint32_t g_ColumnWidth = 50;
+        constexpr uint32_t g_RowHeight = 20;
+    }
+}
+
+struct CellAddress
 {
     int x, y;
 };
+const char* AddressText_R(int row)
+{
+    if (row < 0)
+        return "#REF!";
+
+    return TextFormat("%i", 1 + row);
+}
+const char* AddressText_C(int column)
+{
+    if (column < 0)
+        return "#REF!";
+
+    if (column < 26)
+        return TextFormat("%c", 'A' + column);
+    else if (column < 26 * 26)
+        return TextFormat("%c%c", 'A' + column / 26 - 1, 'A' + column % 26);
+    else if (column < 26 * 26 * 26)
+        return TextFormat("%c%c%c", 'A' + column / (26 * 26) - 1, 'A' + column / 26, 'A' + column % 26);
+    else
+        return "#VALUE!";
+}
+const char* AddressText(int row, int column)
+{
+    if (row < 0 || column < 0)
+        return "#REF!";
+
+    if (column < 26)
+        return TextFormat("%c%i", 'A' + column, 1 + row);
+    else if (column < 26 * 26)
+        return TextFormat("%c%c%i", 'A' + column / 26 - 1, 'A' + column % 26, 1 + row);
+    else if (column < 26 * 26 * 26)
+        return TextFormat("%c%c%c%i", 'A' + column / (26 * 26) - 1, 'A' + column / 26, 'A' + column % 26, 1 + row);
+}
 struct Range
 {
-    Cell start, end;
+    CellAddress start, end;
 };
+std::vector<Range> g_Merged; // Entire merged range takes the style of the top-left cell
+
+std::vector<std::vector<std::string>> g_cells;
+
 // Does not say whether the rows/columns *match*
 bool IsRangeContiguous(Range a, Range b)
 {
@@ -159,15 +295,15 @@ bool IsRangeOverlapping(Range a, Range b)
     Rectangle rb = { b.start.x, b.start.y, b.end.x - b.start.x, b.end.y - b.start.y };
     return CheckCollisionRecs(ra, rb);
 }
-Range RangeFromCellPair(Cell a, Cell b)
+Range RangeFromCellPair(CellAddress a, CellAddress b)
 {
     return
         Range{
-            Cell{
+            CellAddress{
                 Min(a.x, b.x),
                 Min(a.y, b.y)
             },
-            Cell{
+            CellAddress{
                 Max(a.x, b.x),
                 Max(a.y, b.y)
             }
@@ -276,7 +412,7 @@ void SimplifyMultiRange(std::vector<Range>* ranges)
         }
     }
 }
-bool IsCellInRange(Cell cell, Range range)
+bool IsCellInRange(CellAddress cell, Range range)
 {
     return
         cell.x >= range.start.x &&
@@ -337,10 +473,61 @@ void OutlineRange(Range range, Color color, int thick = 1)
         DrawRectangleLines(startX + i - 1, startY + i, g_ColumnWidths[range.end.x] - startX - i * 2 + 1, g_RowHeights[range.end.y] - startY - i * 2 + 1, color);
     }
 }
-void DrawHandle(Cell cell, Color color)
+void DrawHandle(CellAddress cell, Color color)
 {
     DrawRectangle(g_ColumnWidths[cell.x] - 5, g_RowHeights[cell.y] - 4, 7, 7, WHITE);
     DrawRectangle(g_ColumnWidths[cell.x] - 4, g_RowHeights[cell.y] - 3, 6, 6, color);
+}
+
+void DrawRibbon(size_t start_x, size_t start_y, size_t end_x)
+{
+    // todo
+}
+void DrawMenu(size_t start_x, size_t start_y, size_t end_x)
+{
+
+}
+void DrawMenu_Collapsed(size_t start_x, size_t start_y, size_t end_x)
+{
+
+}
+void DrawFrozen(size_t start_x, size_t start_y, size_t end_x, size_t end_y)
+{
+    size_t frozenColumnWidth = 50;
+    size_t frozenRowHeight = 20;
+
+    DrawRectangle(0, 0, frozenColumnWidth, g_RowHeights.back(), RAYWHITE);
+    DrawRectangle(0, 0, g_ColumnWidths.back(), frozenRowHeight, RAYWHITE);
+    DrawLine(frozenColumnWidth, 0, frozenColumnWidth, g_RowHeights.back(), DARKGRAY1);
+    DrawLine(0, frozenRowHeight, g_ColumnWidths.back(), frozenRowHeight, DARKGRAY1);
+
+    for (int i = 0; i < g_ColumnWidths.size(); ++i)
+    {
+        DrawLine(g_ColumnWidths[i], 0, g_ColumnWidths[i], frozenRowHeight, DARKGRAY1);
+        DrawLine(g_ColumnWidths[i], 21, g_ColumnWidths[i], g_RowHeights.back(), LIGHTGRAY1);
+        DrawText((i > 26 ? TextFormat("%c%c", 'A' + i / 26, 'A' + i % 26) : TextFormat("%c", 'A' + i)), (g_ColumnWidths[i] + PreviousColumnWidth(i)) / 2 - 3.5f, 5, 10, DARKGRAY3);
+    }
+    for (int i = 0; i < g_RowHeights.size(); ++i)
+    {
+        DrawLine(0, g_RowHeights[i], 50, g_RowHeights[i], DARKGRAY1);
+        DrawLine(50, g_RowHeights[i], g_ColumnWidths.back(), g_RowHeights[i], LIGHTGRAY1);
+        DrawText(TextFormat("%i", i), 25 - 3.5f, (g_RowHeights[i] + PreviousRowHeight(i)) / 2 - 2.5f, 10, DARKGRAY3);
+    }
+}
+void DrawWorkArea(size_t start_x, size_t start_y, size_t end_x, size_t end_y)
+{
+    for (int i = 0; i < g_ColumnWidths.size(); ++i)
+    {
+        DrawLine(g_ColumnWidths[i], 0, g_ColumnWidths[i], 20, DARKGRAY1);
+        DrawLine(g_ColumnWidths[i], 21, g_ColumnWidths[i], g_RowHeights.back(), LIGHTGRAY1);
+        DrawText((i > 26 ? TextFormat("%c%c", 'A' + i / 26, 'A' + i % 26) : TextFormat("%c", 'A' + i)), (g_ColumnWidths[i] + PreviousColumnWidth(i)) / 2 - 3.5f, 5, 10, DARKGRAY3);
+    }
+    for (int i = 0; i < g_RowHeights.size(); ++i)
+    {
+        DrawLine(0, g_RowHeights[i], 50, g_RowHeights[i], DARKGRAY1);
+        DrawLine(50, g_RowHeights[i], g_ColumnWidths.back(), g_RowHeights[i], LIGHTGRAY1);
+        DrawText(TextFormat("%i", i), 25 - 3.5f, (g_RowHeights[i] + PreviousRowHeight(i)) / 2 - 2.5f, 10, DARKGRAY3);
+    }
 }
 
 int main()
@@ -364,6 +551,10 @@ int main()
         g_RowHeights.push_back(41 + 21 * i);
     }
 
+    Context context;
+    context.sect = Context::Section::NA;
+    context.sub.na = Context::Subsection::Subsection_NA::NA;
+
     enum class MouseMode
     {
         None,
@@ -371,19 +562,14 @@ int main()
         Dragging,
     } mouseMode = MouseMode::None;
 
-    enum class Region
-    {
-        Outside,
-        Cell,
-        Edge,
-    } region = Region::Outside;
-
     // -1 for none
     int cell_x = -1;
     int cell_y = -1;
     int drag_distance = 0;
+    float timeOfLastClick = -1.0f;
+    bool b_DoubleClicking;
 
-    Cell startOfSelection;
+    CellAddress startOfSelection;
 
     while (!WindowShouldClose())
     {
@@ -391,12 +577,14 @@ int main()
         *   Simulate frame and update variables   *
         ******************************************/
 
-        // Something must already be selected before selection can be eliminated
+        b_DoubleClicking = false;
+
+        // Release left click
         if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
         {
             if (mouseMode == MouseMode::Dragging)
             {
-                if (region == Region::Edge)
+                if (context.IsFrozen_Edge())
                 {
                     // Column
                     if (cell_x != -1)
@@ -411,9 +599,11 @@ int main()
                             g_RowHeights[i] += drag_distance;
                     }
                 }
-                else if (region == Region::Cell && g_selection.size() > 1)
+                else if (context.IsCell() && g_selection.size() > 1)
                 {
                     std::stack<size_t> redundant;
+                    // Handle selection actions now that selection is confirmed
+                    // Subtract/Combine selection
                     for (size_t i = 0; i < g_selection.size() - 1; ++i)
                     {
                         // Subtract
@@ -739,6 +929,7 @@ int main()
                             redundant.push(i);
                         }
                     }
+                    
                     while (!redundant.empty())
                     {
                         g_selection.erase(g_selection.begin() + redundant.top());
@@ -749,56 +940,95 @@ int main()
             mouseMode = MouseMode::None;
         }
 
-        // Skip checking if we already know they're dragging something
+        // Current context is ignored while the mouse is held down
         if (mouseMode != MouseMode::Dragging)
         {
-            region = Region::Outside;
+            // Determine context
+            if (GetMouseY() <= UI::Ribbon::g_height)
+            {
+                context.Set_Ribbon();
+                // Todo
+            }
+            else if (GetMouseY() <= UI::Ribbon::g_height + UI::Menu::MenuHeight())
+            {
+                context.Set_Menu();
+                // Todo
+            }
+            else if ((GetMouseY() <= UI::Ribbon::g_height + UI::Menu::MenuHeight() + UI::Frozen::g_RowHeight) || (GetMouseX() <= UI::Frozen::g_ColumnWidth))
+            {
+                context.Set_Frozen();
+
+                // Row
+                if (GetMouseY() <= UI::Ribbon::g_height + UI::Menu::MenuHeight() + UI::Frozen::g_RowHeight)
+                {
+                    // Corner
+                    if (GetMouseX() <= UI::Frozen::g_ColumnWidth)
+                    {
+                        // Todo
+                    }
+                    // Row
+                    else
+                    {
+                        // Todo
+                    }
+                }
+                // Column
+                else
+                {
+                    // Todo
+                }
+            }
+            else
+            {
+                context.Set_WorkArea();
+                // Todo
+            }
 
             // Find column
-            if (GetMouseX() > 50)
+            if (GetMouseX() > UI::Frozen::g_ColumnWidth)
             {
                 for (int i = 0; i < g_ColumnWidths.size(); ++i)
                 {
                     if (GetMouseX() <= g_ColumnWidths[i])
                     {
                         cell_x = i;
-                        if (GetMouseY() <= 20 && (GetMouseX() + 8) >= g_ColumnWidths[i])
-                            region = Region::Edge;
+                        if (GetMouseY() <= UI::Frozen::g_RowHeight && (GetMouseX() + 8) >= g_ColumnWidths[i])
+                            context.Set_Edge(Context::Section::Frozen);
                         break;
                     }
                 }
             }
             else
             {
-                region = Region::Cell;
+                context.Set_Cell();
                 cell_x = -1;
             }
 
             // Find row
-            if (GetMouseY() > 20)
+            if (GetMouseY() > UI::Frozen::g_RowHeight)
             {
                 for (int i = 0; i < g_RowHeights.size(); ++i)
                 {
                     if (GetMouseY() <= g_RowHeights[i])
                     {
                         cell_y = i;
-                        if (GetMouseX() <= 50 && (GetMouseY() + 8) >= g_RowHeights[i])
-                            region = Region::Edge;
+                        if (GetMouseX() <= UI::Frozen::g_ColumnWidth && (GetMouseY() + 8) >= g_RowHeights[i])
+                            context.Set_Edge(Context::Section::Frozen);
                         break;
                     }
                 }
             }
             else
             {
-                if (region != Region::Edge)
-                    region = Region::Cell;
+                if (!context.IsEdge())
+                    context.Set_Cell();
                 cell_y = -1;
             }
 
             if (cell_x != -1 && cell_y != -1)
-                region = Region::Cell;
+                context.Set_Cell();
 
-            if (region == Region::Edge)
+            if (context.IsEdge())
             {
                 if (cell_x != -1)
                     SetMouseCursor(MOUSE_CURSOR_RESIZE_EW);
@@ -820,9 +1050,14 @@ int main()
             {
                 mouseMode = MouseMode::Dragging;
 
-                if (region == Region::Cell)
+                if (GetTime() - timeOfLastClick <= 1.0f)
+                    b_DoubleClicking = true;
+
+                timeOfLastClick = GetTime();
+
+                if (context.IsCell())
                 {
-                    Cell cell = { cell_x, cell_y };
+                    CellAddress cell = { cell_x, cell_y };
 
                     if (!g_selection.empty() && (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT))) // Expand selection
                     {
@@ -848,6 +1083,7 @@ int main()
                         {
                             startOfSelection = cell;
                             g_selection.push_back({ cell, cell });
+                            // todo: Add support for frozen
                         }
                         else // Replace selection
                         {
@@ -858,11 +1094,11 @@ int main()
                                 mouseMode = MouseMode::Hovering;
 
                             if (cell_x == -1 && cell_y == -1)
-                                g_selection.push_back({ { 0,0 }, { (int)g_ColumnWidths.size() - 1, (int)g_RowHeights.size() - 1 } });
+                                g_selection.push_back({ { 0, 0 }, { (int)g_ColumnWidths.size() - 1, (int)g_RowHeights.size() - 1 } });
                             else if (cell_x == -1)
-                                g_selection.push_back({ { 0,cell_y }, { (int)g_ColumnWidths.size() - 1, cell_y } });
+                                g_selection.push_back({ { 0, cell_y }, { (int)g_ColumnWidths.size() - 1, cell_y } });
                             else if (cell_y == -1)
-                                g_selection.push_back({ { cell_x,0 }, { cell_x, (int)g_RowHeights.size() - 1 } });
+                                g_selection.push_back({ { cell_x, 0 }, { cell_x, (int)g_RowHeights.size() - 1 } });
                             else
                                 g_selection.push_back({ cell, cell });
                         }
@@ -871,9 +1107,10 @@ int main()
             }
         }
 
+        // When mouse is held down
         if (mouseMode == MouseMode::Dragging)
         {
-            if (region == Region::Edge)
+            if (context.IsEdge())
             {
                 if (cell_x != -1) // Vertical
                 {
@@ -892,13 +1129,13 @@ int main()
                     
                 }
             }
-            else if (region == Region::Cell)
+            else if (context.IsCell())
             {
                 int temp_x, temp_y;
                 temp_x = temp_y = -1;
 
                 // Find column
-                if (GetMouseX() > 50)
+                if (GetMouseX() > UI::Frozen::g_ColumnWidth)
                 {
                     for (int i = 0; i < g_ColumnWidths.size(); ++i)
                     {
@@ -909,7 +1146,7 @@ int main()
                 }
 
                 // Find row
-                if (GetMouseY() > 20)
+                if (GetMouseY() > UI::Frozen::g_RowHeight)
                 {
                     for (int i = 0; i < g_RowHeights.size(); ++i)
                     {
@@ -935,25 +1172,32 @@ int main()
         BeginDrawing(); {
 
             ClearBackground(WHITE);
-
-            DrawRectangle(0, 0, 50, g_RowHeights.back(), RAYWHITE);
-            DrawRectangle(0, 0, g_ColumnWidths.back(), 20, RAYWHITE);
-            DrawLine(50, 0, 50, g_RowHeights.back(), DARKGRAY1);
-            DrawLine(0, 20, g_ColumnWidths.back(), 20, DARKGRAY1);
-            for (int i = 0; i < g_ColumnWidths.size(); ++i)
+            
+            // Draw frozen
             {
-                DrawLine(g_ColumnWidths[i], 0, g_ColumnWidths[i], 20, DARKGRAY1);
-                DrawLine(g_ColumnWidths[i], 21, g_ColumnWidths[i], g_RowHeights.back(), LIGHTGRAY1);
-                DrawText((i > 26 ? TextFormat("%c%c", 'A' + i / 26, 'A' + i % 26) : TextFormat("%c",'A' + i)), (g_ColumnWidths[i] + PreviousColumnWidth(i)) / 2 - 3.5f, 5, 10, DARKGRAY3);
-            }
-            for (int i = 0; i < g_RowHeights.size(); ++i)
-            {
-                DrawLine(0, g_RowHeights[i], 50, g_RowHeights[i], DARKGRAY1);
-                DrawLine(50, g_RowHeights[i], g_ColumnWidths.back(), g_RowHeights[i], LIGHTGRAY1);
-                DrawText(TextFormat("%i", i), 25 - 3.5f, (g_RowHeights[i] + PreviousRowHeight(i)) / 2 - 2.5f, 10, DARKGRAY3);
+                DrawRectangle(0, 0, UI::Frozen::g_ColumnWidth, g_RowHeights.back(), RAYWHITE);
+                DrawRectangle(0, 0, g_ColumnWidths.back(), UI::Frozen::g_RowHeight, RAYWHITE);
+                DrawLine(UI::Frozen::g_ColumnWidth, 0, UI::Frozen::g_ColumnWidth, g_RowHeights.back(), DARKGRAY1);
+                DrawLine(0, UI::Frozen::g_RowHeight, g_ColumnWidths.back(), UI::Frozen::g_RowHeight, DARKGRAY1);
             }
 
-            if (region == Region::Edge)
+            // Draw cell divisions
+            {
+                for (int i = 0; i < g_ColumnWidths.size(); ++i)
+                {
+                    DrawLine(g_ColumnWidths[i], 0, g_ColumnWidths[i], 20, DARKGRAY1);
+                    DrawLine(g_ColumnWidths[i], 21, g_ColumnWidths[i], g_RowHeights.back(), LIGHTGRAY1);
+                    DrawText(AddressText_C(i), (g_ColumnWidths[i] + PreviousColumnWidth(i)) / 2 - 3.5f, 5, 10, DARKGRAY3);
+                }
+                for (int i = 0; i < g_RowHeights.size(); ++i)
+                {
+                    DrawLine(0, g_RowHeights[i], UI::Frozen::g_ColumnWidth, g_RowHeights[i], DARKGRAY1);
+                    DrawLine(UI::Frozen::g_ColumnWidth, g_RowHeights[i], g_ColumnWidths.back(), g_RowHeights[i], LIGHTGRAY1);
+                    DrawText(AddressText_R(i), 25 - 3.5f, (g_RowHeights[i] + PreviousRowHeight(i)) / 2 - 2.5f, 10, DARKGRAY3);
+                }
+            }
+
+            if (context.IsEdge())
             {
                 if (cell_x != -1)
                 {
@@ -967,7 +1211,7 @@ int main()
                     if (mouseMode == MouseMode::Dragging)
                         DrawResizeBar(0, g_RowHeights[cell_y] + drag_distance, CORNFLOWER_BLUE);
                     else
-                        DrawRectangle(0, g_RowHeights[cell_y] - 4, 50, 5, CORNFLOWER_BLUE);
+                        DrawRectangle(0, g_RowHeights[cell_y] - 4, UI::Frozen::g_ColumnWidth, 5, CORNFLOWER_BLUE);
                 }
             }
 
@@ -986,7 +1230,7 @@ int main()
                 {
                     OutlineRange(g_selection[i], CORNFLOWER_BLUE);
                 }
-                Cell startingCell = { (startOfSelection.x != -1 ? startOfSelection.x : 0), (startOfSelection.y != -1 ? startOfSelection.y : 0) };
+                CellAddress startingCell = { (startOfSelection.x != -1 ? startOfSelection.x : 0), (startOfSelection.y != -1 ? startOfSelection.y : 0) };
                 OutlineRange({ startingCell, startingCell }, CORNFLOWER_BLUE, 2);
                 if ((mouseMode == MouseMode::Dragging ? cell_x == startOfSelection.x && cell_y == startOfSelection.y : true))
                     DrawHandle(g_selection.back().end, CORNFLOWER_BLUE);
@@ -1002,8 +1246,6 @@ int main()
     /******************************************
     *   Unload and free memory                *
     ******************************************/
-
-    // @TODO: Unload variables
 
     CloseWindow();
 
