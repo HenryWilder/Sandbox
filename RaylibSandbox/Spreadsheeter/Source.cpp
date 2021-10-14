@@ -1,5 +1,6 @@
 #include <string>
 #include <vector>
+#include <stack>
 #include <math.h>
 #include <raylib.h>
 #include <raymath.h>
@@ -301,7 +302,7 @@ int PreviousColumnWidth(int column)
     if (column > 0)
         return g_ColumnWidths[(size_t)column - 1];
     else
-        return 20;
+        return 50;
 }
 int CellWidth(int column)
 {
@@ -317,8 +318,8 @@ void DrawResizeBar(int x, int y, Color color)
     }
     else // Horizontal
     {
-        DrawRectangle(x, y - 2, 20, 5, color);
-        DrawLine(20, y, g_ColumnWidths.back(), y, color);
+        DrawRectangle(x, y - 2, 50, 5, color);
+        DrawLine(50, y, g_ColumnWidths.back(), y, color);
     }
 }
 void HighlightRange(Range range, Color color)
@@ -348,6 +349,7 @@ int main()
     int windowHeight = 720;
     InitWindow(windowWidth, windowHeight, "Spreadsheeter");
     SetTargetFPS(60);
+    //ToggleFullscreen();
 
     /******************************************
     *   Load textures, shaders, and meshes    *
@@ -355,7 +357,7 @@ int main()
 
     for (int i = 0; i < 26; ++i)
     {
-        g_ColumnWidths.push_back(120 + 100 * i);
+        g_ColumnWidths.push_back(150 + 100 * i);
     }
     for (int i = 0; i < 100; ++i)
     {
@@ -365,7 +367,7 @@ int main()
     enum class MouseMode
     {
         None,
-        Hovering,
+        Hovering, // Used for highlighting resize anchors
         Dragging,
     } mouseMode = MouseMode::None;
 
@@ -392,19 +394,356 @@ int main()
         // Something must already be selected before selection can be eliminated
         if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
         {
-            if (mouseMode == MouseMode::Dragging && region == Region::Edge)
+            if (mouseMode == MouseMode::Dragging)
             {
-                // Column
-                if (cell_x != -1)
+                if (region == Region::Edge)
                 {
-                    for (int i = cell_x; i < g_ColumnWidths.size(); ++i)
-                        g_ColumnWidths[i] += drag_distance;
+                    // Column
+                    if (cell_x != -1)
+                    {
+                        for (int i = cell_x; i < g_ColumnWidths.size(); ++i)
+                            g_ColumnWidths[i] += drag_distance;
+                    }
+                    // Row
+                    else
+                    {
+                        for (int i = cell_y; i < g_RowHeights.size(); ++i)
+                            g_RowHeights[i] += drag_distance;
+                    }
                 }
-                // Row
-                else
+                else if (region == Region::Cell && g_selection.size() > 1)
                 {
-                    for (int i = cell_y; i < g_RowHeights.size(); ++i)
-                        g_RowHeights[i] += drag_distance;
+                    std::stack<size_t> redundant;
+                    for (size_t i = 0; i < g_selection.size() - 1; ++i)
+                    {
+                        // Subtract
+                        if (g_selection.back().start.x >= g_selection[i].start.x &&
+                            g_selection.back().end.x <= g_selection[i].end.x &&
+                            g_selection.back().start.y >= g_selection[i].start.y &&
+                            g_selection.back().end.y <= g_selection[i].end.y)
+                        {
+                            // Identical
+                            /************
+                            * ( )( )( ) *
+                            * ( )( )( ) *
+                            * ( )( )( ) *
+                            ************/
+                            if (g_selection.back().start.x == g_selection[i].start.x &&
+                                g_selection.back().start.y == g_selection[i].start.y &&
+                                g_selection.back().end.x == g_selection[i].end.x &&
+                                g_selection.back().end.y == g_selection[i].end.y)
+                            {
+                                redundant.push(i);
+                            }
+
+                            // Shave top
+                            /************
+                            * ( )( )( ) *
+                            * [ ][ ][ ] *
+                            * [ ][ ][ ] *
+                            ************/
+                            else if (g_selection.back().start.x == g_selection[i].start.x &&
+                                g_selection.back().start.y == g_selection[i].start.y &&
+                                g_selection.back().end.x == g_selection[i].end.x &&
+                                g_selection.back().end.y <= g_selection[i].end.y)
+                            {
+                                g_selection[i].start.y = g_selection.back().end.y + 1;
+                            }
+
+                            // Shave bottom
+                            /************
+                            * [ ][ ][ ] *
+                            * [ ][ ][ ] *
+                            * ( )( )( ) *
+                            ************/
+                            else if (g_selection.back().start.x == g_selection[i].start.x &&
+                                g_selection.back().start.y >= g_selection[i].start.y &&
+                                g_selection.back().end.x == g_selection[i].end.x &&
+                                g_selection.back().end.y == g_selection[i].end.y)
+                            {
+                                g_selection[i].end.y = g_selection.back().start.y - 1;
+                            }
+
+                            // Shave left
+                            /************
+                            * ( )[ ][ ] *
+                            * ( )[ ][ ] *
+                            * ( )[ ][ ] *
+                            ************/
+                            else if (g_selection.back().start.x == g_selection[i].start.x &&
+                                g_selection.back().start.y == g_selection[i].start.y &&
+                                g_selection.back().end.x <= g_selection[i].end.x &&
+                                g_selection.back().end.y == g_selection[i].end.y)
+                            {
+                                g_selection[i].start.x = g_selection.back().end.x + 1;
+                            }
+
+                            // Shave right
+                            /************
+                            * [ ][ ]( ) *
+                            * [ ][ ]( ) *
+                            * [ ][ ]( ) *
+                            ************/
+                            else if (g_selection.back().start.x >= g_selection[i].start.x &&
+                                g_selection.back().start.y == g_selection[i].start.y &&
+                                g_selection.back().end.x == g_selection[i].end.x &&
+                                g_selection.back().end.y == g_selection[i].end.y)
+                            {
+                                g_selection[i].end.x = g_selection.back().start.x - 1;
+                            }
+
+                            // Cut horizontal
+                            /************
+                            * [ ][ ][ ] *
+                            * ( )( )( ) *
+                            * [ ][ ][ ] *
+                            ************/
+                            else if (g_selection.back().start.x == g_selection[i].start.x &&
+                                g_selection.back().start.y >= g_selection[i].start.y &&
+                                g_selection.back().end.x == g_selection[i].end.x &&
+                                g_selection.back().end.y <= g_selection[i].end.y)
+                            {
+                                g_selection.push_back(g_selection.back());
+                                size_t j = g_selection.size() - 2;
+                                g_selection[j] = g_selection[i];
+
+                                g_selection[i].end.y = g_selection.back().start.y - 1;
+                                g_selection[j].start.y = g_selection.back().end.y + 1;
+                            }
+
+                            // Cut vertical
+                            /************
+                            * [ ]( )[ ] *
+                            * [ ]( )[ ] *
+                            * [ ]( )[ ] *
+                            ************/
+                            else if (g_selection.back().start.x >= g_selection[i].start.x &&
+                                g_selection.back().start.y == g_selection[i].start.y &&
+                                g_selection.back().end.x <= g_selection[i].end.x &&
+                                g_selection.back().end.y == g_selection[i].end.y)
+                            {
+                                g_selection.push_back(g_selection.back());
+                                size_t j = g_selection.size() - 2;
+                                g_selection[j] = g_selection[i];
+
+                                g_selection[i].end.x = g_selection.back().start.x - 1;
+                                g_selection[j].start.x = g_selection.back().end.x + 1;
+                            }
+
+                            // Hole punch
+                            /************
+                            * [ ][ ][ ] *
+                            * [ ]( )[ ] *
+                            * [ ][ ][ ] *
+                            ************/
+                            else if (g_selection.back().start.x >= g_selection[i].start.x &&
+                                g_selection.back().start.y >= g_selection[i].start.y &&
+                                g_selection.back().end.x <= g_selection[i].end.x &&
+                                g_selection.back().end.y <= g_selection[i].end.y)
+                            {
+                                bool touches_left = g_selection.back().start.x == g_selection[i].start.x;
+                                bool touches_top = g_selection.back().start.y == g_selection[i].start.y;
+                                bool touches_right = g_selection.back().end.x == g_selection[i].end.x;
+                                bool touches_bottom = g_selection.back().end.y == g_selection[i].end.y;
+
+                                size_t partsAdded = (size_t)!touches_left + (size_t)!touches_right + (size_t)!touches_bottom - (size_t)touches_top;
+
+                                if (partsAdded)
+                                {
+                                    Range temp = g_selection.back();
+                                    g_selection.back() = g_selection[i];
+                                    g_selection.reserve(g_selection.size() + partsAdded);
+                                    for (size_t j = 0; j < partsAdded; ++j)
+                                    {
+                                        g_selection.push_back(g_selection[i]);
+                                    }
+                                    g_selection.back() = temp;
+                                }
+
+                                size_t j = (g_selection.size() - partsAdded) - 1;
+
+                                /**************************
+                                * left, top, right, bottom
+                                *
+                                * none 0000
+                                * [i][i][i]
+                                * [j]( )[k]
+                                * [l][l][l]
+                                *
+                                * left 1000
+                                * [i][i][i]
+                                * ( )( )[j]
+                                * [k][k][k]
+                                * top 0100
+                                * [i]( )[j]
+                                * [i]( )[j]
+                                * [k][k][k]
+                                * right 0010
+                                * [i][i][i]
+                                * [j]( )( )
+                                * [k][k][k]
+                                * bottom 0001
+                                * [i][i][i]
+                                * [j]( )[k]
+                                * [j]( )[k]
+                                *
+                                * left, top 1100
+                                * ( )( )[i]
+                                * ( )( )[i]
+                                * [j][j][j]
+                                * left, bottom 1001
+                                * [i][i][i]
+                                * ( )( )[j]
+                                * ( )( )[j]
+                                * top, right 0110
+                                * [i]( )( )
+                                * [i]( )( )
+                                * [j][j][j]
+                                * right, bottom 0101
+                                * [i][i][i]
+                                * [j]( )( )
+                                * [j]( )( )
+                                **************************/
+                                // Prioratize keeping cells together horizontally
+                                uint8_t branch = (touches_left << 3) | (touches_top << 2) | (touches_right << 1) | touches_bottom;
+                                switch (branch)
+                                {
+                                case 0b0000: // none
+                                    // Top
+                                    g_selection[i].end.y = g_selection.back().start.y - 1;
+
+                                    // Left
+                                    g_selection[j].start.y = g_selection.back().start.y;
+                                    g_selection[j].end.y = g_selection.back().end.y;
+                                    g_selection[j].end.x = g_selection.back().start.x - 1;
+
+                                    // Right
+                                    g_selection[j + 1].start.y = g_selection.back().start.y;
+                                    g_selection[j + 1].end.y = g_selection.back().end.y;
+                                    g_selection[j + 1].start.x = g_selection.back().end.x + 1;
+
+                                    // Bottom
+                                    g_selection[j + 2].start.y = g_selection.back().end.y + 1;
+                                    break;
+                                case 0b1000: // left
+                                    // Top
+                                    g_selection[i].end.y = g_selection.back().start.y - 1;
+
+                                    // Right
+                                    g_selection[j].start.y = g_selection.back().start.y;
+                                    g_selection[j].end.y = g_selection.back().end.y;
+                                    g_selection[j].start.x = g_selection.back().end.x + 1;
+
+                                    // Bottom
+                                    g_selection[j + 1].start.y = g_selection.back().end.y + 1;
+                                    break;
+                                case 0b0100: // top
+                                    // Left
+                                    g_selection[i].start.y = g_selection.back().start.y;
+                                    g_selection[i].end.y = g_selection.back().end.y;
+                                    g_selection[i].end.x = g_selection.back().start.x - 1;
+
+                                    // Right
+                                    g_selection[j].start.y = g_selection.back().start.y;
+                                    g_selection[j].end.y = g_selection.back().end.y;
+                                    g_selection[j].start.x = g_selection.back().end.x + 1;
+
+                                    // Bottom
+                                    g_selection[j + 1].start.y = g_selection.back().end.y + 1;
+                                    break;
+                                case 0b0010: // right
+                                    // Top
+                                    g_selection[i].end.y = g_selection.back().start.y - 1;
+
+                                    // Left
+                                    g_selection[j].start.y = g_selection.back().start.y;
+                                    g_selection[j].end.y = g_selection.back().end.y;
+                                    g_selection[j].end.x = g_selection.back().start.x - 1;
+
+                                    // Bottom
+                                    g_selection[j + 1].start.y = g_selection.back().end.y + 1;
+                                    break;
+                                case 0b0001: // bottom
+                                    // Top
+                                    g_selection[i].end.y = g_selection.back().start.y - 1;
+
+                                    // Left
+                                    g_selection[j].start.y = g_selection.back().start.y;
+                                    g_selection[j].end.y = g_selection.back().end.y;
+                                    g_selection[j].end.x = g_selection.back().start.x - 1;
+
+                                    // Right
+                                    g_selection[j + 1].start.y = g_selection.back().start.y;
+                                    g_selection[j + 1].end.y = g_selection.back().end.y;
+                                    g_selection[j + 1].start.x = g_selection.back().end.x + 1;
+                                    break;
+
+                                case 0b1100: // left, top
+                                    // Right
+                                    g_selection[i].start.y = g_selection.back().start.y;
+                                    g_selection[i].end.y = g_selection.back().end.y;
+                                    g_selection[i].start.x = g_selection.back().end.x + 1;
+
+                                    // Bottom
+                                    g_selection[j].start.y = g_selection.back().end.y + 1;
+                                    break;
+                                case 0b1001: // left, bottom
+                                    // Top
+                                    g_selection[i].end.y = g_selection.back().start.y - 1;
+
+                                    // Right
+                                    g_selection[j].start.y = g_selection.back().start.y;
+                                    g_selection[j].end.y = g_selection.back().end.y;
+                                    g_selection[j].start.x = g_selection.back().end.x + 1;
+                                    break;
+                                case 0b0110: // top, right
+
+                                    // Left
+                                    g_selection[i].start.y = g_selection.back().start.y;
+                                    g_selection[i].end.y = g_selection.back().end.y;
+                                    g_selection[i].end.x = g_selection.back().start.x - 1;
+
+                                    // Bottom
+                                    g_selection[j].start.y = g_selection.back().end.y + 1;
+                                    break;
+                                case 0b0011: // right, bottom
+                                    // Top
+                                    g_selection[i].end.y = g_selection.back().start.y - 1;
+
+                                    // Left
+                                    g_selection[j].start.y = g_selection.back().start.y;
+                                    g_selection[j].end.y = g_selection.back().end.y;
+                                    g_selection[j].end.x = g_selection.back().start.x - 1;
+                                    break;
+                                }
+                            }
+                            startOfSelection = g_selection[i].start;
+                            g_selection.pop_back();
+                        }
+                        // Combine
+                        else if (g_selection.back().start.x == g_selection[i].start.x &&
+                                 g_selection.back().end.x == g_selection[i].end.x)
+                        {
+                            // Prepend
+                            if (g_selection.back().start.y == g_selection[i].end.y + 1)
+                                g_selection.back().start.y = g_selection[i].start.y;
+
+                            // Append
+                            else if (g_selection.back().end.y + 1 == g_selection[i].start.y)
+                                g_selection.back().end.y = g_selection[i].end.y;
+
+                            // Do nothing
+                            else
+                                continue;
+
+                            redundant.push(i);
+                        }
+                    }
+                    while (!redundant.empty())
+                    {
+                        g_selection.erase(g_selection.begin() + redundant.top());
+                        redundant.pop();
+                    }
                 }
             }
             mouseMode = MouseMode::None;
@@ -416,7 +755,7 @@ int main()
             region = Region::Outside;
 
             // Find column
-            if (GetMouseX() > 20)
+            if (GetMouseX() > 50)
             {
                 for (int i = 0; i < g_ColumnWidths.size(); ++i)
                 {
@@ -443,7 +782,7 @@ int main()
                     if (GetMouseY() <= g_RowHeights[i])
                     {
                         cell_y = i;
-                        if (GetMouseX() <= 20 && (GetMouseY() + 8) >= g_RowHeights[i])
+                        if (GetMouseX() <= 50 && (GetMouseY() + 8) >= g_RowHeights[i])
                             region = Region::Edge;
                         break;
                     }
@@ -494,11 +833,11 @@ int main()
                         }
                         if (cell_x == -1)
                         {
-
+                            // todo
                         }
                         else if (cell_y == -1)
                         {
-
+                            // todo
                         }
                         else
                             g_selection.back() = RangeFromCellPair(startOfSelection, cell);
@@ -559,7 +898,7 @@ int main()
                 temp_x = temp_y = -1;
 
                 // Find column
-                if (GetMouseX() > 20)
+                if (GetMouseX() > 50)
                 {
                     for (int i = 0; i < g_ColumnWidths.size(); ++i)
                     {
@@ -597,9 +936,9 @@ int main()
 
             ClearBackground(WHITE);
 
-            DrawRectangle(0, 0, 20, g_RowHeights.back(), RAYWHITE);
+            DrawRectangle(0, 0, 50, g_RowHeights.back(), RAYWHITE);
             DrawRectangle(0, 0, g_ColumnWidths.back(), 20, RAYWHITE);
-            DrawLine(20, 0, 20, g_RowHeights.back(), DARKGRAY1);
+            DrawLine(50, 0, 50, g_RowHeights.back(), DARKGRAY1);
             DrawLine(0, 20, g_ColumnWidths.back(), 20, DARKGRAY1);
             for (int i = 0; i < g_ColumnWidths.size(); ++i)
             {
@@ -609,9 +948,9 @@ int main()
             }
             for (int i = 0; i < g_RowHeights.size(); ++i)
             {
-                DrawLine(0, g_RowHeights[i], 20, g_RowHeights[i], DARKGRAY1);
-                DrawLine(20, g_RowHeights[i], g_ColumnWidths.back(), g_RowHeights[i], LIGHTGRAY1);
-                DrawText(TextFormat("%i", i), 10 - 3.5f, (g_RowHeights[i] + PreviousRowHeight(i)) / 2 - 2.5f, 10, DARKGRAY3);
+                DrawLine(0, g_RowHeights[i], 50, g_RowHeights[i], DARKGRAY1);
+                DrawLine(50, g_RowHeights[i], g_ColumnWidths.back(), g_RowHeights[i], LIGHTGRAY1);
+                DrawText(TextFormat("%i", i), 25 - 3.5f, (g_RowHeights[i] + PreviousRowHeight(i)) / 2 - 2.5f, 10, DARKGRAY3);
             }
 
             if (region == Region::Edge)
@@ -628,7 +967,7 @@ int main()
                     if (mouseMode == MouseMode::Dragging)
                         DrawResizeBar(0, g_RowHeights[cell_y] + drag_distance, CORNFLOWER_BLUE);
                     else
-                        DrawRectangle(0, g_RowHeights[cell_y] - 4, 20, 5, CORNFLOWER_BLUE);
+                        DrawRectangle(0, g_RowHeights[cell_y] - 4, 50, 5, CORNFLOWER_BLUE);
                 }
             }
 
@@ -639,16 +978,18 @@ int main()
                     HighlightRange(g_selection[i], SELECTION_BLUE);
                 }
             }
-            for (size_t i = 0; i < g_selection.size() - (mouseMode == MouseMode::Dragging ? 1 : 0); ++i)
-            {
-                OutlineRange(g_selection[i], CORNFLOWER_BLUE);
-            }
+
+
             if (!g_selection.empty())
             {
+                for (size_t i = 0; i < (mouseMode == MouseMode::Dragging ? g_selection.size() - 1 : g_selection.size()); ++i)
+                {
+                    OutlineRange(g_selection[i], CORNFLOWER_BLUE);
+                }
                 Cell startingCell = { (startOfSelection.x != -1 ? startOfSelection.x : 0), (startOfSelection.y != -1 ? startOfSelection.y : 0) };
                 OutlineRange({ startingCell, startingCell }, CORNFLOWER_BLUE, 2);
-                if (mouseMode != MouseMode::Dragging)
-                DrawHandle(g_selection.back().end, CORNFLOWER_BLUE);
+                if ((mouseMode == MouseMode::Dragging ? cell_x == startOfSelection.x && cell_y == startOfSelection.y : true))
+                    DrawHandle(g_selection.back().end, CORNFLOWER_BLUE);
             }
 
 
