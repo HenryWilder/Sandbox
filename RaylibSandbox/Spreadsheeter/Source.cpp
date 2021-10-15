@@ -194,76 +194,6 @@ struct CellStyle
 };
 std::vector<CellStyle> g_Styles;
 
-std::vector<int> g_ColumnWidths;
-std::vector<int> g_RowHeights;
-
-namespace UI
-{
-    namespace Ribbon
-    {
-        constexpr uint32_t g_height = 20;
-        uint32_t AbsoluteRibbonStart()
-        {
-            return 0;
-        }
-        uint32_t AbsoluteRibbonEnd()
-        {
-            return g_height;
-        }
-    }
-    namespace Menu
-    {
-        bool g_IsCollapsed = false;
-        constexpr uint32_t g_height = 200;
-        constexpr uint32_t g_height_Collapsed = 50;
-
-        uint32_t MenuHeight()
-        {
-            if (g_IsCollapsed)
-                return g_height_Collapsed;
-            else
-                return g_height;
-        }
-
-        uint32_t AbsoluteMenuStart()
-        {
-            return Ribbon::AbsoluteRibbonEnd();
-        }
-        uint32_t AbsoluteMenuEnd()
-        {
-            return Ribbon::AbsoluteRibbonEnd() + MenuHeight();
-        }
-    }
-    namespace FormulaBar
-    {
-        constexpr uint32_t g_height = 21;
-        
-        uint32_t AbsoluteFormulaBarStart()
-        {
-            return Menu::AbsoluteMenuEnd();
-        }
-        
-        uint32_t AbsoluteFormulaBarEnd()
-        {
-            return Menu::AbsoluteMenuEnd() + g_height;
-        }
-    }
-    namespace Frozen
-    {
-        constexpr uint32_t g_ColumnWidth = 50;
-        constexpr uint32_t g_RowHeight = 20;
-
-        uint32_t AbsoluteFrozenStart()
-        {
-            return FormulaBar::AbsoluteFormulaBarEnd();
-        }
-        uint32_t AbsoluteFrozenEnd_Row()
-        {
-            return FormulaBar::AbsoluteFormulaBarEnd() + g_RowHeight;
-        }
-    }
-}
-
 struct CellAddress
 {
     int x, y;
@@ -301,37 +231,195 @@ const char* AddressText(int row, int column)
     else if (column < 26 * 26 * 26)
         return TextFormat("%c%c%c%i", 'A' + column / (26 * 26) - 1, 'A' + column / 26, 'A' + column % 26, 1 + row);
 }
+
 struct Range
 {
     CellAddress start, end;
+
+    int Width()
+    {
+        return end.x - start.x;
+    }
+    int Height()
+    {
+        return end.y - start.y;
+    }
+    bool IsOneCell()
+    {
+        return start.x == end.x && start.y == end.y;
+    }
 };
+
+namespace UI
+{
+    namespace Ribbon
+    {
+        constexpr uint32_t g_height = 20;
+
+        uint32_t AbsoluteRibbonStart()
+        {
+            return 0;
+        }
+        uint32_t AbsoluteRibbonEnd()
+        {
+            return g_height;
+        }
+    }
+    namespace Menu
+    {
+        bool g_IsCollapsed = false;
+        constexpr uint32_t g_height = 100;
+        constexpr uint32_t g_height_Collapsed = 50;
+
+        uint32_t MenuHeight()
+        {
+            if (g_IsCollapsed)
+                return g_height_Collapsed;
+            else
+                return g_height;
+        }
+
+        uint32_t AbsoluteMenuStart()
+        {
+            return Ribbon::AbsoluteRibbonEnd() + 1;
+        }
+        uint32_t AbsoluteMenuEnd()
+        {
+            return AbsoluteMenuStart() + MenuHeight();
+        }
+    }
+    namespace FormulaBar
+    {
+        constexpr uint32_t g_height = 21;
+        
+        uint32_t AbsoluteFormulaBarStart()
+        {
+            return Menu::AbsoluteMenuEnd() + 1;
+        }
+        
+        uint32_t AbsoluteFormulaBarEnd()
+        {
+            return AbsoluteFormulaBarStart() + g_height;
+        }
+    }
+    namespace Frozen
+    {
+        constexpr uint32_t g_ColumnWidth = 50;
+        constexpr uint32_t g_RowHeight = 20;
+
+        uint32_t AbsoluteFrozenStart_Y()
+        {
+            return FormulaBar::AbsoluteFormulaBarEnd() + 1;
+        }
+        uint32_t AbsoluteFrozenEnd_Row()
+        {
+            return AbsoluteFrozenStart_Y() + g_RowHeight;
+        }
+        uint32_t AbsoluteFrozenEnd_Column()
+        {
+            return g_ColumnWidth;
+        }
+    }
+    namespace WorkArea
+    {
+        std::vector<int> g_ColumnWidths;
+        std::vector<int> g_RowHeights;
+
+        // Start
+        uint32_t AbsoluteWorkAreaStart_X()
+        {
+            return Frozen::AbsoluteFrozenEnd_Column() + 1;
+        }
+        uint32_t AbsoluteWorkAreaStart_Y()
+        {
+            return Frozen::AbsoluteFrozenEnd_Row() + 1;
+        }
+
+        // End
+        uint32_t AbsoluteWorkAreaEnd_X()
+        {
+            return AbsoluteWorkAreaStart_X() + g_ColumnWidths.back();
+        }
+        uint32_t AbsoluteWorkAreaEnd_Y()
+        {
+            return AbsoluteWorkAreaStart_Y() + g_RowHeights.back();
+        }
+
+        // At
+        uint32_t AbsoluteWorkAreaColumn_StartX(int column)
+        {
+            --column;
+            if (column < 0)
+                return AbsoluteWorkAreaStart_X() - 1;
+            else if (column >= g_ColumnWidths.size())
+                return AbsoluteWorkAreaEnd_X() - 1;
+            else
+                return AbsoluteWorkAreaStart_X() + g_ColumnWidths[column] - 1;
+        }
+        uint32_t AbsoluteWorkAreaColumn_EndX(int column)
+        {
+            if (column < 0)
+                return AbsoluteWorkAreaStart_X();
+            else if (column >= g_ColumnWidths.size())
+                return AbsoluteWorkAreaEnd_X();
+            else
+                return AbsoluteWorkAreaStart_X() + g_ColumnWidths[column];
+        }
+        uint32_t AbsoluteWorkAreaRow_StartY(int row)
+        {
+            --row;
+            if (row < 0)
+                return AbsoluteWorkAreaStart_Y();
+            else if (row >= g_RowHeights.size())
+                return AbsoluteWorkAreaEnd_Y();
+            else
+                return AbsoluteWorkAreaStart_Y() + g_RowHeights[row];
+        }
+        uint32_t AbsoluteWorkAreaRow_EndY(int row)
+        {
+            if (row < 0)
+                return AbsoluteWorkAreaStart_Y();
+            else if (row >= g_RowHeights.size())
+                return AbsoluteWorkAreaEnd_Y();
+            else
+                return AbsoluteWorkAreaStart_Y() + g_RowHeights[row];
+        }
+
+        // Width/height
+        // Single cell
+        uint32_t WorkAreaColumnWidth(int column)
+        {
+             return AbsoluteWorkAreaColumn_EndX(column) - AbsoluteWorkAreaColumn_StartX(column);
+        }
+        uint32_t WorkAreaRowHeight(int row)
+        {
+            return AbsoluteWorkAreaRow_EndY(row) - AbsoluteWorkAreaRow_StartY(row);
+        }
+        // Range
+        uint32_t WorkAreaColumnRangeWidth(Range range)
+        {
+            return AbsoluteWorkAreaColumn_EndX(range.end.x) - AbsoluteWorkAreaColumn_StartX(range.start.x);
+        }
+        uint32_t WorkAreaRowRangeHeight(Range range)
+        {
+            return AbsoluteWorkAreaRow_EndY(range.end.y) - AbsoluteWorkAreaRow_StartY(range.start.y);
+        }
+        // Entire workspace
+        uint32_t WorkAreaWidth()
+        {
+            return g_ColumnWidths.back();
+        }
+        uint32_t WorkAreaHeight()
+        {
+             return g_RowHeights.back();
+        }
+    }
+}
+
 std::vector<Range> g_Merged; // Entire merged range takes the style of the top-left cell
 
 std::vector<std::vector<std::string>> g_cells;
 
-// Does not say whether the rows/columns *match*
-bool IsRangeContiguous(Range a, Range b)
-{
-    return
-        a.end.x + 1 == b.start.x ||
-        b.end.x + 1 == a.start.x ||
-        a.end.y + 1 == b.start.y ||
-        b.end.y + 1 == a.start.y;
-}
-bool IsRangeMatchingR(Range a, Range b)
-{
-    return a.start.y == b.start.y && b.end.y == a.end.y;
-}
-bool IsRangeMatchingC(Range a, Range b)
-{
-    return a.start.x == b.start.x && b.end.x == a.end.x;
-}
-bool IsRangeOverlapping(Range a, Range b)
-{
-    Rectangle ra = { a.start.x, a.start.y, a.end.x - a.start.x, a.end.y - a.start.y };
-    Rectangle rb = { b.start.x, b.start.y, b.end.x - b.start.x, b.end.y - b.start.y };
-    return CheckCollisionRecs(ra, rb);
-}
 Range RangeFromCellPair(CellAddress a, CellAddress b)
 {
     return
@@ -346,109 +434,150 @@ Range RangeFromCellPair(CellAddress a, CellAddress b)
             }
         };
 }
-void SimplifyMultiRange(std::vector<Range>* ranges)
-{
-    /*******************************************************************************************************
-    *
-    *   RANGE COMBINATION
-    *
-    *   Compatible:
-    *
-    *     0. ROWS match and COLUMNS are contiguous. Order does not matter.
-    *
-    *         [A][A][B][B] or [B][B][A][A]
-    *         [A][A][B][B]    [B][B][A][A]
-    *
-    *         Result: Ranges can combine.
-    *
-    *         [A][A][A][A]
-    *         [A][A][A][A]
-    *
-    *
-    *     0. COLUMNS match and ROWS are contiguous. Order does not matter.
-    *
-    *         [A][A]    [B][B]
-    *         [A][A] or [B][B]
-    *         [B][B]    [A][A]
-    *         [B][B]    [A][A]
-    *
-    *         Result: Ranges can combine.
-    *
-    *         [A][A]
-    *         [A][A]
-    *         [A][A]
-    *         [A][A]
-    *
-    *
-    *   Incompatible:
-    *
-    *     1. Ranges are not contiguous either by row nor by column, whether their rows or columns match
-    *
-    *         [A][A]   [B][B]
-    *         [A][A]   [B][B]
-    *
-    *         Result: Do nothing.
-    *
-    *         [A][A]   [B][B]
-    *         [A][A]   [B][B]
-    *
-    *
-    *     2. Row AND column mismatch, even if partly contiguous
-    *
-    *         [A][A]
-    *         [A][A][B][B]
-    *               [B][B]
-    *
-    *         Result: Keep the two ranges separate.
-    *
-    *         [A][A]
-    *         [A][A][B][B]
-    *               [B][B]
-    *
-    *
-    *     3. Ranges overlap partially
-    *
-    *         [A][A]
-    *         [A](B)[B]
-    *            [B][B]
-    *
-    *         Result: Break the existing range apart.
-    *
-    *         [A][A]
-    *         [C][B][B]
-    *            [B][B]
-    *
-    *
-    *     4. Range does not go outside the bounds of the existing range
-    *
-    *         [A][A]                        [A][A][A]
-    *         (B)(B)  or  [A](B)(B)[A]  or  [A](B)[A]
-    *         (B)(B)      [A](B)(B)[A]      [A][A][A]
-    *         [A][A]
-    *
-    *         Result: Subtract the new range from the existing one.
-    *
-    *         [A][A]                        [A][A][A]
-    *                 or  [A]      [B]  or  [B]   [C]
-    *                     [A]      [B]      [D][D][D]
-    *         [B][B]
-    *
-    *******************************************************************************************************/
 
-    for (size_t i = 0; i < ranges->size(); ++i)
+
+void DrawVerticalLineRight(int column, Color color)
+{
+    DrawLine(
+        UI::WorkArea::AbsoluteWorkAreaColumn_EndX(column),
+        UI::WorkArea::AbsoluteWorkAreaStart_Y(),
+        UI::WorkArea::AbsoluteWorkAreaColumn_EndX(column),
+        UI::WorkArea::AbsoluteWorkAreaEnd_Y(),
+        color);
+}
+void DrawHorizontalLineBottom(int row, Color color)
+{
+    DrawLine(
+        UI::WorkArea::AbsoluteWorkAreaStart_X(),
+        UI::WorkArea::AbsoluteWorkAreaRow_EndY(row),
+        UI::WorkArea::AbsoluteWorkAreaEnd_X(),
+        UI::WorkArea::AbsoluteWorkAreaRow_EndY(row),
+        color);
+}
+
+void DrawCellText(const char* text, CellAddress cell, int fontSize, Color color)
+{
+    Rectangle cellRec =
     {
-        for (size_t j = 0; j < ranges->size(); ++j)
+        UI::WorkArea::AbsoluteWorkAreaColumn_StartX(cell.x) + 3,
+        UI::WorkArea::AbsoluteWorkAreaRow_StartY(cell.y) + (UI::WorkArea::WorkAreaRowHeight(cell.y) - fontSize),
+        UI::WorkArea::WorkAreaColumnWidth(cell.x) - 3,
+        UI::WorkArea::WorkAreaRowHeight(cell.y) - (UI::WorkArea::WorkAreaRowHeight(cell.y) - fontSize),
+    };
+    DrawTextRec(
+        GetFontDefault(),
+        text,
+        cellRec,
+        fontSize,
+        1,
+        true,
+        color);
+}
+// Put -1 in the axis that should be frozen
+void DrawFrozenCellLabel(const char* text, CellAddress cell, int fontSize, Color color)
+{
+    // Frozen column (of row 123 labels)
+    if (cell.x == -1)
+        DrawText(text,
+            3,
+            UI::WorkArea::AbsoluteWorkAreaRow_StartY(cell.y) + 3,
+            fontSize,
+            color);
+
+    // Frozen row (of column ABC labels)
+    else if (cell.y == -1)
+        DrawText(text,
+            UI::WorkArea::AbsoluteWorkAreaColumn_StartX(cell.x) + 3,
+            UI::Frozen::AbsoluteFrozenStart_Y() + 3,
+            fontSize,
+            color);
+}
+void DrawRangeFill(Range range, Color color)
+{
+    DrawRectangle(
+        UI::WorkArea::AbsoluteWorkAreaColumn_StartX(range.start.x),
+        UI::WorkArea::AbsoluteWorkAreaRow_StartY(range.start.y),
+        UI::WorkArea::WorkAreaColumnRangeWidth(range),
+        UI::WorkArea::WorkAreaRowRangeHeight(range),
+        color);
+}
+
+// Listed clockwise
+enum BorderSideFlags
+{
+    // Surrounding the range
+    BORDER_TOP      = 0b0001,
+    BORDER_RIGHT    = 0b0010,
+    BORDER_BOTTOM   = 0b0100,
+    BORDER_LEFT     = 0b1000,
+
+    // Splitting internal cells
+    BORDER_VERTICAL     = 0b010000,
+    BORDER_HORIZONTAL   = 0b100000,
+};
+void DrawRangeBorder(Range range, BorderSideFlags sides, Color color)
+{
+    uint32_t startX = UI::WorkArea::AbsoluteWorkAreaColumn_StartX(range.start.x);
+    uint32_t startY = UI::WorkArea::AbsoluteWorkAreaRow_StartY(range.start.y);
+    uint32_t endX = UI::WorkArea::AbsoluteWorkAreaColumn_EndX(range.end.x);
+    uint32_t endY = UI::WorkArea::AbsoluteWorkAreaRow_EndY(range.end.y);
+
+    if (sides & BORDER_TOP)
+        DrawLine(startX, startY, endX, startY, color);
+
+    if (sides & BORDER_LEFT)
+        DrawLine(startX, startY, startX, endY, color);
+
+    if (sides & BORDER_RIGHT)
+        DrawLine(endX, startY, endX, endY, color);
+
+    if (sides & BORDER_BOTTOM)
+        DrawLine(startX, endY, endX, endY, color);
+
+    // Horizontal line cycles vertically
+    if (range.Height() > 1 && sides & BORDER_HORIZONTAL)
+    {
+        for (size_t i = range.start.y; i <= range.end.y; ++i)
         {
-            if (IsRangeContiguous((*ranges)[i], (*ranges)[j]) && (IsRangeMatchingR((*ranges)[i], (*ranges)[j]) || IsRangeMatchingC((*ranges)[i], (*ranges)[j])))
-            {
-                (*ranges)[i].start.x = Min((*ranges)[i].start.x, (*ranges)[j].start.x);
-                (*ranges)[i].start.y = Min((*ranges)[i].start.y, (*ranges)[j].start.y);
-                (*ranges)[i].end.x = Max((*ranges)[i].end.x, (*ranges)[j].end.x);
-                (*ranges)[i].end.y = Max((*ranges)[i].end.y, (*ranges)[j].end.y);
-            }
+            int y = UI::WorkArea::AbsoluteWorkAreaRow_EndY(i);
+
+            DrawLine(startX, y, endX, y, color);
+        }
+    }
+    // Vertical line cycles horizontally
+    if (range.Width() > 1 && sides & BORDER_VERTICAL)
+    {
+        for (size_t i = range.start.x; i <= range.end.x; ++i)
+        {
+            int x = UI::WorkArea::AbsoluteWorkAreaColumn_EndX(i);
+
+            DrawLine(x, startY, x, endY, color);
         }
     }
 }
+void DrawRangeOutline(Range range, BorderSideFlags sides, int insetThickness, Color color)
+{
+    uint32_t startX = UI::WorkArea::AbsoluteWorkAreaColumn_StartX(range.start.x);
+    uint32_t startY = UI::WorkArea::AbsoluteWorkAreaRow_StartY(range.start.y);
+    uint32_t endX = UI::WorkArea::AbsoluteWorkAreaColumn_EndX(range.end.x);
+    uint32_t endY = UI::WorkArea::AbsoluteWorkAreaRow_EndY(range.end.y);
+    uint32_t width = UI::WorkArea::WorkAreaColumnRangeWidth(range);
+    uint32_t height = UI::WorkArea::WorkAreaRowRangeHeight(range);
+
+    if (sides & BORDER_TOP)
+        DrawRectangle(startX, startY, width, insetThickness, color);
+
+    if (sides & BORDER_LEFT)
+        DrawRectangle(startX, startY, insetThickness, height, color);
+
+    if (sides & BORDER_RIGHT)
+        DrawRectangle(endX - insetThickness, startY, insetThickness, height, color);
+
+    if (sides & BORDER_BOTTOM)
+        DrawRectangle(startX, endY - insetThickness, width, insetThickness, color);
+}
+
+
 bool IsCellInRange(CellAddress cell, Range range)
 {
     return
@@ -459,97 +588,65 @@ bool IsCellInRange(CellAddress cell, Range range)
 }
 std::vector<Range> g_selection = {};
 
-int PreviousRowHeight(int row)
-{
-    if (row > 0)
-        return g_RowHeights[(size_t)row - 1];
-    else
-        return 0;
-}
-int CellHeight(int row)
-{
-    return g_RowHeights[row] - PreviousRowHeight(row);
-}
-int PreviousColumnWidth(int column)
-{
-    if (column > 0)
-        return g_ColumnWidths[(size_t)column - 1];
-    else
-        return 0;
-}
-int CellWidth(int column)
-{
-    return g_ColumnWidths[column] - PreviousColumnWidth(column);
-}
-
 void DrawResizeBar(int x, int y, Color color)
 {
-    if (x > 0) // Vertical
+    if (x > UI::Frozen::g_ColumnWidth) // Vertical
     {
-        DrawRectangle(x - 3, y, 5, 21, color);
-        DrawLine(x, 21, x, g_RowHeights.back(), color);
+        DrawRectangle(x - 3, UI::Frozen::AbsoluteFrozenStart_Y(), 5, UI::Frozen::g_RowHeight, color);
+        DrawLine(x, UI::WorkArea::AbsoluteWorkAreaStart_Y(), x, UI::WorkArea::AbsoluteWorkAreaEnd_Y(), color);
     }
-    else // Horizontal
+    else if (y > UI::Frozen::AbsoluteFrozenEnd_Row()) // Horizontal
     {
-        DrawRectangle(x, y - 2, 50, 5, color);
-        DrawLine(50, y, g_ColumnWidths.back(), y, color);
-    }
-}
-void HighlightRange(Range range, Color color)
-{
-    int startX = PreviousColumnWidth(range.start.x);
-    int startY = PreviousRowHeight(range.start.y);
-    DrawRectangle(startX, startY, g_ColumnWidths[range.end.x] - startX, g_RowHeights[range.end.y] - startY, color);
-}
-void OutlineRange(Range range, Color color, int thick = 1)
-{
-    int startX = PreviousColumnWidth(range.start.x);
-    int startY = PreviousRowHeight(range.start.y);
-    for (int i = 0; i < thick; ++i)
-    {
-        DrawRectangleLines(startX + i - 1, startY + i, g_ColumnWidths[range.end.x] - startX - i * 2 + 1, g_RowHeights[range.end.y] - startY - i * 2 + 1, color);
+        DrawRectangle(0, y - 2, UI::Frozen::g_ColumnWidth, 5, color);
+        DrawLine(UI::WorkArea::AbsoluteWorkAreaStart_X(), y, UI::WorkArea::AbsoluteWorkAreaEnd_X(), y, color);
     }
 }
 void DrawHandle(CellAddress cell, Color color)
 {
-    DrawRectangle(g_ColumnWidths[cell.x] - 5, g_RowHeights[cell.y] - 4, 7, 7, WHITE);
-    DrawRectangle(g_ColumnWidths[cell.x] - 4, g_RowHeights[cell.y] - 3, 6, 6, color);
+    uint32_t centerPointX = UI::WorkArea::AbsoluteWorkAreaColumn_EndX(cell.x);
+    uint32_t centerPointY = UI::WorkArea::AbsoluteWorkAreaRow_EndY(cell.y);
+    DrawRectangle(centerPointX - 5, centerPointY - 4, 7, 7, WHITE);
+    DrawRectangle(centerPointX - 4, centerPointY - 3, 6, 6, color);
 }
 
-void DrawRibbon()
+void DrawRibbon(int windowWidth)
 {
-    // Todo
+    DrawRectangle(0, 0, windowWidth, UI::Ribbon::g_height, RAYWHITE);
+    DrawLine(0, UI::Ribbon::g_height, windowWidth, UI::Ribbon::g_height, DARKGRAY1);
 }
-void DrawMenu()
+void DrawMenu(int windowWidth)
 {
-    // Todo
+    DrawRectangle(0, UI::Menu::AbsoluteMenuStart() + 1, windowWidth, UI::Menu::g_height - 1, RAYWHITE);
+    DrawLine(0, UI::Menu::AbsoluteMenuStart() + 1 + UI::Menu::g_height, windowWidth, UI::Menu::AbsoluteMenuStart() + 1 + UI::Menu::g_height, DARKGRAY1);
 }
-void DrawMenu_Collapsed()
+void DrawMenu_Collapsed(int windowWidth)
 {
-    // Todo
+    DrawRectangle(0, UI::Menu::AbsoluteMenuStart() + 1, windowWidth, UI::Menu::g_height - 1, RAYWHITE);
+    DrawLine(0, UI::Menu::AbsoluteMenuStart() + UI::Menu::g_height_Collapsed, windowWidth, UI::Menu::AbsoluteMenuStart() + UI::Menu::g_height_Collapsed, DARKGRAY1);
 }
-void DrawFormulaBar()
+void DrawFormulaBar(int windowWidth)
 {
-    // Todo
+    DrawRectangle(0, UI::FormulaBar::AbsoluteFormulaBarStart() + 1, windowWidth, UI::FormulaBar::g_height - 1, RAYWHITE);
+    DrawLine(0, UI::FormulaBar::AbsoluteFormulaBarEnd() - 1, windowWidth, UI::FormulaBar::AbsoluteFormulaBarEnd() - 1, DARKGRAY1);
 }
 void DrawFrozen(CellAddress startOfSelection = { -2,-2 })
 {
     // The frozen row (row of columns)
     uint32_t startRowX = 0;
-    uint32_t endRowX = startRowX + g_ColumnWidths.back();
-    uint32_t startRowY = UI::Frozen::AbsoluteFrozenStart();
-    uint32_t endRowY = UI::Frozen::AbsoluteFrozenEnd_Row();
-    uint32_t rowWidth = g_ColumnWidths.back();
+    uint32_t endRowX = UI::WorkArea::AbsoluteWorkAreaEnd_X();
+    uint32_t startRowY = UI::Frozen::AbsoluteFrozenStart_Y();
+    uint32_t endRowY = startRowY + UI::Frozen::g_RowHeight;
+    uint32_t rowWidth = UI::WorkArea::WorkAreaWidth();
     uint32_t rowHeight = UI::Frozen::g_RowHeight;
     uint32_t rowHalfHeight = rowHeight / 2;
 
     // The frozen column (column of rows)
     uint32_t startColumnX = 0;
     uint32_t endColumnX = startColumnX + UI::Frozen::g_ColumnWidth;
-    uint32_t startColumnY = UI::Frozen::AbsoluteFrozenStart();
-    uint32_t endColumnY = startColumnY + g_RowHeights.back();
+    uint32_t startColumnY = UI::Frozen::AbsoluteFrozenStart_Y();
+    uint32_t endColumnY = UI::WorkArea::AbsoluteWorkAreaEnd_Y();
     uint32_t columnWidth = UI::Frozen::g_ColumnWidth;
-    uint32_t columnHeight = g_RowHeights.back();
+    uint32_t columnHeight = UI::WorkArea::WorkAreaHeight();
     uint32_t columnHalfWidth = columnWidth / 2;
 
     // Frozen cells fill
@@ -559,13 +656,11 @@ void DrawFrozen(CellAddress startOfSelection = { -2,-2 })
     // Selected row/column
     if (startOfSelection.x != -2)
     {
-        uint32_t highlightRowY = startRowY;
-        if (startOfSelection.y > 0) highlightRowY += g_RowHeights[(size_t)startOfSelection.y - 1];
-        uint32_t highlightRowHeight = g_RowHeights[(size_t)startOfSelection.y] - highlightRowY;
+        uint32_t highlightColumnX = UI::WorkArea::AbsoluteWorkAreaColumn_StartX(startOfSelection.x);
+        uint32_t highlightColumnWidth = UI::WorkArea::WorkAreaColumnWidth(startOfSelection.x);
 
-        uint32_t highlightColumnX = startColumnX;
-        if (startOfSelection.x > 0) highlightColumnX += g_ColumnWidths[(size_t)startOfSelection.x - 1];
-        uint32_t highlightColumnWidth = g_ColumnWidths[(size_t)startOfSelection.x] - highlightColumnX;
+        uint32_t highlightRowY = UI::WorkArea::AbsoluteWorkAreaRow_StartY(startOfSelection.y);
+        uint32_t highlightRowHeight = UI::WorkArea::WorkAreaRowHeight(startOfSelection.y);
 
         DrawRectangle(startRowX, highlightRowY, rowWidth, highlightRowHeight, GRAY); // Vertical
         DrawRectangle(highlightColumnX, startColumnY, highlightColumnWidth, columnHeight, GRAY); // Horizontal
@@ -578,44 +673,32 @@ void DrawFrozen(CellAddress startOfSelection = { -2,-2 })
     uint32_t frozenFontSize = 10;
 
     // Vertical (frozen row; cycling through columns) lines
-    for (int i = 0; i < g_ColumnWidths.size(); ++i)
+    for (int i = 0; i < UI::WorkArea::g_ColumnWidths.size(); ++i)
     {
-        uint32_t thisColumnX = endColumnX + g_ColumnWidths[i];
+        uint32_t thisColumnX = UI::WorkArea::AbsoluteWorkAreaColumn_EndX(i);
         DrawLine(thisColumnX, startRowY, thisColumnX, endRowY, DARKGRAY1);
         const char* columnWord = AddressText_C(i);
-        uint32_t thisRowHalfWidth = (g_ColumnWidths[i] + PreviousColumnWidth(i)) / 2;
-        DrawText(columnWord, endColumnX + thisRowHalfWidth - 3.5f, startRowY + rowHalfHeight - 3.5f, frozenFontSize, DARKGRAY3);
+        uint32_t thisRowHalfWidth = UI::WorkArea::WorkAreaColumnWidth(i) / 2;
+        //DrawText(columnWord, endColumnX + thisRowHalfWidth - 3.5f, startRowY + rowHalfHeight - 3.5f, frozenFontSize, DARKGRAY3);
+        DrawFrozenCellLabel(columnWord, { i, -1 }, frozenFontSize, DARKGRAY3);
     }
     // Horizontal (frozen column; cycling through rows) lines
-    for (int i = 0; i < g_RowHeights.size(); ++i)
+    for (int i = 0; i < UI::WorkArea::g_RowHeights.size(); ++i)
     {
-        uint32_t thisRowY = endRowY + g_RowHeights[i];
+        uint32_t thisRowY = UI::WorkArea::AbsoluteWorkAreaRow_EndY(i);
         DrawLine(startColumnX, thisRowY, endColumnX, thisRowY, DARKGRAY1);
         const char* rowNumber = AddressText_R(i);
-        uint32_t thisColumnHalfHeight = (g_RowHeights[i] + PreviousRowHeight(i)) / 2;
-        DrawText(rowNumber, startColumnX + columnHalfWidth - 3.5f, endRowY + thisColumnHalfHeight - 2.5f, frozenFontSize, DARKGRAY3);
+        uint32_t thisColumnHalfHeight = UI::WorkArea::WorkAreaRowHeight(i) / 2;
+        //DrawText(rowNumber, startColumnX + columnHalfWidth - 3.5f, endRowY + thisColumnHalfHeight - 2.5f, frozenFontSize, DARKGRAY3);
+        DrawFrozenCellLabel(rowNumber, { -1, i }, frozenFontSize, DARKGRAY3);
     }
 }
 void DrawWorkArea()
 {
-    // Columns (vertical lines cycling horizontally)
-    for (int i = 0; i < g_ColumnWidths.size(); ++i)
-    {
-        DrawLine(UI::Frozen::g_ColumnWidth + g_ColumnWidths[i],
-            UI::Frozen::AbsoluteFrozenEnd_Row(),
-            UI::Frozen::g_ColumnWidth + g_ColumnWidths[i],
-            UI::Frozen::AbsoluteFrozenEnd_Row() + g_RowHeights.back(),
-            LIGHTGRAY1);
-    }
-    // Rows (horizontal lines cycling vertically)
-    for (int i = 0; i < g_RowHeights.size(); ++i)
-    {
-        DrawLine(UI::Frozen::g_ColumnWidth,
-            UI::Frozen::AbsoluteFrozenEnd_Row() + g_RowHeights[i],
-            UI::Frozen::g_ColumnWidth + g_ColumnWidths.back(),
-            UI::Frozen::AbsoluteFrozenEnd_Row() + g_RowHeights[i],
-            LIGHTGRAY1);
-    }
+    DrawRangeBorder(
+        { { 0,0 }, { (int)UI::WorkArea::g_ColumnWidths.size(), (int)UI::WorkArea::g_RowHeights.size() } },
+        BorderSideFlags(BORDER_HORIZONTAL | BORDER_VERTICAL | BORDER_RIGHT | BORDER_BOTTOM),
+        LIGHTGRAY1);
 }
 void DrawSelection(std::vector<Range>* selection)
 {
@@ -636,11 +719,11 @@ int main()
 
     for (int i = 0; i < 26; ++i)
     {
-        g_ColumnWidths.push_back(100 * (i + 1));
+        UI::WorkArea::g_ColumnWidths.push_back(100 * (i + 1));
     }
     for (int i = 0; i < 100; ++i)
     {
-        g_RowHeights.push_back(21 * (i + 1));
+        UI::WorkArea::g_RowHeights.push_back(21 * (i + 1));
     }
 
     Context context;
@@ -681,14 +764,14 @@ int main()
                     // Column
                     if (cell_x != -1)
                     {
-                        for (int i = cell_x; i < g_ColumnWidths.size(); ++i)
-                            g_ColumnWidths[i] += drag_distance;
+                        for (int i = cell_x; i < UI::WorkArea::g_ColumnWidths.size(); ++i)
+                            UI::WorkArea::g_ColumnWidths[i] += drag_distance;
                     }
                     // Row
                     else
                     {
-                        for (int i = cell_y; i < g_RowHeights.size(); ++i)
-                            g_RowHeights[i] += drag_distance;
+                        for (int i = cell_y; i < UI::WorkArea::g_RowHeights.size(); ++i)
+                            UI::WorkArea::g_RowHeights[i] += drag_distance;
                     }
                 }
                 else if (context.IsCell() && g_selection.size() > 1)
@@ -1075,14 +1158,15 @@ int main()
                     // Row
                     else // Will certainly be outside of the corner
                     {
-                        for (cell_x = 0; cell_x < g_ColumnWidths.size(); ++cell_x)
+                        for (cell_x = 0; cell_x < UI::WorkArea::g_ColumnWidths.size(); ++cell_x)
                         {
-                            if (GetMouseX() <= g_ColumnWidths[cell_x])
+                            if (GetMouseX() <= UI::WorkArea::AbsoluteWorkAreaColumn_EndX(cell_x))
                             {
-                                if ((GetMouseX() + 8) >= g_ColumnWidths[cell_x])
+                                if ((GetMouseX() + 8) >= UI::WorkArea::AbsoluteWorkAreaColumn_EndX(cell_x))
                                 {
                                     context.Set_Frozen_Edge();
                                     SetMouseCursor(MOUSE_CURSOR_RESIZE_EW);
+                                    mouseMode = MouseMode::Hovering;
                                 }
                                 break;
                             }
@@ -1092,14 +1176,15 @@ int main()
                 // Column
                 else // Will certainly be outside of the corner
                 {
-                    for (cell_y = 0; cell_y < g_RowHeights.size(); ++cell_y)
+                    for (cell_y = 0; cell_y < UI::WorkArea::g_RowHeights.size(); ++cell_y)
                     {
-                        if (GetMouseY() <= g_RowHeights[cell_y])
+                        if (GetMouseY() <= UI::WorkArea::AbsoluteWorkAreaRow_EndY(cell_y))
                         {
-                            if ((GetMouseY() + 8) >= g_RowHeights[cell_y])
+                            if ((GetMouseY() + 8) >= UI::WorkArea::AbsoluteWorkAreaRow_EndY(cell_y))
                             {
                                 context.Set_Frozen_Edge();
                                 SetMouseCursor(MOUSE_CURSOR_RESIZE_NS);
+                                mouseMode = MouseMode::Hovering;
                             }
                             break;
                         }
@@ -1112,15 +1197,15 @@ int main()
             {
                 context.Set_WorkArea_Cell();
 
-                for (cell_x = 0; cell_x < g_ColumnWidths.size(); ++cell_x)
+                for (cell_x = 0; cell_x < UI::WorkArea::g_ColumnWidths.size(); ++cell_x)
                 {
-                    if (g_ColumnWidths[cell_x] <= GetMouseX())
+                    if (UI::WorkArea::AbsoluteWorkAreaColumn_EndX(cell_x) <= GetMouseX())
                         break;
                 }
 
-                for (cell_y = 0; cell_y < g_RowHeights.size(); ++cell_y)
+                for (cell_y = 0; cell_y < UI::WorkArea::g_RowHeights.size(); ++cell_y)
                 {
-                    if (g_ColumnWidths[cell_y] <= GetMouseX())
+                    if (UI::WorkArea::AbsoluteWorkAreaRow_EndY(cell_y) <= GetMouseX())
                         break;
                 }
 
@@ -1129,8 +1214,8 @@ int main()
                 {
                     // HACK: Being used for pixels here
                     Range handle;
-                    handle.start.x = g_ColumnWidths[g_selection.back().end.x] - 5;
-                    handle.start.y = g_RowHeights[g_selection.back().end.y] - 5;
+                    handle.start.x = UI::WorkArea::AbsoluteWorkAreaColumn_EndX(g_selection.back().end.x) - 5;
+                    handle.start.y = UI::WorkArea::AbsoluteWorkAreaRow_EndY(g_selection.back().end.y) - 5;
                     handle.end.x = handle.start.x + 7;
                     handle.end.y = handle.start.y + 7;
 
@@ -1142,6 +1227,11 @@ int main()
                         SetMouseCursor(MOUSE_CURSOR_CROSSHAIR);
                     }
                 }
+            }
+
+            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+            {
+                mouseMode = MouseMode::Dragging;
             }
 
             // Mouse press
@@ -1237,10 +1327,10 @@ int main()
                 // Find column
                 if (GetMouseX() > UI::Frozen::g_ColumnWidth)
                 {
-                    for (int i = 0; i < g_ColumnWidths.size(); ++i)
+                    for (int i = 0; i < UI::Frozen::g_ColumnWidths.size(); ++i)
                     {
                         temp_x = i;
-                        if (GetMouseX() <= g_ColumnWidths[i])
+                        if (GetMouseX() <= UI::Frozen::g_ColumnWidths[i])
                             break;
                     }
                 }
@@ -1248,10 +1338,10 @@ int main()
                 // Find row
                 if (GetMouseY() > UI::Frozen::g_RowHeight)
                 {
-                    for (int i = 0; i < g_RowHeights.size(); ++i)
+                    for (int i = 0; i < UI::Frozen::g_RowHeights.size(); ++i)
                     {
                         temp_y = i;
-                        if (GetMouseY() <= g_RowHeights[i])
+                        if (GetMouseY() <= UI::Frozen::g_RowHeights[i])
                             break;
                     }
                 }
@@ -1274,20 +1364,30 @@ int main()
 
             ClearBackground(WHITE);
             
-            //DrawRibbon();
-            //if (UI::Menu::g_IsCollapsed)
-            //    DrawMenu_Collapsed();
-            //else
-            //    DrawMenu();
-            //DrawFormulaBar();
-
             DrawWorkArea();
+            DrawCellText("test", {0,0}, 13, BLACK);
+
             DrawSelection(&g_selection);
 
             if (!g_selection.empty())
                 DrawFrozen(startOfSelection);
             else
                 DrawFrozen();
+
+            DrawFormulaBar(windowWidth);
+
+            if (UI::Menu::g_IsCollapsed)
+                DrawMenu_Collapsed(windowWidth);
+            else
+                DrawMenu(windowWidth);
+
+            DrawRibbon(windowWidth);
+
+            if (context.IsFrozen())
+            {
+                if (mouseMode == MouseMode::Dragging)
+                    DrawResizeBar(GetMouseX(), GetMouseY(), CORNFLOWER_BLUE);
+            }
 
             /*
             // Draw frozen
