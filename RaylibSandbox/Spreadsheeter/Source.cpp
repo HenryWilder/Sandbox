@@ -31,6 +31,15 @@ constexpr Color ColorFromHex(unsigned int value)
     };
 }
 
+bool IsHoldingShift()
+{
+    return IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
+}
+bool IsHoldingCtrl()
+{
+    return IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+}
+
 constexpr Color g_palette[] =
 {
     // Grayscale
@@ -82,6 +91,75 @@ constexpr Color g_palette[] =
 #define SELECTION_BLUE { 0x4a, 0x86, 0xe8, 32 }
 
 #define sign(x) (((x) > (decltype(x))(0)) - ((x) < (decltype(x))(0)))
+
+
+
+
+std::string ParamPack(std::string str)
+{
+    size_t start, end;
+    bool searchingForStart = true;
+    size_t layers = 0;
+    for (size_t i = 0; i < str.size(); ++i)
+    {
+        if (str[i] == '(')
+        {
+            ++layers;
+            if (searchingForStart)
+            {
+                start = i;
+                searchingForStart = false;
+            }
+        }
+        if (str[i] == ')')
+        {
+            --layers;
+            if (layers == 0)
+            {
+                end = i;
+                break;
+            }
+        }
+    }
+    return str.substr(start + 1, end - start - 1);
+}
+std::string Param(std::string str, size_t param = 0)
+{
+    size_t start = 0;
+    size_t end = str.length();
+    size_t counter = 0;
+    bool b_quote = false;
+    bool confirmed = false;
+    for (size_t i = 0; i < str.length(); ++i)
+    {
+        if (str[i] == '\"')
+        {
+            b_quote = !b_quote;
+            continue;
+        }
+        if (str[i] == ',' && !b_quote)
+        {
+            if (counter == param)
+            {
+                end = i - 1;
+                confirmed = true;
+                break;
+            }
+            ++counter;
+            if (counter == param)
+            {
+                start = i + 1;
+            }
+        }
+    }
+    if (confirmed)
+        return str.substr(start, end - start + 1);
+    else
+        return "#ERR!";
+}
+
+
+
 
 struct Context
 {
@@ -230,6 +308,18 @@ const char* AddressText(int row, int column)
         return TextFormat("%c%c%i", 'A' + column / 26 - 1, 'A' + column % 26, 1 + row);
     else if (column < 26 * 26 * 26)
         return TextFormat("%c%c%c%i", 'A' + column / (26 * 26) - 1, 'A' + column / 26, 'A' + column % 26, 1 + row);
+}
+const char* AddressText(CellAddress cell)
+{
+    if (cell.y < 0 || cell.x < 0)
+        return "#REF!";
+
+    if (cell.x < 26)
+        return TextFormat("%c%i", 'A' + cell.x, 1 + cell.y);
+    else if (cell.x < 26 * 26)
+        return TextFormat("%c%c%i", 'A' + cell.x / 26 - 1, 'A' + cell.x % 26, 1 + cell.y);
+    else if (cell.x < 26 * 26 * 26)
+        return TextFormat("%c%c%c%i", 'A' + cell.x / (26 * 26) - 1, 'A' + cell.x / 26, 'A' + cell.x % 26, 1 + cell.y);
 }
 
 struct Range
@@ -555,7 +645,7 @@ void DrawRangeBorder(Range range, BorderSideFlags sides, Color color)
         }
     }
 }
-void DrawRangeOutline(Range range, BorderSideFlags sides, int insetThickness, Color color)
+void DrawRangeOutline(Range range, int insetThickness, Color color)
 {
     uint32_t startX = UI::WorkArea::AbsoluteWorkAreaColumn_StartX(range.start.x);
     uint32_t startY = UI::WorkArea::AbsoluteWorkAreaRow_StartY(range.start.y);
@@ -564,17 +654,10 @@ void DrawRangeOutline(Range range, BorderSideFlags sides, int insetThickness, Co
     uint32_t width = UI::WorkArea::WorkAreaColumnRangeWidth(range);
     uint32_t height = UI::WorkArea::WorkAreaRowRangeHeight(range);
 
-    if (sides & BORDER_TOP)
-        DrawRectangle(startX, startY, width, insetThickness, color);
-
-    if (sides & BORDER_LEFT)
-        DrawRectangle(startX, startY, insetThickness, height, color);
-
-    if (sides & BORDER_RIGHT)
-        DrawRectangle(endX - insetThickness, startY, insetThickness, height, color);
-
-    if (sides & BORDER_BOTTOM)
-        DrawRectangle(startX, endY - insetThickness, width, insetThickness, color);
+    DrawRectangle(startX, startY, width, insetThickness, color);
+    DrawRectangle(startX, startY, insetThickness, height, color);
+    DrawRectangle(endX - insetThickness, startY, insetThickness, height, color);
+    DrawRectangle(startX, endY - insetThickness, width, insetThickness, color);
 }
 
 
@@ -626,10 +709,10 @@ void DrawMenu_Collapsed(int windowWidth)
 }
 void DrawFormulaBar(int windowWidth)
 {
-    DrawRectangle(0, UI::FormulaBar::AbsoluteFormulaBarStart() + 1, windowWidth, UI::FormulaBar::g_height - 1, RAYWHITE);
+    DrawRectangle(0, UI::FormulaBar::AbsoluteFormulaBarStart() + 1, windowWidth, UI::FormulaBar::g_height - 1, WHITE);
     DrawLine(0, UI::FormulaBar::AbsoluteFormulaBarEnd() - 1, windowWidth, UI::FormulaBar::AbsoluteFormulaBarEnd() - 1, DARKGRAY1);
 }
-void DrawFrozen(CellAddress startOfSelection = { -2,-2 })
+void DrawFrozen(std::vector<Range>* selection = nullptr)
 {
     // The frozen row (row of columns)
     uint32_t startRowX = 0;
@@ -650,20 +733,23 @@ void DrawFrozen(CellAddress startOfSelection = { -2,-2 })
     uint32_t columnHalfWidth = columnWidth / 2;
 
     // Frozen cells fill
-    DrawRectangle(startColumnX, startColumnY, columnWidth, columnHeight, RAYWHITE); // Vertical
-    DrawRectangle(startRowX, startRowY, rowWidth, rowHeight, RAYWHITE); // Horizontal
+    DrawRectangle(startColumnX, startColumnY, columnWidth, columnHeight, LIGHTGRAY3); // Vertical
+    DrawRectangle(startRowX, startRowY, rowWidth, rowHeight, LIGHTGRAY3); // Horizontal
 
     // Selected row/column
-    if (startOfSelection.x != -2)
+    if (selection)
     {
-        uint32_t highlightColumnX = UI::WorkArea::AbsoluteWorkAreaColumn_StartX(startOfSelection.x);
-        uint32_t highlightColumnWidth = UI::WorkArea::WorkAreaColumnWidth(startOfSelection.x);
+        for (Range range : *selection)
+        {
+            uint32_t highlightColumnX = UI::WorkArea::AbsoluteWorkAreaColumn_StartX(range.start.x);
+            uint32_t highlightColumnWidth = UI::WorkArea::AbsoluteWorkAreaColumn_EndX(range.end.x) - highlightColumnX;
 
-        uint32_t highlightRowY = UI::WorkArea::AbsoluteWorkAreaRow_StartY(startOfSelection.y);
-        uint32_t highlightRowHeight = UI::WorkArea::WorkAreaRowHeight(startOfSelection.y);
+            uint32_t highlightRowY = UI::WorkArea::AbsoluteWorkAreaRow_StartY(range.start.y);
+            uint32_t highlightRowHeight = UI::WorkArea::AbsoluteWorkAreaRow_EndY(range.end.y) - highlightRowY;
 
-        DrawRectangle(startRowX, highlightRowY, rowWidth, highlightRowHeight, GRAY); // Vertical
-        DrawRectangle(highlightColumnX, startColumnY, highlightColumnWidth, columnHeight, GRAY); // Horizontal
+            DrawRectangle(startRowX, highlightRowY, columnWidth, highlightRowHeight, LIGHTGRAY1); // Row
+            DrawRectangle(highlightColumnX, startColumnY, highlightColumnWidth, rowHeight, LIGHTGRAY1); // Column
+        }
     }
 
     // Frozen cells border lines
@@ -700,9 +786,14 @@ void DrawWorkArea()
         BorderSideFlags(BORDER_HORIZONTAL | BORDER_VERTICAL | BORDER_RIGHT | BORDER_BOTTOM),
         LIGHTGRAY1);
 }
-void DrawSelection(std::vector<Range>* selection)
+void DrawSelection(std::vector<Range>* selection, CellAddress start)
 {
-    // Todo
+    for (Range range : *selection)
+    {
+        DrawRangeFill(range, SELECTION_BLUE);
+        DrawRangeOutline(range, 1, CORNFLOWER_BLUE);
+    }
+    DrawRangeOutline({ start, start }, 2, CORNFLOWER_BLUE);
 }
 
 int main()
@@ -730,21 +821,21 @@ int main()
     context.sect = Context::Section::NA;
     context.sub.na = Context::Subsection::Subsection_NA::NA;
 
-    enum class MouseMode
-    {
-        None,
-        Hovering, // Used for highlighting resize anchors
-        Dragging,
-    } mouseMode = MouseMode::None;
+    bool mouseDown = false;
 
     // -1 for none
     int cell_x = -1;
     int cell_y = -1;
     int drag_distance = 0;
     float timeOfLastClick = -1.0f;
+    CellAddress placeOfLastClick = { -2, -2 };
     bool b_DoubleClicking;
+    bool b_WaitingToEdit = false;
+    bool b_EditingCell = false;
 
     CellAddress startOfSelection;
+
+    std::string cellText = "test";
 
     while (!WindowShouldClose())
     {
@@ -754,11 +845,18 @@ int main()
 
         b_DoubleClicking = false;
 
+        if (!b_WaitingToEdit)
+            b_EditingCell = false;
+
         // Release left click
         if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
         {
-            if (mouseMode == MouseMode::Dragging)
+            if (b_WaitingToEdit && placeOfLastClick.x == cell_x && placeOfLastClick.y == cell_y)
+                b_EditingCell = true;
+
+            if (mouseDown)
             {
+                // Resize row/column
                 if (context.IsFrozen_Edge())
                 {
                     // Column
@@ -774,6 +872,7 @@ int main()
                             UI::WorkArea::g_RowHeights[i] += drag_distance;
                     }
                 }
+                // Update selection
                 else if (context.IsCell() && g_selection.size() > 1)
                 {
                     std::stack<size_t> redundant;
@@ -1103,6 +1202,23 @@ int main()
 
                             redundant.push(i);
                         }
+                        else if (g_selection.back().start.y == g_selection[i].start.y &&
+                                 g_selection.back().end.y == g_selection[i].end.y)
+                        {
+                            // Prepend
+                            if (g_selection.back().start.x == g_selection[i].end.x + 1)
+                                g_selection.back().start.x = g_selection[i].start.x;
+
+                            // Append
+                            else if (g_selection.back().end.x + 1 == g_selection[i].start.x)
+                                g_selection.back().end.x = g_selection[i].end.x;
+
+                            // Do nothing
+                            else
+                                continue;
+
+                            redundant.push(i);
+                        }
                     }
                     
                     while (!redundant.empty())
@@ -1112,12 +1228,13 @@ int main()
                     }
                 }
             }
-            mouseMode = MouseMode::None;
+            mouseDown = false;
         }
 
+        // Update context
         // Realtime context is not updated while the mouse is held down
         // This is to prevent exiting the context while dragging causing the intent of the drag to be re/misinterpreted
-        if (mouseMode != MouseMode::Dragging)
+        if (!mouseDown)
         {
             // Reset cursor
             SetMouseCursor(MOUSE_CURSOR_DEFAULT);
@@ -1128,16 +1245,12 @@ int main()
             if (GetMouseY() <= UI::Ribbon::AbsoluteRibbonEnd())
             {
                 context.Set_Ribbon();
-
-                // Todo
             }
 
             // Menu
             else if (GetMouseY() <= UI::Menu::AbsoluteMenuEnd())
             {
                 context.Set_Menu();
-
-                // Todo
             }
 
             // Frozen
@@ -1146,17 +1259,18 @@ int main()
             {
                 context.Set_Frozen_Cell();
 
+                if (GetMouseX() <= UI::Frozen::g_ColumnWidth)
+                {
+                    cell_x = -1;
+                }
+
                 // Row
                 if (GetMouseY() <= UI::Frozen::AbsoluteFrozenEnd_Row())
                 {
                     cell_y = -1;
-                    // Corner
-                    if (GetMouseX() <= UI::Frozen::g_ColumnWidth)
-                    {
-                        cell_x = -1;
-                    }
+
                     // Row
-                    else // Will certainly be outside of the corner
+                    if (GetMouseX() > UI::Frozen::g_ColumnWidth)
                     {
                         for (cell_x = 0; cell_x < UI::WorkArea::g_ColumnWidths.size(); ++cell_x)
                         {
@@ -1166,13 +1280,13 @@ int main()
                                 {
                                     context.Set_Frozen_Edge();
                                     SetMouseCursor(MOUSE_CURSOR_RESIZE_EW);
-                                    mouseMode = MouseMode::Hovering;
                                 }
                                 break;
                             }
                         }
                     }
                 }
+
                 // Column
                 else // Will certainly be outside of the corner
                 {
@@ -1184,7 +1298,6 @@ int main()
                             {
                                 context.Set_Frozen_Edge();
                                 SetMouseCursor(MOUSE_CURSOR_RESIZE_NS);
-                                mouseMode = MouseMode::Hovering;
                             }
                             break;
                         }
@@ -1196,165 +1309,164 @@ int main()
             else
             {
                 context.Set_WorkArea_Cell();
-
-                for (cell_x = 0; cell_x < UI::WorkArea::g_ColumnWidths.size(); ++cell_x)
-                {
-                    if (UI::WorkArea::AbsoluteWorkAreaColumn_EndX(cell_x) <= GetMouseX())
-                        break;
-                }
-
-                for (cell_y = 0; cell_y < UI::WorkArea::g_RowHeights.size(); ++cell_y)
-                {
-                    if (UI::WorkArea::AbsoluteWorkAreaRow_EndY(cell_y) <= GetMouseX())
-                        break;
-                }
-
-                // Handle
-                if (!g_selection.empty())
-                {
-                    // HACK: Being used for pixels here
-                    Range handle;
-                    handle.start.x = UI::WorkArea::AbsoluteWorkAreaColumn_EndX(g_selection.back().end.x) - 5;
-                    handle.start.y = UI::WorkArea::AbsoluteWorkAreaRow_EndY(g_selection.back().end.y) - 5;
-                    handle.end.x = handle.start.x + 7;
-                    handle.end.y = handle.start.y + 7;
-
-                    if (GetMouseX() >= handle.start.x &&
-                        GetMouseX() <= handle.end.x &&
-                        GetMouseY() >= handle.start.y &&
-                        GetMouseY() <= handle.end.y)
-                    {
-                        SetMouseCursor(MOUSE_CURSOR_CROSSHAIR);
-                    }
-                }
-            }
-
-            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
-            {
-                mouseMode = MouseMode::Dragging;
             }
 
             // Mouse press
-            //if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
-            //{
-            //    mouseMode = MouseMode::Dragging;
-            //
-            //    if (GetTime() - timeOfLastClick <= 1.0f)
-            //        b_DoubleClicking = true;
-            //
-            //    timeOfLastClick = GetTime();
-            //
-            //    if (context.IsCell())
-            //    {
-            //        CellAddress cell = { cell_x, cell_y };
-            //
-            //        if (!g_selection.empty() && (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT))) // Expand selection
-            //        {
-            //            if (cell_x == -1 && cell_y == -1)
-            //            {
-            //                g_selection.back() = RangeFromCellPair({ 0, startOfSelection.y }, { (int)g_ColumnWidths.size() - 1, 0});
-            //                mouseMode = MouseMode::Hovering;
-            //            }
-            //            if (cell_x == -1)
-            //            {
-            //                // todo
-            //            }
-            //            else if (cell_y == -1)
-            //            {
-            //                // todo
-            //            }
-            //            else
-            //                g_selection.back() = RangeFromCellPair(startOfSelection, cell);
-            //        }
-            //        else
-            //        {
-            //            if (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)) // Add selection
-            //            {
-            //                startOfSelection = cell;
-            //                g_selection.push_back({ cell, cell });
-            //                // todo: Add support for frozen
-            //            }
-            //            else // Replace selection
-            //            {
-            //                startOfSelection = cell;
-            //                g_selection.clear();
-            //
-            //                if (cell_x == -1 || cell_y == -1)
-            //                    mouseMode = MouseMode::Hovering;
-            //
-            //                if (cell_x == -1 && cell_y == -1)
-            //                    g_selection.push_back({ { 0, 0 }, { (int)g_ColumnWidths.size() - 1, (int)g_RowHeights.size() - 1 } });
-            //                else if (cell_x == -1)
-            //                    g_selection.push_back({ { 0, cell_y }, { (int)g_ColumnWidths.size() - 1, cell_y } });
-            //                else if (cell_y == -1)
-            //                    g_selection.push_back({ { cell_x, 0 }, { cell_x, (int)g_RowHeights.size() - 1 } });
-            //                else
-            //                    g_selection.push_back({ cell, cell });
-            //            }
-            //        }
-            //    }
-            //}
+            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+            {
+                b_EditingCell = false;
+                mouseDown = true;
+                bool b_mouseUnmoved = placeOfLastClick.x == cell_x && placeOfLastClick.y == cell_y;
+                b_WaitingToEdit = b_mouseUnmoved;
+            
+                if (GetTime() - timeOfLastClick <= 1.0f && b_mouseUnmoved)
+                {
+                    b_DoubleClicking = true;
+                    b_WaitingToEdit = context.IsWorkArea_Cell();
+                }
+            
+                timeOfLastClick = GetTime();
+                placeOfLastClick = { cell_x, cell_y };
+
+                if (!IsHoldingShift())
+                {
+                    startOfSelection = { cell_x, cell_y };
+
+                    if (!IsHoldingCtrl())
+                        g_selection.clear();
+
+                    g_selection.push_back({ startOfSelection, startOfSelection });
+                }
+            }
         }
 
-        // When mouse is held down
-        /*
-        if (mouseMode == MouseMode::Dragging)
+        // Happens whether mouse is dragging or not
+        switch (context.sect)
         {
-            if (context.IsEdge())
+        case Context::Section::Ribbon:
+        {
+            // todo
+        }
+        break;
+
+        case Context::Section::Menu:
+        {
+            // todo
+        }
+        break;
+
+        case Context::Section::FormulaBar:
+        {
+            // todo
+        }
+        break;
+
+        case Context::Section::Frozen:
+        {
+            // Dragging to resize row/column
+            if (mouseDown)
             {
-                if (cell_x != -1) // Vertical
+                if (cell_x != -1) // Horizontal
                 {
-                    drag_distance = GetMouseX() - g_ColumnWidths[cell_x];
+                    uint32_t end_x = UI::WorkArea::AbsoluteWorkAreaColumn_EndX(cell_x);
+                    uint32_t start_x = UI::WorkArea::AbsoluteWorkAreaColumn_StartX(cell_x);
+                    drag_distance = GetMouseX() - end_x;
                     // Clamp
-                    if (drag_distance < 0 && (g_ColumnWidths[cell_x] + drag_distance) < (PreviousColumnWidth(cell_x) + 6))
-                        drag_distance = PreviousColumnWidth(cell_x) - g_ColumnWidths[cell_x] + 6;
-                    
+                    if (drag_distance < 0 && (end_x + drag_distance) < (start_x + 6))
+                        drag_distance = start_x - end_x + 6;
+
                 }
-                else // Horizontal
+                else // Vertical
                 {
-                    drag_distance = GetMouseY() - g_RowHeights[cell_y];
+                    uint32_t end_y = UI::WorkArea::AbsoluteWorkAreaRow_EndY(cell_y);
+                    uint32_t start_y = UI::WorkArea::AbsoluteWorkAreaRow_StartY(cell_y);
+                    drag_distance = GetMouseY() - end_y;
                     // Clamp
-                    if (drag_distance < 0 && (g_RowHeights[cell_y] + drag_distance) < (PreviousRowHeight(cell_y) + 6))
-                        drag_distance = PreviousRowHeight(cell_y) - g_RowHeights[cell_y] + 6;
-                    
-                }
-            }
-            else if (context.IsCell())
-            {
-                int temp_x, temp_y;
-                temp_x = temp_y = -1;
+                    if (drag_distance < 0 && (end_y + drag_distance) < (start_y + 6))
+                        drag_distance = start_y - end_y + 6;
 
-                // Find column
-                if (GetMouseX() > UI::Frozen::g_ColumnWidth)
-                {
-                    for (int i = 0; i < UI::Frozen::g_ColumnWidths.size(); ++i)
-                    {
-                        temp_x = i;
-                        if (GetMouseX() <= UI::Frozen::g_ColumnWidths[i])
-                            break;
-                    }
-                }
-
-                // Find row
-                if (GetMouseY() > UI::Frozen::g_RowHeight)
-                {
-                    for (int i = 0; i < UI::Frozen::g_RowHeights.size(); ++i)
-                    {
-                        temp_y = i;
-                        if (GetMouseY() <= UI::Frozen::g_RowHeights[i])
-                            break;
-                    }
-                }
-
-                if (cell_x != temp_x || cell_y != temp_y)
-                {
-                    cell_x = temp_x;
-                    cell_y = temp_y;
-                    g_selection.back() = RangeFromCellPair(startOfSelection, { cell_x, cell_y });
                 }
             }
         }
-        */
+        break;
+
+        case Context::Section::WorkArea:
+        {
+            // Locate cell
+            {
+                for (cell_x = 0; cell_x < UI::WorkArea::g_ColumnWidths.size(); ++cell_x)
+                {
+                    if (UI::WorkArea::AbsoluteWorkAreaColumn_StartX(cell_x) <= GetMouseX() && GetMouseX() <= UI::WorkArea::AbsoluteWorkAreaColumn_EndX(cell_x))
+                        break;
+                }
+                for (cell_y = 0; cell_y < UI::WorkArea::g_RowHeights.size(); ++cell_y)
+                {
+                    if (UI::WorkArea::AbsoluteWorkAreaRow_StartY(cell_y) <= GetMouseY() && GetMouseY() <= UI::WorkArea::AbsoluteWorkAreaRow_EndY(cell_y))
+                        break;
+                }
+            }
+
+            // Whether mouse is on the handle
+            if (!g_selection.empty())
+            {
+                // HACK: Range is being used for pixels instead of cells here
+                Range handle;
+                handle.start.x = UI::WorkArea::AbsoluteWorkAreaColumn_EndX(g_selection.back().end.x) - 5;
+                handle.start.y = UI::WorkArea::AbsoluteWorkAreaRow_EndY(g_selection.back().end.y) - 5;
+                handle.end.x = handle.start.x + 7;
+                handle.end.y = handle.start.y + 7;
+
+                if (GetMouseX() >= handle.start.x &&
+                    GetMouseX() <= handle.end.x &&
+                    GetMouseY() >= handle.start.y &&
+                    GetMouseY() <= handle.end.y)
+                {
+                    SetMouseCursor(MOUSE_CURSOR_CROSSHAIR);
+                }
+            }
+        }
+        break;
+
+        default:
+            break;
+        }
+
+        // Mouse has changed cells while held
+        if (mouseDown && context.IsCell() && !g_selection.empty())
+        {
+            if (g_selection.back().end.x != cell_x || g_selection.back().end.y != cell_y) // No idea why but this seemed to not be getting short circuited
+            {
+                b_WaitingToEdit = b_EditingCell = false;
+
+                if (cell_x == -1 && cell_y == -1)
+                {
+                    g_selection.back() = RangeFromCellPair({ 0, 0 }, { (int)UI::WorkArea::g_ColumnWidths.size() - 1, (int)UI::WorkArea::g_RowHeights.size() - 1 });
+                }
+                if (cell_x == -1)
+                {
+                    g_selection.back() = RangeFromCellPair({ 0, startOfSelection.y }, { (int)UI::WorkArea::g_ColumnWidths.size() - 1, cell_y });
+                }
+                else if (cell_y == -1)
+                {
+                    g_selection.back() = RangeFromCellPair({ startOfSelection.x, 0 }, { cell_x, (int)UI::WorkArea::g_RowHeights.size() - 1 });
+                }
+                else
+                    g_selection.back() = RangeFromCellPair(startOfSelection, { cell_x, cell_y });
+            }
+        }
+
+        if (b_EditingCell && cell_x == g_selection.back().start.x && cell_y == g_selection.back().start.y)
+        {
+            SetMouseCursor(MOUSE_CURSOR_IBEAM);
+        }
+        if (b_EditingCell)
+        {
+            if (GetCharPressed() >= 'a' && GetCharPressed() <= 'z')
+                cellText.push_back(GetCharPressed());
+
+            if (IsKeyPressed(KEY_BACKSPACE))
+                cellText.pop_back();
+        }
 
         /******************************************
         *   Draw the frame                        *
@@ -1365,12 +1477,29 @@ int main()
             ClearBackground(WHITE);
             
             DrawWorkArea();
-            DrawCellText("test", {0,0}, 13, BLACK);
 
-            DrawSelection(&g_selection);
 
             if (!g_selection.empty())
-                DrawFrozen(startOfSelection);
+            {
+                if (b_EditingCell)
+                {
+                    DrawRangeOutline(g_selection.back(), 2, CORNFLOWER_BLUE);
+
+                    if (!((int)((timeOfLastClick - GetTime()) * 2.0f) & 1))
+                        DrawCellText((cellText + '|').c_str(), g_selection.back().start, 13, BLACK);
+                    else
+                        DrawCellText(cellText.c_str(), g_selection.back().start, 13, BLACK);
+                }
+                else
+                {
+                    DrawSelection(&g_selection, startOfSelection);
+
+                    if (!mouseDown)
+                        DrawHandle(g_selection.back().end, CORNFLOWER_BLUE);
+                }
+
+                DrawFrozen(&g_selection);
+            }
             else
                 DrawFrozen();
 
@@ -1383,10 +1512,21 @@ int main()
 
             DrawRibbon(windowWidth);
 
-            if (context.IsFrozen())
+            if (context.IsFrozen_Edge())
             {
-                if (mouseMode == MouseMode::Dragging)
-                    DrawResizeBar(GetMouseX(), GetMouseY(), CORNFLOWER_BLUE);
+                if (mouseDown)
+                    DrawResizeBar(
+                        (cell_x != -1 ? UI::WorkArea::AbsoluteWorkAreaColumn_EndX(cell_x) + drag_distance : 0),
+                        (cell_y != -1 ? UI::WorkArea::AbsoluteWorkAreaRow_EndY(cell_y) + drag_distance : 0),
+                        CORNFLOWER_BLUE);
+                else
+                {
+                    int barWidth = 5;
+                    if (cell_y == -1)
+                        DrawRectangle(UI::WorkArea::AbsoluteWorkAreaColumn_EndX(cell_x) - barWidth, UI::Frozen::AbsoluteFrozenStart_Y(), barWidth, UI::Frozen::g_RowHeight, CORNFLOWER_BLUE);
+                    else
+                        DrawRectangle(0, UI::WorkArea::AbsoluteWorkAreaRow_EndY(cell_y) - barWidth, UI::Frozen::g_ColumnWidth, barWidth, CORNFLOWER_BLUE);
+                }
             }
 
             /*
@@ -1458,6 +1598,16 @@ int main()
             //    DrawText(TextFormat("$%c$%i:$%c$%i",'A' + g_selection.back().start.x, g_selection.back().start.y, 'A' + g_selection.back().end.x, g_selection.back().end.y),0,0,8,RED);
 
             */
+
+            DrawText(TextFormat("Mouse coordinates: { %i, %i }", GetMouseX(), GetMouseY()), 0, 0, 8, RED);
+            DrawText(TextFormat("Cell coordinates: { %i, %i }", cell_x, cell_y), 0, 10, 8, YELLOW);
+            if (!g_selection.empty())
+            {
+                if (g_selection.back().start.x == -1 || g_selection.back().start.y == -1 || g_selection.back().end.x == -1 || g_selection.back().end.y == -1)
+                    DrawText("Selection Range: #REF!", 0, 20, 8, CORNFLOWER_BLUE);
+                else
+                    DrawText(TextFormat("Selection Range: %s:%s", AddressText(g_selection.back().start), AddressText(g_selection.back().end)), 0, 20, 8, CORNFLOWER_BLUE);
+            }
 
         } EndDrawing();
     }
