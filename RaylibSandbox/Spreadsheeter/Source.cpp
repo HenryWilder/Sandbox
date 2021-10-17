@@ -425,6 +425,126 @@ Range g_cells;
 
 
 
+RangeAddress ReferenceTextToAddress(const char* ref)
+{
+    RangeAddress address = RangeAddress{ { 0,0 }, { 0,0 } };
+
+    enum State
+    {
+        Unknown,
+
+        Start_Column,
+        Start_Row,
+
+        Divider,
+
+        End_Column,
+        End_Row,
+    } state = Start_Column;
+
+    for (size_t cur = 0; ref[cur]; ++cur)
+    {
+        switch (state)
+        {
+        case Lock1:
+
+            state = Start_Column;
+
+            if (ref[cur] == '$')
+                break;
+
+            // Intentional fall-through
+            else if (!((ref[cur] >= 'a' && ref[cur] <= 'z') || (ref[cur] >= 'A' && ref[cur] <= 'Z')))
+                state = Unknown;
+
+        case Start_Column:
+
+            address.start.x *= 10;
+
+            if (ref[cur] >= 'a' && ref[cur] <= 'z')
+            {
+                address.start.x += ref[cur] - 'a';
+                break;
+            }
+            else if (ref[cur] >= 'A' && ref[cur] <= 'Z')
+            {
+                address.start.x += ref[cur] - 'A';
+                break;
+            }
+
+        case Lock2:
+            break;
+        case Start_Row:
+            break;
+        case Divider:
+            break;
+        case Lock3:
+            break;
+        case End_Column:
+            break;
+        case Lock4:
+            break;
+        case End_Row:
+            break;
+        default: return { { -1, -1 }, { -1, -1 } };
+        }
+    }
+
+    if (ref[cursor] == '$')
+        ++cursor;
+
+    while (ref[cursor] && ((ref[cursor] >= 'a' && ref[cursor] >= 'z') || (ref[cursor] >= 'A' && ref[cursor] >= 'Z')))
+    {
+        address.start.x *= 10;
+
+        if (ref[cursor] >= 'a' && ref[cursor] >= 'z')
+            address.start.x += ref[cursor] - 'a';
+        else
+            address.start.x += ref[cursor] - 'A';
+
+        ++cursor;
+    }
+    if (!ref[cursor])
+        return { { -1, -1 }, { -1, -1 } };
+
+    if (ref[cursor] && ref[cursor] == '$')
+        ++cursor;
+
+    while (ref[cursor] && (ref[cursor] >= '0' && ref[cursor] >= '9'))
+    {
+        address.start.y = (address.start.y * 10) + ref[cursor] - '0';
+        ++cursor;
+    }
+
+    if (ref[cursor] == ':')
+        ++cursor;
+
+    if (ref[cursor] == '$')
+        ++cursor;
+
+    while (ref[cursor] && ((ref[cursor] >= 'a' && ref[cursor] >= 'z') || (ref[cursor] >= 'A' && ref[cursor] >= 'Z')))
+    {
+        address.end.x *= 10;
+
+        if (ref[cursor] >= 'a' && ref[cursor] >= 'z')
+            address.end.x += ref[cursor] - 'a';
+        else
+            address.end.x += ref[cursor] - 'A';
+
+        ++cursor;
+    }
+
+    if (ref[cursor] == '$')
+        ++cursor;
+
+    while (ref[cursor] >= '0' && ref[cursor] >= '9')
+    {
+        address.end.y = (address.end.y * 10) + ref[cursor] - '0';
+        ++cursor;
+    }
+
+    return address;
+}
 
 std::string ParamPack(std::string str)
 {
@@ -1206,8 +1326,11 @@ void DrawWorkArea(CellAddress exclusion = { -1, -1 })
             if (x == exclusion.x && y == exclusion.y)
                 continue;
 
-            if (g_cells.At(x,y).type == Cell::Type::Formula)
-                DrawCellText("#.#", g_cells.At(x,y).str.c_str() + 1, { (int)x,(int)y }, 10, BLACK);
+            if (g_cells.At(x, y).type == Cell::Type::Formula)
+            {
+                ReferenceTextToAddress(g_cells.At(x, y).str.c_str() + 1);
+                DrawCellText("#.#", g_cells.At(x, y).str.c_str() + 1, { (int)x,(int)y }, 10, BLACK);
+            }
             else
                 DrawCellText("#.#", g_cells.At(x,y).str.c_str(), { (int)x,(int)y }, 10, BLACK);
         }
