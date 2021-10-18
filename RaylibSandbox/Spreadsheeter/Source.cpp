@@ -424,127 +424,165 @@ struct Range
 Range g_cells;
 
 
-
+bool IsLetter(char c)
+{
+    return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
+}
+int LetterValue(char c)
+{
+    if (c >= 'a')
+        return c - ('a' - 1);
+    else
+        return c - ('A' - 1);
+}
+bool IsNumber(char c)
+{
+    return c >= '0' && c <= '9';
+}
+int NumberValue(char c)
+{
+    return c - '0';
+}
+#define ERR_RANGE { { -2,-2 }, { -2,-2 } }
 RangeAddress ReferenceTextToAddress(const char* ref)
 {
     RangeAddress address = RangeAddress{ { 0,0 }, { 0,0 } };
 
-    enum State
+    size_t i = 0;
+    bool locked = false;
+
+    // Skip locks
+    if (ref[i] == '$')
     {
-        Unknown,
+        locked = true;
+        ++i;
+    }
 
-        Start_Column,
-        Start_Row,
-
-        Divider,
-
-        End_Column,
-        End_Row,
-    } state = Start_Column;
-
-    for (size_t cur = 0; ref[cur]; ++cur)
+    // A?:??
+    while (IsLetter(ref[i]))
     {
-        switch (state)
+        address.start.x = (address.start.x * 26) + LetterValue(ref[i]);
+        ++i;
+    }
+    address.start.x--;
+    if (address.start.x != -1)
+        locked = false;
+
+    // Skip locks
+    if (ref[i] == '$')
+    {
+        // Locked without followup
+        if (locked)
+            return ERR_RANGE;
+
+        locked = true;
+        ++i;
+    }
+
+    // ?1:??
+    while (IsNumber(ref[i]))
+    {
+        address.start.y = (address.start.y * 10) + NumberValue(ref[i]);
+        ++i;
+    }
+    address.start.y--;
+    if (address.start.y != -1)
+        locked = false;
+
+    // Address has second half?
+    if (ref[i] == ':')
+    {
+        ++i;
+
+        // Skip locks
+        if (ref[i] == '$')
         {
-        case Lock1:
+            // Locked without followup
+            if (locked)
+                return ERR_RANGE;
 
-            state = Start_Column;
+            locked = true;
+            ++i;
+        }
 
-            if (ref[cur] == '$')
-                break;
+        // ??:B?
+        while (IsLetter(ref[i]))
+        {
+            address.end.x = (address.end.x * 26) + LetterValue(ref[i]);
+            ++i;
+        }
+        address.end.x--;
+        if (address.end.x != -1)
+            locked = false;
 
-            // Intentional fall-through
-            else if (!((ref[cur] >= 'a' && ref[cur] <= 'z') || (ref[cur] >= 'A' && ref[cur] <= 'Z')))
-                state = Unknown;
+        // Skip locks
+        if (ref[i] == '$')
+        {
+            // Locked without followup
+            if (locked)
+                return ERR_RANGE;
 
-        case Start_Column:
+            locked = true;
+            ++i;
+        }
 
-            address.start.x *= 10;
+        // ??:?2
+        while (IsNumber(ref[i]))
+        {
+            address.end.y = (address.end.y * 10) + NumberValue(ref[i]);
+            ++i;
+        }
+        address.end.y--;
+        if (address.end.y != -1)
+            locked = false;
 
-            if (ref[cur] >= 'a' && ref[cur] <= 'z')
-            {
-                address.start.x += ref[cur] - 'a';
-                break;
-            }
-            else if (ref[cur] >= 'A' && ref[cur] <= 'Z')
-            {
-                address.start.x += ref[cur] - 'A';
-                break;
-            }
+        // Locked without followup
+        if (locked)
+            return ERR_RANGE;
+    }
+    else
+    {
+        address.end.x--;
+        address.end.y--;
+    }
 
-        case Lock2:
-            break;
-        case Start_Row:
-            break;
-        case Divider:
-            break;
-        case Lock3:
-            break;
-        case End_Column:
-            break;
-        case Lock4:
-            break;
-        case End_Row:
-            break;
-        default: return { { -1, -1 }, { -1, -1 } };
+
+    // A valid reference must have at least 2 coordinates:
+    // - 1 X and 1 Y (both must be in the first half)
+    // - 2 Xs (one must be in each half)
+    // - 2 Ys (one must be in each half)
+    // A -1 represents that the selected coordinate is missing.
+    // Additionally, there should be no more characters in the reference by this point
+    if (!ref[i])
+    {
+        // Put negatives at the end
+        if (address.start.x == -1 && address.end.x != -1)
+        {
+            address.start.x = address.end.x;
+            address.end.x = -1;
+        }
+        if (address.start.y == -1 && address.end.y != -1)
+        {
+            address.start.y = address.end.y;
+            address.end.y = -1;
+        }
+
+        if ((address.start.x != -1 && address.end.x != -1) ||
+            (address.start.y != -1 && address.end.y != -1))
+        {
+            return address;
+        }
+        else if (address.start.x != -1 && address.start.y != -1)
+        {
+            address.end = address.start;
+            return address;
         }
     }
 
-    if (ref[cursor] == '$')
-        ++cursor;
-
-    while (ref[cursor] && ((ref[cursor] >= 'a' && ref[cursor] >= 'z') || (ref[cursor] >= 'A' && ref[cursor] >= 'Z')))
-    {
-        address.start.x *= 10;
-
-        if (ref[cursor] >= 'a' && ref[cursor] >= 'z')
-            address.start.x += ref[cursor] - 'a';
-        else
-            address.start.x += ref[cursor] - 'A';
-
-        ++cursor;
-    }
-    if (!ref[cursor])
-        return { { -1, -1 }, { -1, -1 } };
-
-    if (ref[cursor] && ref[cursor] == '$')
-        ++cursor;
-
-    while (ref[cursor] && (ref[cursor] >= '0' && ref[cursor] >= '9'))
-    {
-        address.start.y = (address.start.y * 10) + ref[cursor] - '0';
-        ++cursor;
-    }
-
-    if (ref[cursor] == ':')
-        ++cursor;
-
-    if (ref[cursor] == '$')
-        ++cursor;
-
-    while (ref[cursor] && ((ref[cursor] >= 'a' && ref[cursor] >= 'z') || (ref[cursor] >= 'A' && ref[cursor] >= 'Z')))
-    {
-        address.end.x *= 10;
-
-        if (ref[cursor] >= 'a' && ref[cursor] >= 'z')
-            address.end.x += ref[cursor] - 'a';
-        else
-            address.end.x += ref[cursor] - 'A';
-
-        ++cursor;
-    }
-
-    if (ref[cursor] == '$')
-        ++cursor;
-
-    while (ref[cursor] >= '0' && ref[cursor] >= '9')
-    {
-        address.end.y = (address.end.y * 10) + ref[cursor] - '0';
-        ++cursor;
-    }
-
-    return address;
+    return ERR_RANGE;
 }
+#undef ERR_RANGE
+
 
 std::string ParamPack(std::string str)
 {
@@ -912,12 +950,12 @@ namespace UI
     namespace FormulaBar
     {
         constexpr uint32_t g_height = 21;
-        
+
         uint32_t AbsoluteFormulaBarStart()
         {
             return Menu::AbsoluteMenuEnd() + 1;
         }
-        
+
         uint32_t AbsoluteFormulaBarEnd()
         {
             return AbsoluteFormulaBarStart() + g_height;
@@ -1010,7 +1048,7 @@ namespace UI
         // Single cell
         uint32_t WorkAreaColumnWidth(int column)
         {
-             return AbsoluteWorkAreaColumn_EndX(column) - AbsoluteWorkAreaColumn_StartX(column);
+            return AbsoluteWorkAreaColumn_EndX(column) - AbsoluteWorkAreaColumn_StartX(column);
         }
         uint32_t WorkAreaRowHeight(int row)
         {
@@ -1032,7 +1070,7 @@ namespace UI
         }
         uint32_t WorkAreaHeight()
         {
-             return g_RowHeights.back();
+            return g_RowHeights.back();
         }
     }
 }
@@ -1051,7 +1089,7 @@ RangeAddress RangeFromCellPair(CellAddress a, CellAddress b)
                 Max(a.x, b.x),
                 Max(a.y, b.y)
             }
-        };
+    };
 }
 
 
@@ -1129,14 +1167,14 @@ void DrawRangeFill(RangeAddress range, Color color)
 enum BorderSideFlags
 {
     // Surrounding the range
-    BORDER_TOP      = 0b0001,
-    BORDER_RIGHT    = 0b0010,
-    BORDER_BOTTOM   = 0b0100,
-    BORDER_LEFT     = 0b1000,
+    BORDER_TOP = 0b0001,
+    BORDER_RIGHT = 0b0010,
+    BORDER_BOTTOM = 0b0100,
+    BORDER_LEFT = 0b1000,
 
     // Splitting internal cells
-    BORDER_VERTICAL     = 0b010000,
-    BORDER_HORIZONTAL   = 0b100000,
+    BORDER_VERTICAL = 0b010000,
+    BORDER_HORIZONTAL = 0b100000,
 };
 void DrawRangeBorder(RangeAddress range, BorderSideFlags sides, Color color)
 {
@@ -1332,7 +1370,7 @@ void DrawWorkArea(CellAddress exclusion = { -1, -1 })
                 DrawCellText("#.#", g_cells.At(x, y).str.c_str() + 1, { (int)x,(int)y }, 10, BLACK);
             }
             else
-                DrawCellText("#.#", g_cells.At(x,y).str.c_str(), { (int)x,(int)y }, 10, BLACK);
+                DrawCellText("#.#", g_cells.At(x, y).str.c_str(), { (int)x,(int)y }, 10, BLACK);
         }
     }
 }
@@ -1742,7 +1780,7 @@ int main()
                         }
                         // Combine
                         else if (g_selection.back().start.x == g_selection[i].start.x &&
-                                 g_selection.back().end.x == g_selection[i].end.x)
+                            g_selection.back().end.x == g_selection[i].end.x)
                         {
                             // Prepend
                             if (g_selection.back().start.y == g_selection[i].end.y + 1)
@@ -1759,7 +1797,7 @@ int main()
                             redundant.push(i);
                         }
                         else if (g_selection.back().start.y == g_selection[i].start.y &&
-                                 g_selection.back().end.y == g_selection[i].end.y)
+                            g_selection.back().end.y == g_selection[i].end.y)
                         {
                             // Prepend
                             if (g_selection.back().start.x == g_selection[i].end.x + 1)
@@ -1776,7 +1814,7 @@ int main()
                             redundant.push(i);
                         }
                     }
-                    
+
                     while (!redundant.empty())
                     {
                         g_selection.erase(g_selection.begin() + redundant.top());
@@ -1817,7 +1855,7 @@ int main()
 
             // Frozen
             else if (GetMouseY() <= UI::Frozen::AbsoluteFrozenEnd_Row() ||
-                     GetMouseX() <= UI::Frozen::g_ColumnWidth)
+                GetMouseX() <= UI::Frozen::g_ColumnWidth)
             {
                 context.Set_Frozen_Cell();
 
@@ -1880,13 +1918,13 @@ int main()
                 mouseDown = true;
                 bool b_mouseUnmoved = placeOfLastClick.x == cell_x && placeOfLastClick.y == cell_y;
                 b_WaitingToEdit = b_mouseUnmoved;
-            
+
                 if (GetTime() - timeOfLastClick <= 1.0f && b_mouseUnmoved)
                 {
                     b_DoubleClicking = true;
                     b_WaitingToEdit = context.IsWorkArea_Cell();
                 }
-            
+
                 timeOfLastClick = GetTime();
                 placeOfLastClick = { cell_x, cell_y };
 
@@ -2037,7 +2075,7 @@ int main()
         }
 
         // Arrow keys
-        if (!b_EditingCell&& (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_DOWN)) && !g_selection.empty())
+        if (!b_EditingCell && (IsKeyPressed(KEY_LEFT) || IsKeyPressed(KEY_RIGHT) || IsKeyPressed(KEY_UP) || IsKeyPressed(KEY_DOWN)) && !g_selection.empty())
         {
             if (IsHoldingShift())
             {
@@ -2090,7 +2128,7 @@ int main()
                     {
                         for (int x = range.start.x; x <= range.end.x; ++x)
                         {
-                            SetCell(g_cells.At(x,y), "");
+                            SetCell(g_cells.At(x, y), "");
                         }
                     }
                 }
@@ -2131,7 +2169,7 @@ int main()
         BeginDrawing(); {
 
             ClearBackground(WHITE);
-            
+
             if (b_EditingCell)
                 DrawWorkArea(g_selection.back().start);
             else
@@ -2218,5 +2256,5 @@ int main()
 
     CloseWindow();
 
-	return 0;
+    return 0;
 }
