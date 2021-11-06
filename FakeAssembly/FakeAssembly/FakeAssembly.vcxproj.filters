@@ -20,7 +20,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <Text Include="code">
+    <Text Include="code.fasm">
       <Filter>Resource Files</Filter>
     </Text>
   </ItemGroup>
