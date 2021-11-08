@@ -194,13 +194,15 @@ public:
     }
 };
 
-enum class RequestMessage : uint8_t
+enum class RequestMessage
 {
     // Connection granted
     Success = 0b00000000,
     Success_Noflags = Success, // No additional information is necessary, request was granted with no changes.
     Success_Swapped = Success | 1, // The specific node connected was changed to another node which is equally valid, but connection was still successful
     Success_Redundant = Success | 2, // The nodes which were requested to be connected were already connected, so no changes were made/no changes are needed
+    Success_Repaired_Widowed = Success | 3, // There was a Retry_Widowed on one or both of the nodes which was successfully resolved and a connection made
+    Success_Repaired_Unrequited = Success | 4, // There was a Retry_Malformed_Wire on one or both of the nodes which was successfully resolved and a connection made
 
     // Connection possible, but requires modifications which must be granted to be performed safely.
     Retry = 0b01000000,
@@ -212,7 +214,10 @@ enum class RequestMessage : uint8_t
     Retry_Widowed = Retry | 1,
     // One of the nodes was connected to the other, but the other was not connected to the former.
     // Please choose whether to repair the connection between the two, or to disregard the connection and clean it.
-    Retry_Malformed_Widow = Retry | 2,
+    Retry_Unrequited = Retry | 2,
+    // One or both nodes is already connecd to another node and cannot connect
+    // Please choose a different wire or wires to connect instead
+    Retry_Taken = Retry | 3,
 
     // Connection not possible according to connection rules
     Failed = 0b10000000,
@@ -222,20 +227,30 @@ enum class RequestMessage : uint8_t
     Failed_Homo = Failed | 3, // Failed because either both nodes were inputs or both were outputs and the connector would not fit
     Failed_Adulterer = Failed | 4, // Failed because one or both nodes were already committed, and the specific method did not support replacement
     Failed_NonFungible = Failed | 5, // Failed because one or both nodes were already connected, and no replacement could be found
-    Failed_Detatched = Failed | 6, // One or both nodes were detatched from any connectible object and were either corrupted, uninitialized, or otherwise divergent from proper behavior.
+    Failed_Orphan = Failed | 6, // One or both nodes were detatched from any connectible object and were either corrupted, uninitialized, or otherwise divergent from proper behavior.
+};
+
+enum ResolutionFlags
+{
+    Resolve_Widowed = 0b0001,
+    Resolve_Unrequited = 0b0010,
+    Resolve_Taken = 0b0100,
+    // Doesn't actually allow for the connection to be made, but still fixes the problem of there being an orphan (by *deleting* it)
+    // DO NOT USE THIS FLAG IF YOU HAVE COPIES OF EITHER NODE'S POINTER, AS THE MEMORY WILL BE FREED
+    Resolve_Orphan = 0b1000,
 };
 
 bool IsSuccess(RequestMessage msg)
 {
-    return (uint16_t)msg & (uint16_t)RequestMessage::Success;
+    return (unsigned int)msg & (unsigned int)RequestMessage::Success;
 }
 bool IsRetry(RequestMessage msg)
 {
-    return (uint16_t)msg & (uint16_t)RequestMessage::Retry;
+    return (unsigned int)msg & (unsigned int)RequestMessage::Retry;
 }
 bool IsFailed(RequestMessage msg)
 {
-    return (uint16_t)msg & (uint16_t)RequestMessage::Failed;
+    return (unsigned int)msg & (unsigned int)RequestMessage::Failed;
 }
 // 0 = success
 // 1 = retry
@@ -245,67 +260,161 @@ int MessageAction(RequestMessage msg)
     return IsRetry(msg) | (IsFailed(msg) << 1);
 }
 
-// Ask nicely to connect two nodes safely; if anything goes wrong, a message will be returned giving details on how to handle
-RequestMessage RequestConnection(Node* a, Node* b)
+// Ask nicely to connect two nodes safely; if anything goes wrong, a message will be returned giving details on what went wrong
+RequestMessage RequestConnection(Node* a, Node* b, unsigned int resolutionFlags)
 {
+    // One or both nodes is null
     if (!a || !b)
         return RequestMessage::Failed_Null;
 
-    if (a->type == b->type)
+    // Both nodes are of same "sex"
+    if ((a->type == Node::TransferMode::Input && b->type == Node::TransferMode::Input) ||
+        (a->type == Node::TransferMode::Output && b->type == Node::TransferMode::Output))
         return RequestMessage::Failed_Homo;
 
     bool neededToChange = false;
 
+    // Node-a is already connected to something
     if (a->wired)
     {
-        // Already connected to the other input
+        // Connected to the other node parameter (Half the work is already done!)
         if (a->wired == b)
         {
+            // Both nodes already recognize each other as connected (Job done!!)
             if (b->wired == a)
                 return RequestMessage::Success_Redundant;
+            // Unrequited love...
             else
-                return RequestMessage::Retry_Malformed_Widow;
+            {
+                // We have permission to resolve the problem automatically
+                if (resolutionFlags & Resolve_Unrequited)
+                {
+                    // Node-b either is not connected to ANYTHING (so she's available?)
+                    // OR the node node-b is connected to does not recognize the connection (so she's available...)
+                    // OR Node-b's significant other is connected to a node OTHER THAN node-b (SCANDALOUS!! ...So she's available...)
+                    if (!b->wired || !b->wired->wired || b->wired->wired != b)
+                    {
+                        b->wired = a;
+                        return RequestMessage::Success_Repaired_Unrequited;
+                    }
+                    // Wire-b is in an existing, loving connection and is unavailable. Sorry, a.
+                    else
+                    {
+                        a->wired = nullptr;
+                        return RequestMessage::Failed_Adulterer;
+                    }
+                }
+                // We do not have permission to resolve the problem automatically, and nodes a and b will have to be resolved externally.
+                else
+                    return RequestMessage::Retry_Unrequited;
+            }
         }
 
-        // Able to swap out
+        // If a is connected to b, the function will have exited by this point.
+        // Beyond this point the assumption is made that the initial node-a passed in is already connected, and must either be fungibly replaced, or fail the connection.
+
+        neededToChange = true;
+
+        // Node-a has his mom's phone number so we can call her up and ask if any of a's brothers are interested
         if (a->attached)
         {
-            a = a->attached->GetFirstAvailableInterchangeableNode(a);
+            // We have permission to call node-a's mom
+            if (resolutionFlags & Resolve_Taken)
+            {
+                // Try looking for a suitable replacement for node-a
+                a = a->attached->GetFirstAvailableInterchangeableNode(a);
 
-            if (!a)
+                // Node-a doesn't have any suitable replacements! They're all nonexistent or unavailable!
+                if (!a)
+                    return RequestMessage::Failed_NonFungible;
+            }
+            // We do not have permission to resolve the problem automatically, and it should be handeled externally.
+            else
                 return RequestMessage::Failed_NonFungible;
-
-            neededToChange = true;
         }
+        // Node-a doesn't have a mother! OH NO!!
         else
-            return RequestMessage::Failed_Detatched;
+        {
+            // We have permission to resolve the orphan, but we still can't make the connection.
+            // I sincerely hope you didn't keep any copy of node-a's pointer when you gave me this permission.
+            if (resolutionFlags & Resolve_Orphan)
+                delete a;
+
+            return RequestMessage::Failed_Orphan;
+        }
     }
 
+    // Node-b is already connected to something
     if (b->wired)
     {
-        // Already connected to the other input
+        // Connected to the other node parameter (Half the work is already done!)
         if (b->wired == a)
         {
+            // Both nodes already recognize each other as connected (Job done!!)
             if (a->wired == b)
                 return RequestMessage::Success_Redundant;
+            // Unrequited love...
             else
-                return RequestMessage::Retry_Malformed_Widow;
+            {
+                // We have permission to resolve the problem automatically
+                if (resolutionFlags & Resolve_Unrequited)
+                {
+                    // Node-a either is not connected to ANYTHING (so he's available?)
+                    // OR the node node-a is connected to does not recognize the connection (so he's available...)
+                    // OR Node-a's significant other is connected to a node OTHER THAN node-a (SCANDALOUS!! ...So he's available...)
+                    if (!a->wired || !a->wired->wired || a->wired->wired != a)
+                    {
+                        a->wired = b;
+                        return RequestMessage::Success_Repaired_Unrequited;
+                    }
+                    // Wire-a is in an existing, loving connection and is unavailable. Sorry, b.
+                    else
+                    {
+                        b->wired = nullptr;
+                        return RequestMessage::Failed_Adulterer;
+                    }
+                }
+                // We do not have permission to resolve the problem automatically, and nodes b and a will have to be resolved externally.
+                else
+                    return RequestMessage::Retry_Unrequited;
+            }
         }
 
-        // Able to swap out
+        // If b is connected to a, the function will have exited by this point.
+        // Beyond this point the assumption is made that the initial node-a passed in is already connected, and must either be fungibly replaced, or fail the connection.
+
+        neededToChange = true;
+
+        // Node-b has her mom's phone number so we can call her up and ask if any of b's sisters are interested
         if (b->attached)
         {
-            b = b->attached->GetFirstAvailableInterchangeableNode(b);
+            // We have permission to call node-b's mom
+            if (resolutionFlags & Resolve_Taken)
+            {
+                // Try looking for a suitable replacement for node-b
+                b = b->attached->GetFirstAvailableInterchangeableNode(b);
 
-            if (!b)
+                // Node-b doesn't have any suitable replacements! They're all nonexistent or unavailable!
+                if (!b)
+                    return RequestMessage::Failed_NonFungible;
+            }
+            // We do not have permission to resolve the problem automatically, and it should be handeled externally.
+            else
                 return RequestMessage::Failed_NonFungible;
-
-            neededToChange = true;
         }
+        // Node-b doesn't have a mother! OH NO!!
         else
-            return RequestMessage::Failed_Detatched;
+        {
+            // We have permission to resolve the orphan, but we still can't make the connection.
+            // I sincerely hope you didn't keep any copy of node-b's pointer when you gave me this permission.
+            if (resolutionFlags & Resolve_Orphan)
+                delete b;
+
+            return RequestMessage::Failed_Orphan;
+        }
     }
 
+    // We get to establish a connection!! :D
     a->wired = b;
     b->wired = a;
 
