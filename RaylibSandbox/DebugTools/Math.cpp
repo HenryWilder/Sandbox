@@ -2,7 +2,7 @@
 #include <raymath.h>
 #include "Math.h"
 
-#pragma region Range math
+#pragma region RangeAddress math
 
 float ScaleFromRange(float min, float max) {
 	return max - min;
