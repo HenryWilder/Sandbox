@@ -129,6 +129,11 @@ struct Segment
             return GetLastCP();
     }
 };
+Segment Segment_Cubic()
+{
+
+}
+
 void SimplifySegment(Segment& segment)
 {
     if (!segment.EndRequiresStart())
@@ -137,7 +142,7 @@ void SimplifySegment(Segment& segment)
         segment.l.end = segment.GetEnd();
     }
 }
-void SimplifySegmentWithStart(Vector2 start, Segment& segment)
+void SimplifySegmentWithStart(Segment& segment, Vector2 start)
 {
     if (!segment.EndRequiresStart())
     {
@@ -149,21 +154,30 @@ void SimplifySegmentWithStart(Vector2 start, Segment& segment)
             segment.type = Segment::Type::EMPTY;
         if (matchX)
         {
-            segment.
+            segment.type = Segment::Type::HORIZONTAL;
+            segment.h.x = segment.l.end.x;
         }
         if (matchY)
         {
-
+            segment.type = Segment::Type::VERTICAL;
+            segment.v.y = segment.l.end.y;
         }
     }
 }
-void LineToQuad()
+void LineToQuad(Segment& segment, Vector2 cp)
 {
-
+    segment.type = Segment::Type::QUAD;
+    segment.q.end = segment.l.end;
+    segment.q.cp = cp;
 }
-void QuadToCubic()
+void QuadToCubic(Segment& segment, Vector2 cp2)
 {
-
+    segment.type = Segment::Type::CUBIC;
+    Vector2 end = segment.q.end;
+    Vector2 cp1 = segment.q.cp;
+    segment.c.end = end;
+    segment.c.cp1 = cp1;
+    segment.c.cp2 = cp2;
 }
 
 struct Path
