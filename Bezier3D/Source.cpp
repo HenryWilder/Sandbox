@@ -217,63 +217,44 @@ struct WTri2Q
 	Vector2 p2;
 	Vector2 c20;
 
-	WTri2Q Subdiv0()
+	Vector2 Center()
 	{
-		return WTri2Q{
-			p0,
-			Qerp2(p0, c01, p1, 0.25f),
-
-			c01,
-			Lerp2(c01, c20, 0.5f),
-
-			c20,
-			Qerp2(p0, c20, p2, 0.25f)
-		};
-	}
-	WTri2Q Subdiv1()
-	{
-		return WTri2Q{
-			c01,
-			Qerp2(p1, c01, p0, 0.25f),
-
-			p1,
-			Qerp2(p1, c12, p2, 0.25f),
-
-			c12,
-			Lerp2(c01, c12, 0.5f)
-		};
-	}
-	WTri2Q Subdiv2()
-	{
-		return WTri2Q{
-			c20,
-			Lerp2(c20, c12, 0.5f),
-
-			c12,
-			Qerp2(p2, c12, p1, 0.25f),
-
-			p2,
-			Qerp2(p2, c20, p0, 0.25f)
+		return Vector2{
+			(p0.x + c01.x + p1.x + c12.x + p2.x + c20.x) / 6.0f,
+			(p0.y + c01.y + p1.y + c12.y + p2.y + c20.y) / 6.0f
 		};
 	}
 };
-void DrawWTri2Q(WTri2Q tri, unsigned int subdiv)
+void DrawWTri2Q(WTri2Q tri, float increment)
 {
-	if (subdiv == 0)
+	Vector2 center = tri.Center();
+
+	Vector2 last = tri.p0;
+	for (float t = increment; t < 1.0f; t += increment)
 	{
-		DrawTriangle2D(tri.c20, tri.c01, tri.c12);
-		DrawTriangle2D(tri.p0, tri.c01, tri.c20);
-		DrawTriangle2D(tri.c01, tri.p1, tri.c12);
-		DrawTriangle2D(tri.c20, tri.c12, tri.p2);
+		Vector2 current = Qerp2(tri.p0, tri.c01, tri.p1, t);
+		DrawTriangle2D(last, current, center);
+		last = current;
 	}
-	else
+	DrawTriangle2D(last, tri.p1, center);
+
+	last = tri.p1;
+	for (float t = increment; t < 1.0f; t += increment)
 	{
-		--subdiv;
-		DrawTriangle2D(tri.c20, tri.c01, tri.c12);
-		DrawWTri2Q(tri.Subdiv0(), subdiv);
-		DrawWTri2Q(tri.Subdiv1(), subdiv);
-		DrawWTri2Q(tri.Subdiv2(), subdiv);
+		Vector2 current = Qerp2(tri.p1, tri.c12, tri.p2, t);
+		DrawTriangle2D(last, current, center);
+		last = current;
 	}
+	DrawTriangle2D(last, tri.p2, center);
+
+	last = tri.p2;
+	for (float t = increment; t < 1.0f; t += increment)
+	{
+		Vector2 current = Qerp2(tri.p2, tri.c20, tri.p0, t);
+		DrawTriangle2D(last, current, center);
+		last = current;
+	}
+	DrawTriangle2D(last, tri.p0, center);
 }
 
 struct WTri2C
@@ -416,6 +397,9 @@ void DrawWTri3C(WTri3C tri, unsigned int subdiv)
 
 int main()
 {
+	HPEN hPen = CreatePen(PS_SOLID, 0, RGB(0, 0, 255));
+	HPEN hOldPen = SelectPen(g_hdc, hPen);
+
 	HBRUSH hBrush = CreateSolidBrush(RGB(0, 0, 255));
 	HBRUSH hOldBrush = SelectBrush(g_hdc, hBrush);
 
@@ -427,10 +411,13 @@ int main()
 		Vector2{ 100, 300 }, // p2
 		Vector2{ 175, 260 }
 	};
-	DrawWTri2Q(qTri, 1);
+	DrawWTri2Q(qTri, 0.025f);
 
 	SelectBrush(g_hdc, hOldBrush);
 	DeleteObject(hBrush);
+
+	SelectPen(g_hdc, hOldPen);
+	DeleteObject(hPen);
 
 	return 0;
 }
