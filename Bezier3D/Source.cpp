@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <windowsx.h>
 
+#if 0
 float Square(float f)
 {
 	return f * f;
@@ -110,6 +111,79 @@ Vector3 Cerp3(Vector3 a, Vector3 b, Vector3 c, Vector3 d, float t)
 	};
 }
 
+#else
+
+float Lerp(float a, float b, float t)
+{
+	return a + t * (b - a);
+}
+float Qerp(float a, float b, float c, float t)
+{
+	return Lerp(Lerp(a, b, t), Lerp(b, c, t), t);
+}
+float Cerp(float a, float b, float c, float d, float t)
+{
+	return Qerp(Lerp(a, b, t), Lerp(b, c, t), Lerp(c, d, t), t);
+}
+
+struct Vector2
+{
+	float x, y;
+};
+
+Vector2 Lerp2(Vector2 a, Vector2 b, float t)
+{
+	return {
+		Lerp(a.x, b.x, t),
+		Lerp(a.y, b.y, t)
+	};
+}
+Vector2 Qerp2(Vector2 a, Vector2 b, Vector2 c, float t)
+{
+	return {
+		Qerp(a.x, b.x, c.x, t),
+		Qerp(a.y, b.y, c.y, t)
+	};
+}
+Vector2 Cerp2(Vector2 a, Vector2 b, Vector2 c, Vector2 d, float t)
+{
+	return {
+		Cerp(a.x, b.x, c.x, d.x, t),
+		Cerp(a.y, b.y, c.y, d.y, t)
+	};
+}
+
+struct Vector3
+{
+	float x, y, z;
+};
+
+Vector3 Lerp3(Vector3 a, Vector3 b, float t)
+{
+	return {
+		Lerp(a.x, b.x, t),
+		Lerp(a.y, b.y, t),
+		Lerp(a.z, b.z, t)
+	};
+}
+Vector3 Qerp3(Vector3 a, Vector3 b, Vector3 c, float t)
+{
+	return {
+		Qerp(a.x, b.x, c.x, t),
+		Qerp(a.y, b.y, c.y, t),
+		Qerp(a.z, b.z, c.z, t)
+	};
+}
+Vector3 Cerp3(Vector3 a, Vector3 b, Vector3 c, Vector3 d, float t)
+{
+	return {
+		Cerp(a.x, b.x, c.x, d.x, t),
+		Cerp(a.y, b.y, c.y, d.y, t),
+		Cerp(a.z, b.z, c.z, d.z, t)
+	};
+}
+
+#endif
 
 //Get a console handle
 HWND g_window = GetConsoleWindow();
