@@ -1,3 +1,6 @@
+#include <windows.h>
+#include <windowsx.h>
+
 float Square(float f)
 {
 	return f * f;
@@ -108,9 +111,19 @@ Vector3 Cerp3(Vector3 a, Vector3 b, Vector3 c, Vector3 d, float t)
 }
 
 
+//Get a console handle
+HWND g_window = GetConsoleWindow();
+//Get a handle to device context
+HDC g_hdc = GetDC(g_window);
+
 void DrawTriangle2D(Vector2 p0, Vector2 p1, Vector2 p2)
 {
-	// Dummy
+	POINT vertices[] = {
+		{ (LONG)(p0.x + 0.5f), (LONG)(p0.y + 0.5f) },
+		{ (LONG)(p1.x + 0.5f), (LONG)(p1.y + 0.5f) },
+		{ (LONG)(p2.x + 0.5f),(LONG)(p2.y + 0.5f) }
+	};
+	Polygon(g_hdc, vertices, 3);
 }
 
 struct WTri2Q
@@ -134,23 +147,23 @@ struct WTri2Q
 	{
 		return WTri2Q{
 			p0,
-			Qerp2(p0, c01, p1, 1.0f / 3.0f),
+			Qerp2(p0, c01, p1, 0.25f),
 
 			c01,
 			Lerp2(c01, c20, 0.5f),
 
 			c20,
-			Qerp2(p0, c20, p2, 1.0f / 3.0f)
+			Qerp2(p0, c20, p2, 0.25f)
 		};
 	}
 	WTri2Q Subdiv1()
 	{
 		return WTri2Q{
 			c01,
-			Qerp2(p1, c01, p0, 1.0f / 3.0f),
+			Qerp2(p1, c01, p0, 0.25f),
 
 			p1,
-			Qerp2(p1, c12, p2, 1.0f / 3.0f),
+			Qerp2(p1, c12, p2, 0.25f),
 
 			c12,
 			Lerp2(c01, c12, 0.5f)
@@ -163,10 +176,10 @@ struct WTri2Q
 			Lerp2(c20, c12, 0.5f),
 
 			c12,
-			Qerp2(p2, c12, p1, 1.0f / 3.0f),
+			Qerp2(p2, c12, p1, 0.25f),
 
 			p2,
-			Qerp2(p2, c20, p0, 1.0f / 3.0f)
+			Qerp2(p2, c20, p0, 0.25f)
 		};
 	}
 };
@@ -174,6 +187,7 @@ void DrawWTri2Q(WTri2Q tri, unsigned int subdiv)
 {
 	if (subdiv == 0)
 	{
+		DrawTriangle2D(tri.c20, tri.c01, tri.c12);
 		DrawTriangle2D(tri.p0, tri.c01, tri.c20);
 		DrawTriangle2D(tri.c01, tri.p1, tri.c12);
 		DrawTriangle2D(tri.c20, tri.c12, tri.p2);
@@ -243,23 +257,23 @@ struct WTri3Q
 	{
 		return WTri3Q{
 			p0,
-			Qerp3(p0, c01, p1, 1.0f / 3.0f),
+			Qerp3(p0, c01, p1, 0.25f),
 
 			c01,
 			Lerp3(c01, c20, 0.5f),
 
 			c20,
-			Qerp3(p0, c20, p2, 1.0f / 3.0f)
+			Qerp3(p0, c20, p2, 0.25f)
 		};
 	}
 	WTri3Q Subdiv1()
 	{
 		return WTri3Q{
 			c01,
-			Qerp3(p1, c01, p0, 1.0f / 3.0f),
+			Qerp3(p1, c01, p0, 0.25f),
 
 			p1,
-			Qerp3(p1, c12, p2, 1.0f / 3.0f),
+			Qerp3(p1, c12, p2, 0.25f),
 
 			c12,
 			Lerp3(c01, c12, 0.5f)
@@ -272,10 +286,10 @@ struct WTri3Q
 			Lerp3(c20, c12, 0.5f),
 
 			c12,
-			Qerp3(p2, c12, p1, 1.0f / 3.0f),
+			Qerp3(p2, c12, p1, 0.25f),
 
 			p2,
-			Qerp3(p2, c20, p0, 1.0f / 3.0f)
+			Qerp3(p2, c20, p0, 0.25f)
 		};
 	}
 };
@@ -283,6 +297,7 @@ void DrawWTri3Q(WTri3Q tri, unsigned int subdiv)
 {
 	if (subdiv == 0)
 	{
+		DrawTriangle3D(tri.c20, tri.c01, tri.c12);
 		DrawTriangle3D(tri.p0, tri.c01, tri.c20);
 		DrawTriangle3D(tri.c01, tri.p1, tri.c12);
 		DrawTriangle3D(tri.c20, tri.c12, tri.p2);
@@ -327,5 +342,21 @@ void DrawWTri3C(WTri3C tri, unsigned int subdiv)
 
 int main()
 {
+	HBRUSH hBrush = CreateSolidBrush(RGB(0, 0, 255));
+	HBRUSH hOldBrush = SelectBrush(g_hdc, hBrush);
+
+	WTri2Q qTri = WTri2Q{
+		Vector2{ 200, 200 }, // p0
+		Vector2{ 250, 250 },
+		Vector2{ 300, 300 }, // p1
+		Vector2{ 200, 350 },
+		Vector2{ 100, 300 }, // p2
+		Vector2{ 175, 260 }
+	};
+	DrawWTri2Q(qTri, 1);
+
+	SelectBrush(g_hdc, hOldBrush);
+	DeleteObject(hBrush);
+
 	return 0;
 }
