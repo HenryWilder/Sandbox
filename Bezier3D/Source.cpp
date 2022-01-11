@@ -107,6 +107,12 @@ Vector3 Cerp3(Vector3 a, Vector3 b, Vector3 c, Vector3 d, float t)
 	};
 }
 
+
+void DrawTriangle2D(Vector2 p0, Vector2 p1, Vector2 p2)
+{
+	// Dummy
+}
+
 struct WTri2Q
 {
 	/*
@@ -123,7 +129,65 @@ struct WTri2Q
 
 	Vector2 p2;
 	Vector2 c20;
+
+	WTri2Q Subdiv0()
+	{
+		return WTri2Q{
+			p0,
+			Qerp2(p0, c01, p1, 1.0f / 3.0f),
+
+			c01,
+			Lerp2(c01, c20, 0.5f),
+
+			c20,
+			Qerp2(p0, c20, p2, 1.0f / 3.0f)
+		};
+	}
+	WTri2Q Subdiv1()
+	{
+		return WTri2Q{
+			c01,
+			Qerp2(p1, c01, p0, 1.0f / 3.0f),
+
+			p1,
+			Qerp2(p1, c12, p2, 1.0f / 3.0f),
+
+			c12,
+			Lerp2(c01, c12, 0.5f)
+		};
+	}
+	WTri2Q Subdiv2()
+	{
+		return WTri2Q{
+			c20,
+			Lerp2(c20, c12, 0.5f),
+
+			c12,
+			Qerp2(p2, c12, p1, 1.0f / 3.0f),
+
+			p2,
+			Qerp2(p2, c20, p0, 1.0f / 3.0f)
+		};
+	}
 };
+void DrawWTri2Q(WTri2Q tri, unsigned int subdiv)
+{
+	if (subdiv == 0)
+	{
+		DrawTriangle2D(tri.p0, tri.c01, tri.c20);
+		DrawTriangle2D(tri.c01, tri.p1, tri.c12);
+		DrawTriangle2D(tri.c20, tri.c12, tri.p2);
+	}
+	else
+	{
+		--subdiv;
+		DrawTriangle2D(tri.c20, tri.c01, tri.c12);
+		DrawWTri2Q(tri.Subdiv0(), subdiv);
+		DrawWTri2Q(tri.Subdiv1(), subdiv);
+		DrawWTri2Q(tri.Subdiv2(), subdiv);
+	}
+}
+
 struct WTri2C
 {
 	/*
@@ -145,6 +209,10 @@ struct WTri2C
 	Vector2 c20;
 	Vector2 c21;
 };
+void DrawWTri2C(WTri2C tri, unsigned int subdiv)
+{
+
+}
 
 struct WTri3Q
 {
