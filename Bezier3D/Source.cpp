@@ -208,10 +208,18 @@ struct WTri2C
 	Vector2 p2;
 	Vector2 c20;
 	Vector2 c21;
+
+	// TODO: Add cubic subdiv functions
 };
 void DrawWTri2C(WTri2C tri, unsigned int subdiv)
 {
+	// TODO
+}
 
+
+void DrawTriangle3D(Vector3 p0, Vector3 p1, Vector3 p2)
+{
+	// Dummy
 }
 
 struct WTri3Q
@@ -230,7 +238,65 @@ struct WTri3Q
 
 	Vector3 p2;
 	Vector3 c20;
+
+	WTri3Q Subdiv0()
+	{
+		return WTri3Q{
+			p0,
+			Qerp3(p0, c01, p1, 1.0f / 3.0f),
+
+			c01,
+			Lerp3(c01, c20, 0.5f),
+
+			c20,
+			Qerp3(p0, c20, p2, 1.0f / 3.0f)
+		};
+	}
+	WTri3Q Subdiv1()
+	{
+		return WTri3Q{
+			c01,
+			Qerp3(p1, c01, p0, 1.0f / 3.0f),
+
+			p1,
+			Qerp3(p1, c12, p2, 1.0f / 3.0f),
+
+			c12,
+			Lerp3(c01, c12, 0.5f)
+		};
+	}
+	WTri3Q Subdiv2()
+	{
+		return WTri3Q{
+			c20,
+			Lerp3(c20, c12, 0.5f),
+
+			c12,
+			Qerp3(p2, c12, p1, 1.0f / 3.0f),
+
+			p2,
+			Qerp3(p2, c20, p0, 1.0f / 3.0f)
+		};
+	}
 };
+void DrawWTri3Q(WTri3Q tri, unsigned int subdiv)
+{
+	if (subdiv == 0)
+	{
+		DrawTriangle3D(tri.p0, tri.c01, tri.c20);
+		DrawTriangle3D(tri.c01, tri.p1, tri.c12);
+		DrawTriangle3D(tri.c20, tri.c12, tri.p2);
+	}
+	else
+	{
+		--subdiv;
+		DrawTriangle3D(tri.c20, tri.c01, tri.c12);
+		DrawWTri3Q(tri.Subdiv0(), subdiv);
+		DrawWTri3Q(tri.Subdiv1(), subdiv);
+		DrawWTri3Q(tri.Subdiv2(), subdiv);
+	}
+}
+
 struct WTri3C
 {
 	/*
@@ -251,7 +317,13 @@ struct WTri3C
 	Vector3 p2;
 	Vector3 c20;
 	Vector3 c21;
+
+	// TODO: Add cubic subdiv functions
 };
+void DrawWTri3C(WTri3C tri, unsigned int subdiv)
+{
+	// TODO
+}
 
 int main()
 {
