@@ -268,132 +268,57 @@ struct WTri2C
 
 	Vector2 p0;
 	Vector2 c01;
-	Vector2 c02;
 
-	Vector2 p1;
 	Vector2 c10;
+	Vector2 p1;
 	Vector2 c12;
 
+	Vector2 c21;
 	Vector2 p2;
 	Vector2 c20;
-	Vector2 c21;
 
-	// TODO: Add cubic subdiv functions
-};
-void DrawWTri2C(WTri2C tri, unsigned int subdiv)
-{
-	// TODO
-}
+	Vector2 c02;
 
-
-void DrawTriangle3D(Vector3 p0, Vector3 p1, Vector3 p2)
-{
-	// Dummy
-}
-
-struct WTri3Q
-{
-	/*
-	*	    p0
-	*	  20  01
-	*	p2  12  p1
-	*/
-
-	Vector3 p0;
-	Vector3 c01;
-
-	Vector3 p1;
-	Vector3 c12;
-
-	Vector3 p2;
-	Vector3 c20;
-
-	WTri3Q Subdiv0()
+	Vector2 Center()
 	{
-		return WTri3Q{
-			p0,
-			Qerp3(p0, c01, p1, 0.25f),
-
-			c01,
-			Lerp3(c01, c20, 0.5f),
-
-			c20,
-			Qerp3(p0, c20, p2, 0.25f)
-		};
-	}
-	WTri3Q Subdiv1()
-	{
-		return WTri3Q{
-			c01,
-			Qerp3(p1, c01, p0, 0.25f),
-
-			p1,
-			Qerp3(p1, c12, p2, 0.25f),
-
-			c12,
-			Lerp3(c01, c12, 0.5f)
-		};
-	}
-	WTri3Q Subdiv2()
-	{
-		return WTri3Q{
-			c20,
-			Lerp3(c20, c12, 0.5f),
-
-			c12,
-			Qerp3(p2, c12, p1, 0.25f),
-
-			p2,
-			Qerp3(p2, c20, p0, 0.25f)
+		return Vector2{
+			(p0.x + c01.x + c02.x + p1.x + c10.x + c12.x + p2.x + c20.x + c21.x) / 9.0f,
+			(p0.y + c01.y + c02.y + p1.y + c10.y + c12.y + p2.y + c20.y + c21.y) / 9.0f
 		};
 	}
 };
-void DrawWTri3Q(WTri3Q tri, unsigned int subdiv)
+void DrawWTri2C(WTri2C tri, float increment)
 {
-	if (subdiv == 0)
+	Vector2 center = tri.Center();
+
+	Vector2 last = tri.p0;
+	for (float t = increment; t < 1.0f; t += increment)
 	{
-		DrawTriangle3D(tri.c20, tri.c01, tri.c12);
-		DrawTriangle3D(tri.p0, tri.c01, tri.c20);
-		DrawTriangle3D(tri.c01, tri.p1, tri.c12);
-		DrawTriangle3D(tri.c20, tri.c12, tri.p2);
+		Vector2 current = Cerp2(tri.p0, tri.c01, tri.c10, tri.p1, t);
+		DrawTriangle2D(last, current, center);
+		last = current;
 	}
-	else
+	DrawTriangle2D(last, tri.p1, center);
+
+	last = tri.p1;
+	for (float t = increment; t < 1.0f; t += increment)
 	{
-		--subdiv;
-		DrawTriangle3D(tri.c20, tri.c01, tri.c12);
-		DrawWTri3Q(tri.Subdiv0(), subdiv);
-		DrawWTri3Q(tri.Subdiv1(), subdiv);
-		DrawWTri3Q(tri.Subdiv2(), subdiv);
+		Vector2 current = Cerp2(tri.p1, tri.c12, tri.c21, tri.p2, t);
+		DrawTriangle2D(last, current, center);
+		last = current;
 	}
+	DrawTriangle2D(last, tri.p2, center);
+
+	last = tri.p2;
+	for (float t = increment; t < 1.0f; t += increment)
+	{
+		Vector2 current = Cerp2(tri.p2, tri.c20, tri.c02, tri.p0, t);
+		DrawTriangle2D(last, current, center);
+		last = current;
+	}
+	DrawTriangle2D(last, tri.p0, center);
 }
 
-struct WTri3C
-{
-	/*
-	*	      p0
-	*	    02  01
-	*	  20      10
-	*	p2  21  12  p1
-	*/
-
-	Vector3 p0;
-	Vector3 c01;
-	Vector3 c02;
-
-	Vector3 p1;
-	Vector3 c10;
-	Vector3 c12;
-
-	Vector3 p2;
-	Vector3 c20;
-	Vector3 c21;
-
-	// TODO: Add cubic subdiv functions
-};
-void DrawWTri3C(WTri3C tri, unsigned int subdiv)
-{
-	// TODO
-}
 
 int main()
 {
@@ -403,15 +328,38 @@ int main()
 	HBRUSH hBrush = CreateSolidBrush(RGB(0, 0, 255));
 	HBRUSH hOldBrush = SelectBrush(g_hdc, hBrush);
 
-	WTri2Q qTri = WTri2Q{
+	WTri2Q qTri0 = WTri2Q{
 		Vector2{ 200, 200 }, // p0
 		Vector2{ 250, 250 },
 		Vector2{ 300, 300 }, // p1
 		Vector2{ 200, 350 },
 		Vector2{ 100, 300 }, // p2
-		Vector2{ 175, 260 }
+		Vector2{ 200, 300 }
 	};
-	DrawWTri2Q(qTri, 0.025f);
+	DrawWTri2Q(qTri0, 0.025f);
+	
+	WTri2Q qTri1 = WTri2Q{
+		Vector2{ 200, 200 }, // p0
+		Vector2{ 300, 150 },
+		Vector2{ 400, 200 }, // p1
+		Vector2{ 300, 200 },
+		Vector2{ 300, 300 }, // p2
+		Vector2{ 250, 250 },
+	};
+	DrawWTri2Q(qTri1, 0.025f);
+
+	//WTri2C cTri = WTri2C{
+	//	Vector2{  60, 200 - 70 }, // p0
+	//	Vector2{ 130, 200 - 70 }, // c01
+	//	Vector2{ 180, 200 -  0 }, // c10
+	//	Vector2{ 130, 200 -  0 }, // p1
+	//	Vector2{ 130, 200 - 70 }, // c12
+	//	Vector2{  60, 200 -  0 }, // c21
+	//	Vector2{  20, 200 -  0 }, // p2
+	//	Vector2{  20, 200 - 70 }, // c20
+	//	Vector2{  60, 200 - 30 } // c02
+	//};
+	//DrawWTri2C(cTri, 0.025f);
 
 	SelectBrush(g_hdc, hOldBrush);
 	DeleteObject(hBrush);
