@@ -1,2 +1,7 @@
-version 0
-var i x
+var x
+set x 4
+var y
+set y 8
+var z
+add z x y
+PrintV z

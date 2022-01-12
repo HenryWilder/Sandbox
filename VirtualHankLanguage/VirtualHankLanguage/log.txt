@@ -1,3 +1,2 @@
 Starting interpreter!
 Read token "var"
-Creating variable of type i named x

@@ -5,6 +5,8 @@
 #include <tchar.h>
 #include "Functions2.h"
 
+#include "Debugging.h"
+
 void Open(std::string& str)
 {
 

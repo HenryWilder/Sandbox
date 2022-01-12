@@ -8,6 +8,8 @@
 #include "Functions2.h"
 #include "Interpreter2.h"
 
+#include "Debugging.h"
+
 void Log(const char* fmt, ...)
 {
     FILE* file;
@@ -21,6 +23,9 @@ void Log(const char* fmt, ...)
             va_start(args, fmt);
             vfprintf(file, fmt, args);
             va_end(args);
+            va_start(args, fmt);
+            printf(fmt, args);
+            va_end(args);
         }
 
         fclose(file);
@@ -29,7 +34,8 @@ void Log(const char* fmt, ...)
 
 constexpr int sizeof_str(const char str[8])
 {
-    if (!str[0]) return 0;
+    if (!str) return -1;
+    else if (!str[0]) return 0;
     else if (!str[1]) return 1;
     else if (!str[2]) return 2;
     else if (!str[3]) return 3;
@@ -95,41 +101,28 @@ enum class Type : char
 {
     Int = 'i',
     Flt = 'f',
-    Str = 's',
 };
 
 enum class Instruction : uint64_t
 {
-    // t, s
-    var = Pack_Str("var"),
+    // &n, n
+    set = Pack_Str("set"),
 
-    // &i, i
-    iSet = Pack_Str("iSet"),
-
-    // &f, f
-    fSet = Pack_Str("fSet"),
-
-    // &s, s
-    sSet = Pack_Str("sSet"),
-
-    // &i, i, i
-    iAdd = Pack_Str("iAdd"),
-    iSub = Pack_Str("iSub"),
-    iMul = Pack_Str("iMul"),
-    iDiv = Pack_Str("iDiv"),
-    iMod = Pack_Str("iMod"),
-
-    // &f, f, f
-    fAdd = Pack_Str("fAdd"),
-    fSub = Pack_Str("fSub"),
-    fMul = Pack_Str("fMul"),
-    fDiv = Pack_Str("fDiv"),
+    // &n, n, n
+    Add = Pack_Str("add"),
+    Sub = Pack_Str("sub"),
+    Mul = Pack_Str("mul"),
+    Div = Pack_Str("div"),
+    Mod = Pack_Str("mod"),
 
     // s
-    Print = Pack_Str("Print"),
+    var = Pack_Str("var"),
+    jmp = Pack_Str("jmp"),
+    lbl = Pack_Str("lbl"),
+
+    PrintS = Pack_Str("PrintS"), // Print string
+    PrintV = Pack_Str("PrintV"), // Print value
     Open = Pack_Str("Open"),
-    jmp  = Pack_Str("jmp"),
-    lbl  = Pack_Str("lbl"),
 
     // { [s:lbl], [s:lbl], ... }
     Prompt = Pack_Str("Prompt"),
@@ -140,74 +133,69 @@ Instruction Tokenize(const char token[8])
     return (Instruction)(Pack_Str(token));
 }
 
-// Tells how to interpret the memory
-struct VarData
-{
-    Type ty;        // How to interpret the var
-    short pt;       // Var offset from stack
-    size_t size;    // How many bytes the block is in size
-};
 class VarStack
 {
 private:
     char mem[2048]; // Where the values are stored
-    std::map<std::string, VarData> vars; // name -> { type, position }
+    std::map<std::string, short> vars; // name -> position
     short top = 0;  // Current top offset of stack (where new vars should be pushed to/popped from)
 
 public:
-    bool pull(std::string& name, void* dest)
+    bool pull(std::string& name, int* dest)
     {
         auto it = vars.find(name);
         if (it != vars.end())
         {
-            VarData data = it->second;
-            for (size_t i = 0; i < data.size; i++)
-            {
-                ((char*)dest)[i] = mem[data.pt + i];
-            }
+            short data = it->second;
+            *dest = *(int*)(mem + data);
             return true;
         }
         else return false;
     }
-    void push(std::string& name, Type ty, size_t bytes, void* src = nullptr)
+
+    bool valid(std::string& name)
+    {
+        return (vars.find(name) != vars.end());
+    }
+
+    void push(std::string& name)
+    {
+        vars[name] = top;
+        top += sizeof(int);
+    }
+
+    void push(std::string& name, int value)
     {
         size_t offset;
         {
             auto it = vars.find(name);
             if (it != vars.end()) // Push value to existing
             {
-                bytes = std::min(bytes, it->second.size);
-                offset = it->second.pt;
+                offset = it->second;
             }
             else // Push new
             {
-                vars.insert({ name, { ty, top, bytes } });
-                offset = top;
-                top += bytes;
+                vars[name] = offset = top;
+                top += sizeof(int);
             }
         }
-        if (src)
-        {
-            for (size_t i = 0; i < bytes; i++)
-            {
-                mem[offset + i] = ((char*)src)[i];
-            }
-        }
+        *(int*)(mem + offset) = value;
     }
+    
     bool pop()
     {
         if (vars.empty()) return false;
         else
         {
             auto it = (--vars.end());
-            top -= it->second.size;
+            top -= sizeof(int);
             vars.erase(it);
             return true;
         }
     }
 };
 
-bool nParam(std::ifstream& stream, VarStack* stack, void* dest, Type ty)
+bool nParam(std::ifstream& stream, VarStack* stack, int* dest)
 {
     std::string symbol;
     std::getline(stream, symbol, ' '); // I don't want '-' getting delimited
@@ -215,35 +203,31 @@ bool nParam(std::ifstream& stream, VarStack* stack, void* dest, Type ty)
     if (symbol.find_first_of("0123456789.+-") == 0ull) // The first character is a numeric character
     {
         // Literal
-        switch (ty)
-        {
-        case Type::Int: *(int*)dest   = std::stoi(symbol); Log("Read literal integer value %i\n", *(int*)dest); break;
-        case Type::Flt: *(float*)dest = std::stof(symbol); Log("Read literal float value %i\n", *(float*)dest); break;
-        default: Log("ERROR: Undefined type!\n"); return false;
-        }
+        *(int*)dest = std::stoi(symbol);
+        Log("Read literal integer value %i\n", *(int*)dest);
         return true;
     }
     else
     {
         if (stack->pull(symbol, dest))
         {
-            Log("Read stored value %i OR %f\n", *(int*)dest, *(float*)dest);
+            Log("Read stored value %i\n", *(int*)dest);
             return true;
         }
         else
         {
-            Log("Read stored value %i OR %f\n", *(int*)dest, *(float*)dest);
+            Log("Could not read value!\n");
             return false;
         }
     }
 }
 
-bool sParam(std::ifstream& stream, VarStack* stack, std::string& dest)
+bool sParam(std::ifstream& stream, VarStack* stack, std::string* dest)
 {
     stream.ignore(64, '\"');
-    if (std::getline(stream, dest, '\"'))
+    if (std::getline(stream, *dest, '\"'))
     {
-        Log("Read string parameter \" %s \"\n", dest.c_str());
+        Log("Read string parameter \" %s \"\n", dest->c_str());
         return true;
     }
     else
@@ -253,11 +237,23 @@ bool sParam(std::ifstream& stream, VarStack* stack, std::string& dest)
     }
 }
 
+// Retrieves a "variable reference" (the name of a variable)
+bool vParam(std::ifstream& stream, VarStack* stack, std::string* dest)
+{
+    if (std::getline(stream, *dest, ' '))
+    {
+        return stack->valid(*dest);
+    }
+    else return false;
+}
+
 constexpr int g_thisVersion = 0;
+
 
 void Interpret(const char* file)
 {
     size_t start;
+#if 0
     // Version guard
     {
         int version;
@@ -268,12 +264,14 @@ void Interpret(const char* file)
         fclose(_file);
         if (version != g_thisVersion) return; // TODO: Handle backwards compatibility
     }
+#endif
 
     std::unordered_map<std::string, std::streampos> labels; // TODO: Preliminary readthrough of document to find label positions (with tellg!)
     
 
     std::ifstream code(file);
     {
+        start = code.tellg();
         std::string token;
         while (code.good())
         {
@@ -291,7 +289,11 @@ void Interpret(const char* file)
 
     code.seekg(start);
 
-    while (code.good())
+#define vParam(x) vParam(code, &rsp, x)
+#define nParam(x) nParam(code, &rsp, x)
+#define sParam(x) sParam(code, &rsp, x)
+
+    while (!code.eof())
     {
         std::string tkn; // Token
         code >> tkn;
@@ -300,55 +302,44 @@ void Interpret(const char* file)
         Log("Read token \"%s\"\n", tkn.c_str());
         switch (ins)
         {
-        case Instruction::iAdd: case Instruction::iSub:
-        case Instruction::iDiv: case Instruction::iMul:
-        case Instruction::iMod:
+        case Instruction::set:
         {
-            std::string o; int a, b;
-            sParam(code, &rsp, o); // sParam() for variable name
-            nParam(code, &rsp, &a, Type::Int);
-            nParam(code, &rsp, &b, Type::Int);
+            std::string var;
+            int val;
+            vParam(&var);
+            nParam(&val);
+            rsp.push(var, val);
+        }   break;
+
+        case Instruction::Add: case Instruction::Sub:
+        case Instruction::Div: case Instruction::Mul:
+        case Instruction::Mod:
+        {
+            std::string o;
+            int a, b;
+            vParam(&o); // sParam() for variable name
+            nParam(&a);
+            nParam(&b);
             int result;
             // Evaluate
             switch (ins)
             {
-            case Instruction::iAdd: result = a + b; Log("Added");       break;
-            case Instruction::iSub: result = a - b; Log("Subtracted");  break;
-            case Instruction::iMul: result = a * b; Log("Multiplied");  break;
-            case Instruction::iDiv: result = a / b; Log("Divided");     break;
-            case Instruction::iMod: result = a % b; Log("Moduloed");    break;
+            case Instruction::Add: result = a + b; Log("Added");       break;
+            case Instruction::Sub: result = a - b; Log("Subtracted");  break;
+            case Instruction::Mul: result = a * b; Log("Multiplied");  break;
+            case Instruction::Div: result = a / b; Log("Divided");     break;
+            case Instruction::Mod: result = a % b; Log("Moduloed");    break;
             }
             Log(" int of values a = %i and b = %i to produce the result %i\n", a, b, result);
-            rsp.push(o, Type::Int, sizeof(int), &result);
-        }   break;
-
-        case Instruction::fAdd: case Instruction::fSub:
-        case Instruction::fDiv: case Instruction::fMul:
-        {
-            std::string o; float a, b;
-            sParam(code, &rsp, o); // sParam() for variable name
-            nParam(code, &rsp, &a, Type::Flt);
-            nParam(code, &rsp, &b, Type::Flt);
-            float result;
-            // Evaluate
-            switch (ins)
-            {
-            case Instruction::fAdd: result = a + b; Log("Added");       break;
-            case Instruction::fSub: result = a - b; Log("Subtracted");  break;
-            case Instruction::fMul: result = a * b; Log("Multiplied");  break;
-            case Instruction::fDiv: result = a / b; Log("Divided");     break;
-            }
-            Log(" floats of values a = %f and b = %f to produce the result %f\n", a, b, result);
-            rsp.push(o, Type::Flt, sizeof(float), &result);
+            rsp.push(o, result);
         }   break;
 
         case Instruction::var:
         {
-            char ty;
             std::string name;
-            code >> ty >> name;
-            rsp.push(name, (Type)ty, 4);
-            Log("Creating variable of type %c named %s\n", ty, name.c_str());
+            code >> name;
+            rsp.push(name); break;
+            Log("Creating variable named %s\n", name.c_str());
         }   break;
             
         case Instruction::Prompt:
@@ -385,14 +376,14 @@ void Interpret(const char* file)
         }   break;
 
         case Instruction::lbl:  case Instruction::Open:
-        case Instruction::jmp:  case Instruction::Print:
+        case Instruction::jmp:  case Instruction::PrintS:
         {
             std::string str;
-            sParam(code, &rsp, str);
+            sParam(&str);
             switch (ins)
             {
-            case Instruction::Print: printf(str.c_str()); break;
-            case Instruction::Open: Open(str); break;
+            case Instruction::PrintS: printf(str.c_str()); break;
+            case Instruction::Open:   Open(str);           break;
             case Instruction::jmp:
             {
                 auto it = labels.find(str);
@@ -403,6 +394,14 @@ void Interpret(const char* file)
             case Instruction::lbl: break;
             }
         }   break;
+
+        case Instruction::PrintV:
+        {
+            int val;
+            nParam(&val);
+            printf("%i", val);
+        }   break;
+
         default: goto Exit; break;
         }
     }

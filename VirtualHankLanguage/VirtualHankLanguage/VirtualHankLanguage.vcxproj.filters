@@ -62,6 +62,9 @@
     <ClInclude Include="Interpreter2.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="Debugging.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <Text Include="log.txt">

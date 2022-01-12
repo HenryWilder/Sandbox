@@ -153,6 +153,7 @@
     <ClCompile Include="VirtualHankLanguage.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Debugging.h" />
     <ClInclude Include="Functions.h" />
     <ClInclude Include="Functions2.h" />
     <ClInclude Include="GUI.h" />

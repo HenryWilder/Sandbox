@@ -267,10 +267,11 @@ void InitWindow(int width, int height) {
     // CORE.shader.push(shd0);
 }
 bool WindowShouldClose() {
-    return false; // todo
+    return false; // Todo: Add functionality
 }
+// TODO: There appears to be a problem here?
 void CloseWindow() {
-    for (auto it : CORE.textures) {
+    for (auto& it : CORE.textures) {
         // Only delete render textures
         if (it.second.tag ==
             TexSrc::RT)
@@ -322,12 +323,24 @@ bool EdgeFunc(
             >= 0);
 }
 
-void DrawTriangle(int x1, int y1, int x2, int y2, int x3, int y3)
+// Todo: How does the frag shader get its texture coord?
+// Todo: How are vertex shaders handled again?
+void DrawTriangle(
+    int x1, int y1,
+    int x2, int y2,
+    int x3, int y3)
 {
     ShaderData* shader =
         &CORE.shaders.find(CORE.shader.top().id)->second;
 
-    shader->vert.inputs.find("pos") = x1,y1; // todo
+    shader->vert.inputs.find("pos")->second.vec2[0] = x1;
+    shader->vert.inputs.find("pos")->second.vec2[1] = y1;
+    shader->vert.func();
+    shader->vert.inputs.find("pos")->second.vec2[0] = x2;
+    shader->vert.inputs.find("pos")->second.vec2[1] = y2;
+    shader->vert.func();
+    shader->vert.inputs.find("pos")->second.vec2[0] = x3;
+    shader->vert.inputs.find("pos")->second.vec2[1] = y3;
     shader->vert.func();
 
     int minx, maxx;
@@ -343,7 +356,7 @@ void DrawTriangle(int x1, int y1, int x2, int y2, int x3, int y3)
                 ((x - x2) * (x - x3) - (y - y2) * (y - y3) >= 0) &&
                 ((x - x1) * (x - x3) - (y - y1) * (y - y3) >= 0))
             {
-
+                shader->frag.func();
             }
         }
     }
