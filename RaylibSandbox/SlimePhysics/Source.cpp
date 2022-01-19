@@ -56,22 +56,8 @@ struct Spring
     float restLength;
     float dampingFactor;
 
-    float SpringForce() const
-    {
-        float springForce = (Vector2Distance(a->position, b->position) - restLength) * stiffness;
-
-        Vector2 direction = Vector2Normalize(b->position - a->position);
-        Vector2 velocityDifference = b->velocity - a->velocity;
-        float dampForce = Vector2DotProduct(direction, velocityDifference) * dampingFactor;
-
-        float totalSpringForce = springForce + dampForce;
-    }
-    void ApplySpringForce()
-    {
-        float force = SpringForce();
-        a->force += Vector2Normalize(b->position - a->position) * force;
-        b->force += Vector2Normalize(a->position - b->position) * force;
-    }
+    float SpringForce() const;
+    void ApplySpringForce();
 };
 
 struct MassPoint
@@ -99,6 +85,24 @@ struct MassPoint
         position += velocity * deltaTime;
     }
 };
+
+float Spring::SpringForce() const
+{
+    float springForce = (Vector2Distance(a->position, b->position) - restLength) * stiffness;
+
+    Vector2 direction = Vector2Normalize(b->position - a->position);
+    Vector2 velocityDifference = b->velocity - a->velocity;
+    float dampForce = Vector2DotProduct(direction, velocityDifference) * dampingFactor;
+
+    float totalSpringForce = springForce + dampForce;
+    return totalSpringForce;
+}
+void Spring::ApplySpringForce()
+{
+    float force = SpringForce();
+    a->force += Vector2Normalize(b->position - a->position) * force;
+    b->force += Vector2Normalize(a->position - b->position) * force;
+}
 
 struct Body_Base
 {
@@ -135,7 +139,7 @@ struct Rigidbody : public Body_Base
     }
     Vector2 GetPoint(size_t index) const override
     {
-        return points[index];
+        return points[index % GetPointsCount()];
     }
 };
 bool CheckCollisionPointBody(Vector2 point, Rigidbody body, Vector2* closestPoint)
@@ -148,7 +152,7 @@ bool CheckCollisionPointBody(Vector2 point, Rigidbody body, Vector2* closestPoin
     for (size_t i = 0; i < body.GetPointsCount(); ++i)
     {
         Vector2 p0 = body.GetPoint(i);
-        Vector2 p1 = body.GetPoint((i + 1) % body.GetPointsCount());
+        Vector2 p1 = body.GetPoint(i + 1); // Assumes GetPoint function wraps index
         Vector2 collisionPoint;
         linesIntersected += (size_t)(CheckCollisionLines({ point.x, body.boundingBox.y - 1.0f }, point, p0, p1, &collisionPoint));
 
@@ -174,7 +178,7 @@ struct Softbody : public Body_Base
     }
     Vector2 GetPoint(size_t index) const override
     {
-        return points[index].position;
+        return points[index % GetPointsCount()].position;
     }
 };
 
@@ -230,7 +234,8 @@ int main()
     *   Load textures, shaders, and meshes    *
     ******************************************/
 
-    // @TODO: Load persistent assets & variables
+    std::vector<Softbody> softBodies;
+    std::vector<Rigidbody> rigidBodies;
 
     while (!WindowShouldClose())
     {
@@ -238,7 +243,7 @@ int main()
         *   Simulate frame and update variables   *
         ******************************************/
 
-        // @TODO: simulate frame
+        UpdateCollision(&rigidBodies, &softBodies);
 
         /******************************************
         *   Draw the frame                        *
@@ -248,7 +253,21 @@ int main()
 
             ClearBackground(BLACK);
 
-            // TODO: Draw frame
+            for (Rigidbody body : rigidBodies)
+            {
+                for (size_t i = 0; i < body.GetPointsCount(); ++i)
+                {
+                    DrawLineV(body.GetPoint(i), body.GetPoint(i + 1), WHITE); // Assumes GetPoint function wraps index
+                }
+            }
+
+            for (Softbody body : softBodies)
+            {
+                for (size_t i = 0; i < body.GetPointsCount(); ++i)
+                {
+                    DrawPixelV(body.GetPoint(i), RED);
+                }
+            }
 
         } EndDrawing();
     }
