@@ -81,6 +81,8 @@ struct MassPoint
     Vector2 force;
     float mass;
 
+    float selfCollisionRadius;
+
     std::vector<Spring*> springs;
 
     static constexpr Vector2 gravity = { 0.0f, -9.8f };
@@ -175,6 +177,47 @@ struct Softbody : public Body_Base
         return points[index].position;
     }
 };
+
+void UpdateCollision(std::vector<Rigidbody>* rigid, std::vector<Softbody>* soft)
+{
+    for (Rigidbody& body : *rigid)
+    {
+        body.UpdateBoundingBox();
+    }
+
+    for (Softbody& body : *soft)
+    {
+        for (MassPoint& point : body.points)
+        {
+            for (Rigidbody& body : *rigid)
+            {
+                Vector2 newPosition;
+                if (CheckCollisionPointBody(point.position, body, &newPosition))
+                {
+                    point.velocity = Vector2Reflect(point.velocity, Vector2Normalize(newPosition - point.position));
+                    point.position = newPosition;
+                }
+            }
+
+            for (Softbody& body2 : *soft)
+            {
+                for (MassPoint& point2 : body.points)
+                {
+                    float distance = Vector2Distance(point.position, point2.position);
+                    float idealDistance = point.selfCollisionRadius + point2.selfCollisionRadius;
+
+                    if (distance > 0.0f && distance < idealDistance)
+                    {
+                        Vector2 direction = Vector2Normalize(point2.position - point.position);
+                        Vector2 newPosition = direction * idealDistance;
+                        point.position = newPosition;
+                        point.velocity = Vector2Reflect(point.velocity, direction);
+                    }
+                }
+            }
+        }
+    }
+}
 
 int main()
 {
