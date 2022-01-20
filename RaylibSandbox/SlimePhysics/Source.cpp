@@ -146,8 +146,9 @@ struct Body_Base
 };
 struct Rigidbody : public Body_Base
 {
-    Rigidbody(std::vector<Vector2> _points) : Body_Base(), points(_points) {}
+    Rigidbody(bool _b_static, std::vector<Vector2> _points) : Body_Base(), b_static(_b_static), points(_points) {}
 
+    bool b_static; // Whether to apply physics or just collide
     std::vector<Vector2> points;
 
     size_t GetPointsCount() const override
@@ -161,7 +162,7 @@ struct Rigidbody : public Body_Base
 };
 bool CheckCollisionPointBody(Vector2 point, const Rigidbody& body, Vector2* closestPoint)
 {
-#define DEBUG_COLLISION_POINT_BODY 1
+#define DEBUG_COLLISION_POINT_BODY 0
 
 #if DEBUG_COLLISION_POINT_BODY
     DrawRectangleLinesEx(body.boundingBox, 1, RED);
@@ -237,34 +238,45 @@ int main()
     std::vector<Softbody> softBodies = {
         Softbody({
             MassPoint({ 30, 20 }, 1, 2),
-            //MassPoint({ 40, 20 }, 1, 2),
-            //MassPoint({ 40, 10 }, 1, 2),
-            //MassPoint({ 30, 10 }, 1, 2),
+            MassPoint({ 40, 20 }, 1, 2),
+            MassPoint({ 40, 10 }, 1, 2),
+            MassPoint({ 30, 10 }, 1, 2),
             }),
     };
     std::vector<Rigidbody> rigidBodies{
-        Rigidbody({
+        Rigidbody(true, {
             { 10, 10 },
             { 40, 40 },
             { 10, 40 },
             }),
+        Rigidbody(true, {
+            { 50, 10 },
+            { 90, 90 },
+            { 10, 90 },
+            }),
     };
 
     std::vector<Spring> springs;
-    //{
-    //    Spring springBase(0.5f, 5.0f, 0.5f);
-    //
-    //    springs = {
-    //            Spring(&(softBodies[0].points[0]), &(softBodies[0].points[1]), &springBase),
-    //            Spring(&(softBodies[0].points[0]), &(softBodies[0].points[2]), &springBase),
-    //            Spring(&(softBodies[0].points[0]), &(softBodies[0].points[3]), &springBase),
-    //
-    //            Spring(&(softBodies[0].points[1]), &(softBodies[0].points[2]), &springBase),
-    //            Spring(&(softBodies[0].points[1]), &(softBodies[0].points[3]), &springBase),
-    //
-    //            Spring(&(softBodies[0].points[2]), &(softBodies[0].points[3]), &springBase),
-    //    };
-    //}
+    {
+        Spring springBase(0.5f, 10.0f, 0.5f);
+    
+        springs = {
+                Spring(&(softBodies[0].points[0]), &(softBodies[0].points[1]), &springBase),
+                Spring(&(softBodies[0].points[0]), &(softBodies[0].points[2]), &springBase),
+                Spring(&(softBodies[0].points[0]), &(softBodies[0].points[3]), &springBase),
+    
+                Spring(&(softBodies[0].points[1]), &(softBodies[0].points[2]), &springBase),
+                Spring(&(softBodies[0].points[1]), &(softBodies[0].points[3]), &springBase),
+    
+                Spring(&(softBodies[0].points[2]), &(softBodies[0].points[3]), &springBase),
+        };
+    }
+
+    for (Spring& spring : springs)
+    {
+        spring.SetCurrentStateAsRestLength();
+    }
+
     while (!WindowShouldClose())
     {
         /******************************************
@@ -276,29 +288,49 @@ int main()
             body.UpdateBoundingBox();
         }
 
+        // Reset
         for (Softbody& body : softBodies)
         {
             for (MassPoint& point : body.points)
             {
                 point.force = { 0.0f, 0.0f };
-
                 // Gravity
                 point.force += (point.gravity * point.mass);
+            }
+        }
 
+        // Spring forces
+        for (Spring& spring : springs)
+        {
+            spring.ApplySpringForce();
+        }
+
+        // Collision
+        for (Softbody& body : softBodies)
+        {
+            for (MassPoint& point : body.points)
+            {
                 // Soft Collision
-                for (const Softbody& body2 : softBodies)
+                for (Softbody& body2 : softBodies)
                 {
-                    for (const MassPoint& point2 : body.points)
+                    for (MassPoint& point2 : body.points)
                     {
                         float distance = Vector2Distance(point.position, point2.position);
                         float idealDistance = point.selfCollisionRadius + point2.selfCollisionRadius;
 
                         if (distance > 0.0f && distance < idealDistance)
                         {
-                            Vector2 direction = Vector2Normalize(point2.position - point.position);
-                            Vector2 newPosition = direction * idealDistance;
+                            Vector2 direction = Vector2Normalize(point.position - point2.position);
+
+                            Vector2 newPosition = point.position + direction * (point.selfCollisionRadius - distance * 0.5f);
                             point.position = newPosition;
                             point.velocity = Vector2Reflect(point.velocity, direction);
+
+                            direction = Vector2Negate(direction);
+
+                            newPosition = point2.position + direction * (point2.selfCollisionRadius - distance * 0.5f);
+                            point2.position = newPosition;
+                            point2.velocity = Vector2Reflect(point2.velocity, direction);
                         }
                     }
                 }
@@ -313,9 +345,15 @@ int main()
                         point.position = newPosition;
                     }
                 }
+            }
+        }
 
+        // Finalize
+        for (Softbody& body : softBodies)
+        {
+            for (MassPoint& point : body.points)
+            {
                 point.velocity += (point.force * GetFrameTime()) / point.mass;
-
                 point.position += point.velocity * GetFrameTime();
             }
         }
