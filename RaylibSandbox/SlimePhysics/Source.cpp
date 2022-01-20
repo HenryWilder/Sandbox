@@ -50,25 +50,48 @@ struct MassPoint;
 
 struct Spring
 {
+    // From scratch
+    Spring(MassPoint* _a, MassPoint* _b, float _stiffness, float _restLength, float _dampingFactor) :
+        a(_a), b(_b), stiffness(_stiffness), restLength(_restLength), dampingFactor(_dampingFactor) {}
+
+    // Base
+    Spring(float _stiffness, float _restLength, float _dampingFactor) :
+        a(nullptr), b(nullptr), stiffness(_stiffness), restLength(_restLength), dampingFactor(_dampingFactor) {}
+
+    // From base
+    Spring(MassPoint* _a, MassPoint* _b, Spring* base) :
+        a(_a), b(_b), stiffness(base->stiffness), restLength(base->restLength), dampingFactor(base->dampingFactor) {}
+
     MassPoint* a;
     MassPoint* b;
     float stiffness;
     float restLength;
     float dampingFactor;
 
+    void SetCurrentStateAsRestLength();
     float SpringForce() const;
     void ApplySpringForce();
 };
 
 struct MassPoint
 {
+    // From scratch
+    MassPoint(Vector2 _position, float _mass, float _selfCollisionRadius) :
+        position(_position), velocity(Vector2Zero()), force(Vector2Zero()), mass(_mass), selfCollisionRadius(_selfCollisionRadius), springs{} {}
+
+    // Base
+    MassPoint(float _mass, float _selfCollisionRadius) :
+        position(Vector2Zero()), velocity(Vector2Zero()), force(Vector2Zero()), mass(_mass), selfCollisionRadius(_selfCollisionRadius), springs{} {}
+
+    // From Base
+    MassPoint(Vector2 _position, MassPoint* base) :
+        position(_position), velocity(Vector2Zero()), force(Vector2Zero()), mass(base->mass), selfCollisionRadius(base->selfCollisionRadius), springs{} {}
+
     Vector2 position;
     Vector2 velocity;
     Vector2 force;
     float mass;
-
     float selfCollisionRadius;
-
     std::vector<Spring*> springs;
 
     static constexpr Vector2 gravity = { 0.0f, -9.8f };
@@ -86,6 +109,10 @@ struct MassPoint
     }
 };
 
+void Spring::SetCurrentStateAsRestLength()
+{
+    restLength = Vector2Distance(a->position, b->position);
+}
 float Spring::SpringForce() const
 {
     float springForce = (Vector2Distance(a->position, b->position) - restLength) * stiffness;
@@ -131,6 +158,8 @@ struct Body_Base
 };
 struct Rigidbody : public Body_Base
 {
+    Rigidbody(std::vector<Vector2> _points) : Body_Base(), points(_points) {}
+
     std::vector<Vector2> points;
 
     size_t GetPointsCount() const override
@@ -170,6 +199,8 @@ bool CheckCollisionPointBody(Vector2 point, Rigidbody body, Vector2* closestPoin
 
 struct Softbody : public Body_Base
 {
+    Softbody(std::vector<MassPoint> _points) : Body_Base(), points(_points) {}
+
     std::vector<MassPoint> points;
 
     size_t GetPointsCount() const override
@@ -234,8 +265,12 @@ int main()
     *   Load textures, shaders, and meshes    *
     ******************************************/
 
-    std::vector<Softbody> softBodies;
-    std::vector<Rigidbody> rigidBodies;
+    std::vector<Softbody> softBodies = {
+        
+    };
+    std::vector<Rigidbody> rigidBodies{
+        Rigidbody({ { 10,10 }, { 20,20 }, { 10, 20 } }),
+    };
 
     while (!WindowShouldClose())
     {
