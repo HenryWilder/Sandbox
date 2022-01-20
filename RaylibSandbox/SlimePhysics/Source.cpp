@@ -77,22 +77,21 @@ struct MassPoint
 {
     // From scratch
     MassPoint(Vector2 _position, float _mass, float _selfCollisionRadius) :
-        position(_position), velocity(Vector2Zero()), force(Vector2Zero()), mass(_mass), selfCollisionRadius(_selfCollisionRadius), springs{} {}
+        position(_position), velocity(Vector2Zero()), force(Vector2Zero()), mass(_mass), selfCollisionRadius(_selfCollisionRadius) {}
 
     // Base
     MassPoint(float _mass, float _selfCollisionRadius) :
-        position(Vector2Zero()), velocity(Vector2Zero()), force(Vector2Zero()), mass(_mass), selfCollisionRadius(_selfCollisionRadius), springs{} {}
+        position(Vector2Zero()), velocity(Vector2Zero()), force(Vector2Zero()), mass(_mass), selfCollisionRadius(_selfCollisionRadius) {}
 
     // From Base
     MassPoint(Vector2 _position, MassPoint* base) :
-        position(_position), velocity(Vector2Zero()), force(Vector2Zero()), mass(base->mass), selfCollisionRadius(base->selfCollisionRadius), springs{} {}
+        position(_position), velocity(Vector2Zero()), force(Vector2Zero()), mass(base->mass), selfCollisionRadius(base->selfCollisionRadius) {}
 
     Vector2 position;
     Vector2 velocity;
     Vector2 force;
     float mass;
     float selfCollisionRadius;
-    std::vector<Spring*> springs;
 
     static constexpr Vector2 gravity = { 0.0f, 9.8f };
 };
@@ -237,10 +236,10 @@ int main()
 
     std::vector<Softbody> softBodies = {
         Softbody({
-            MassPoint({ 30, 20 }, 1, 2),
-            MassPoint({ 40, 20 }, 1, 2),
-            MassPoint({ 40, 10 }, 1, 2),
-            MassPoint({ 30, 10 }, 1, 2),
+            MassPoint({ 30, 20 }, 1, 3),
+            MassPoint({ 40, 20 }, 1, 3),
+            MassPoint({ 40, 10 }, 1, 3),
+            MassPoint({ 30, 10 }, 1, 3),
             }),
     };
     std::vector<Rigidbody> rigidBodies{
@@ -250,15 +249,21 @@ int main()
             { 10, 40 },
             }),
         Rigidbody(true, {
-            { 50, 10 },
+            { 50, 50 },
             { 90, 90 },
-            { 10, 90 },
+            { 50, 90 },
+            }),
+        Rigidbody(true, {
+            { 0, (float)(windowHeight - 40) },
+            { (float)windowWidth, (float)(windowHeight - 40) },
+            { (float)windowWidth, (float)windowHeight },
+            { 0, (float)windowHeight },
             }),
     };
 
     std::vector<Spring> springs;
     {
-        Spring springBase(0.5f, 10.0f, 0.5f);
+        Spring springBase(0.999f, 10.0f, 0.999f);
     
         springs = {
                 Spring(&(softBodies[0].points[0]), &(softBodies[0].points[1]), &springBase),
@@ -305,37 +310,35 @@ int main()
             spring.ApplySpringForce();
         }
 
+
         // Collision
+
+        // Soft Collision
         for (Softbody& body : softBodies)
         {
             for (MassPoint& point : body.points)
             {
-                // Soft Collision
-                for (Softbody& body2 : softBodies)
+                for (Softbody& body : softBodies)
                 {
-                    for (MassPoint& point2 : body.points)
+                    for (MassPoint& point1 : body.points)
                     {
-                        float distance = Vector2Distance(point.position, point2.position);
-                        float idealDistance = point.selfCollisionRadius + point2.selfCollisionRadius;
+                        if (Vector2Distance(point.position, point1.position) == 0.0f)
+                            continue;
 
-                        if (distance > 0.0f && distance < idealDistance)
+                        if (CheckCollisionCircles(point.position, point.selfCollisionRadius, point1.position, point1.selfCollisionRadius))
                         {
-                            Vector2 direction = Vector2Normalize(point.position - point2.position);
-
-                            Vector2 newPosition = point.position + direction * (point.selfCollisionRadius - distance * 0.5f);
-                            point.position = newPosition;
-                            point.velocity = Vector2Reflect(point.velocity, direction);
-
-                            direction = Vector2Negate(direction);
-
-                            newPosition = point2.position + direction * (point2.selfCollisionRadius - distance * 0.5f);
-                            point2.position = newPosition;
-                            point2.velocity = Vector2Reflect(point2.velocity, direction);
+                            point.position = point1.position + Vector2Normalize(point.position - point1.position) * (point1.selfCollisionRadius + point.selfCollisionRadius);
                         }
                     }
                 }
+            }
+        }
 
-                // Rigid Collision
+        // Rigid Collision
+        for (Softbody& body : softBodies)
+        {
+            for (MassPoint& point : body.points)
+            {
                 for (const Rigidbody& body : rigidBodies)
                 {
                     Vector2 newPosition;
@@ -347,6 +350,7 @@ int main()
                 }
             }
         }
+
 
         // Finalize
         for (Softbody& body : softBodies)
