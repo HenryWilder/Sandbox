@@ -161,17 +161,31 @@ struct Rigidbody : public Body_Base
 };
 bool CheckCollisionPointBody(Vector2 point, const Rigidbody& body, Vector2* closestPoint)
 {
+#define DEBUG_COLLISION_POINT_BODY 1
+
+#if DEBUG_COLLISION_POINT_BODY
+    DrawRectangleLinesEx(body.boundingBox, 1, RED);
+#endif
     if (!CheckCollisionPointRec(point, body.boundingBox))
         return false;
 
-    float distanceToSide = INFINITY;
+    float distanceToSide = FLT_MAX;
     size_t linesIntersected = 0;
     for (size_t i = 0; i < body.GetPointsCount(); ++i)
     {
         Vector2 p0 = body.GetPoint(i);
         Vector2 p1 = body.GetPoint(i + 1); // Assumes GetPoint function wraps index
         Vector2 collisionPoint;
-        linesIntersected += (size_t)(CheckCollisionLines({ point.x, body.boundingBox.y - 1.0f }, point, p0, p1, &collisionPoint));
+#if DEBUG_COLLISION_POINT_BODY
+        DrawLineV({ point.x, body.boundingBox.y - 1.0f }, point, RED);
+#endif
+        if (CheckCollisionLines(p0, p1, { point.x, body.boundingBox.y - 1.0f }, point, &collisionPoint))
+        {
+#if DEBUG_COLLISION_POINT_BODY
+            DrawLineV(point, collisionPoint, GREEN);
+#endif
+            ++linesIntersected;
+        }
 
         Vector2 directionAB = Vector2Normalize(p1 - p0);
         Vector2 nearestPointOnSide = p0 + directionAB * std::min(std::max(Vector2DotProduct(directionAB, point - p0), 0.0f), Vector2Distance(p0, p1));
@@ -181,8 +195,16 @@ bool CheckCollisionPointBody(Vector2 point, const Rigidbody& body, Vector2* clos
             distanceToSide = distance;
             *closestPoint = nearestPointOnSide;
         }
+#if DEBUG_COLLISION_POINT_BODY
+        DrawCircleV(nearestPointOnSide, 2, BLUE);
+#endif
     }
+#if DEBUG_COLLISION_POINT_BODY
+    DrawCircleV(*closestPoint, 2, GREEN);
+#endif
     return linesIntersected & 1;
+
+#undef DEBUG_COLLISION_POINT_BODY
 }
 
 struct Softbody : public Body_Base
@@ -213,27 +235,36 @@ int main()
     ******************************************/
 
     std::vector<Softbody> softBodies = {
-        Softbody({ MassPoint({ 30, 20 }, 1, 2), MassPoint({ 40, 20 }, 1, 2),  MassPoint({ 40, 10 }, 1, 2),  MassPoint({ 30, 10 }, 1, 2), })
+        Softbody({
+            MassPoint({ 30, 20 }, 1, 2),
+            //MassPoint({ 40, 20 }, 1, 2),
+            //MassPoint({ 40, 10 }, 1, 2),
+            //MassPoint({ 30, 10 }, 1, 2),
+            }),
     };
     std::vector<Rigidbody> rigidBodies{
-        Rigidbody({ { 10,10 }, { 40,40 }, { 10, 40 }, }),
+        Rigidbody({
+            { 10, 10 },
+            { 40, 40 },
+            { 10, 40 },
+            }),
     };
 
     std::vector<Spring> springs;
-    {
-        Spring springBase(0.5f, 5.0f, 0.5f);
-
-        springs = {
-                Spring(&(softBodies[0].points[0]), &(softBodies[0].points[1]), &springBase),
-                Spring(&(softBodies[0].points[0]), &(softBodies[0].points[2]), &springBase),
-                Spring(&(softBodies[0].points[0]), &(softBodies[0].points[3]), &springBase),
-
-                Spring(&(softBodies[0].points[1]), &(softBodies[0].points[2]), &springBase),
-                Spring(&(softBodies[0].points[1]), &(softBodies[0].points[3]), &springBase),
-
-                Spring(&(softBodies[0].points[2]), &(softBodies[0].points[3]), &springBase),
-        };
-    }
+    //{
+    //    Spring springBase(0.5f, 5.0f, 0.5f);
+    //
+    //    springs = {
+    //            Spring(&(softBodies[0].points[0]), &(softBodies[0].points[1]), &springBase),
+    //            Spring(&(softBodies[0].points[0]), &(softBodies[0].points[2]), &springBase),
+    //            Spring(&(softBodies[0].points[0]), &(softBodies[0].points[3]), &springBase),
+    //
+    //            Spring(&(softBodies[0].points[1]), &(softBodies[0].points[2]), &springBase),
+    //            Spring(&(softBodies[0].points[1]), &(softBodies[0].points[3]), &springBase),
+    //
+    //            Spring(&(softBodies[0].points[2]), &(softBodies[0].points[3]), &springBase),
+    //    };
+    //}
     while (!WindowShouldClose())
     {
         /******************************************
