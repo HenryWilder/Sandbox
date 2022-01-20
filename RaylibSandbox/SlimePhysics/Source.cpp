@@ -94,19 +94,7 @@ struct MassPoint
     float selfCollisionRadius;
     std::vector<Spring*> springs;
 
-    static constexpr Vector2 gravity = { 0.0f, -9.8f };
-
-    void Tick(float deltaTime)
-    {
-        force = { 0.0f, 0.0f };
-
-        force += (gravity * mass);
-        // TODO: Add other forces here
-
-        velocity += (force * deltaTime) / mass;
-
-        position += velocity * deltaTime;
-    }
+    static constexpr Vector2 gravity = { 0.0f, 9.8f };
 };
 
 void Spring::SetCurrentStateAsRestLength()
@@ -171,7 +159,7 @@ struct Rigidbody : public Body_Base
         return points[index % GetPointsCount()];
     }
 };
-bool CheckCollisionPointBody(Vector2 point, Rigidbody body, Vector2* closestPoint)
+bool CheckCollisionPointBody(Vector2 point, const Rigidbody& body, Vector2* closestPoint)
 {
     if (!CheckCollisionPointRec(point, body.boundingBox))
         return false;
@@ -213,47 +201,6 @@ struct Softbody : public Body_Base
     }
 };
 
-void UpdateCollision(std::vector<Rigidbody>* rigid, std::vector<Softbody>* soft)
-{
-    for (Rigidbody& body : *rigid)
-    {
-        body.UpdateBoundingBox();
-    }
-
-    for (Softbody& body : *soft)
-    {
-        for (MassPoint& point : body.points)
-        {
-            for (Rigidbody& body : *rigid)
-            {
-                Vector2 newPosition;
-                if (CheckCollisionPointBody(point.position, body, &newPosition))
-                {
-                    point.velocity = Vector2Reflect(point.velocity, Vector2Normalize(newPosition - point.position));
-                    point.position = newPosition;
-                }
-            }
-
-            for (Softbody& body2 : *soft)
-            {
-                for (MassPoint& point2 : body.points)
-                {
-                    float distance = Vector2Distance(point.position, point2.position);
-                    float idealDistance = point.selfCollisionRadius + point2.selfCollisionRadius;
-
-                    if (distance > 0.0f && distance < idealDistance)
-                    {
-                        Vector2 direction = Vector2Normalize(point2.position - point.position);
-                        Vector2 newPosition = direction * idealDistance;
-                        point.position = newPosition;
-                        point.velocity = Vector2Reflect(point.velocity, direction);
-                    }
-                }
-            }
-        }
-    }
-}
-
 int main()
 {
     int windowWidth = 1280;
@@ -293,7 +240,54 @@ int main()
         *   Simulate frame and update variables   *
         ******************************************/
 
-        UpdateCollision(&rigidBodies, &softBodies);
+        for (Rigidbody& body : rigidBodies)
+        {
+            body.UpdateBoundingBox();
+        }
+
+        for (Softbody& body : softBodies)
+        {
+            for (MassPoint& point : body.points)
+            {
+                point.force = { 0.0f, 0.0f };
+
+                // Gravity
+                point.force += (point.gravity * point.mass);
+
+                // Soft Collision
+                for (const Softbody& body2 : softBodies)
+                {
+                    for (const MassPoint& point2 : body.points)
+                    {
+                        float distance = Vector2Distance(point.position, point2.position);
+                        float idealDistance = point.selfCollisionRadius + point2.selfCollisionRadius;
+
+                        if (distance > 0.0f && distance < idealDistance)
+                        {
+                            Vector2 direction = Vector2Normalize(point2.position - point.position);
+                            Vector2 newPosition = direction * idealDistance;
+                            point.position = newPosition;
+                            point.velocity = Vector2Reflect(point.velocity, direction);
+                        }
+                    }
+                }
+
+                // Rigid Collision
+                for (const Rigidbody& body : rigidBodies)
+                {
+                    Vector2 newPosition;
+                    if (CheckCollisionPointBody(point.position, body, &newPosition))
+                    {
+                        point.velocity = Vector2Reflect(point.velocity, Vector2Normalize(newPosition - point.position));
+                        point.position = newPosition;
+                    }
+                }
+
+                point.velocity += (point.force * GetFrameTime()) / point.mass;
+
+                point.position += point.velocity * GetFrameTime();
+            }
+        }
 
         /******************************************
         *   Draw the frame                        *
