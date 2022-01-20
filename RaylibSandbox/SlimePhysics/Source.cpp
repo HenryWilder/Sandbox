@@ -266,12 +266,27 @@ int main()
     ******************************************/
 
     std::vector<Softbody> softBodies = {
-        
+        Softbody({ MassPoint({ 30, 20 }, 1, 2), MassPoint({ 40, 20 }, 1, 2),  MassPoint({ 40, 10 }, 1, 2),  MassPoint({ 30, 10 }, 1, 2), })
     };
     std::vector<Rigidbody> rigidBodies{
-        Rigidbody({ { 10,10 }, { 20,20 }, { 10, 20 } }),
+        Rigidbody({ { 10,10 }, { 40,40 }, { 10, 40 }, }),
     };
 
+    std::vector<Spring> springs;
+    {
+        Spring springBase(0.5f, 5.0f, 0.5f);
+
+        springs = {
+                Spring(&(softBodies[0].points[0]), &(softBodies[0].points[1]), &springBase),
+                Spring(&(softBodies[0].points[0]), &(softBodies[0].points[2]), &springBase),
+                Spring(&(softBodies[0].points[0]), &(softBodies[0].points[3]), &springBase),
+
+                Spring(&(softBodies[0].points[1]), &(softBodies[0].points[2]), &springBase),
+                Spring(&(softBodies[0].points[1]), &(softBodies[0].points[3]), &springBase),
+
+                Spring(&(softBodies[0].points[2]), &(softBodies[0].points[3]), &springBase),
+        };
+    }
     while (!WindowShouldClose())
     {
         /******************************************
@@ -288,7 +303,7 @@ int main()
 
             ClearBackground(BLACK);
 
-            for (Rigidbody body : rigidBodies)
+            for (const Rigidbody& body : rigidBodies)
             {
                 for (size_t i = 0; i < body.GetPointsCount(); ++i)
                 {
@@ -296,11 +311,16 @@ int main()
                 }
             }
 
-            for (Softbody body : softBodies)
+            for (const Spring& spring : springs)
+            {
+                DrawLineV(spring.a->position, spring.b->position, RAYWHITE); // Assumes GetPoint function wraps index
+            }
+
+            for (const Softbody& body : softBodies)
             {
                 for (size_t i = 0; i < body.GetPointsCount(); ++i)
                 {
-                    DrawPixelV(body.GetPoint(i), RED);
+                    DrawCircleV(body.points[i].position, body.points[i].selfCollisionRadius, RED);
                 }
             }
 
