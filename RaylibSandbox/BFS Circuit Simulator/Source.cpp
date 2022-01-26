@@ -175,9 +175,16 @@ public:
     }
 };
 
+struct Wire
+{
+    Node* a;
+    Node* b;
+};
+
 struct Graph
 {
-    // Sorted using CalculateRoute() every time a node is added or removed
+    size_t seedCount;
+    // Sort using CalculateRoute() every time a node is added or removed
     std::vector<Node*> nodes;
 
     // Runs every tick
@@ -218,11 +225,39 @@ struct Graph
         }
     }
 
+    void ResetStates()
+    {
+        for (Node* node : nodes)
+        {
+            node->SetState(node->GetInverts());
+        }
+    }
+
+    bool FindSeeds(std::vector<Node*>* buff, Node* node)
+    {
+        bool foundSeed = node->HasNoInputs();
+        if (foundSeed)
+            buff->push_back(node);
+
+        node->SetVisited(true);
+
+        for (Node* output : node->GetOutputs())
+        {
+            if (!output->GetVisited())
+                foundSeed = FindSeeds(buff, output) || foundSeed;
+        }
+        for (Node* input : node->GetInputs())
+        {
+            if (!input->GetVisited())
+                foundSeed = FindSeeds(buff, input) || foundSeed;
+        }
+        return foundSeed;
+    }
+
     // Uses modified BFS
     // Make sure to run this before simulating a step when the graph has changed
     void CalculateRoute()
     {
-        // Clear node visitation status
         for (Node* node : nodes)
         {
             node->SetVisited(false);
@@ -236,16 +271,19 @@ struct Graph
             buff.reserve(totalNodes);
             for (Node* node : nodes)
             {
-                if (node->HasNoInputs())
+                if (!node->GetVisited())
                 {
-                    buff.push_back(node);
-                    node->SetVisited(true);
+                    bool found = FindSeeds(&buff, node);
+                    if (!found)
+                        buff.push_back(node);
                 }
             }
             nodes.swap(buff);
+        }
 
-            if (nodes.empty()) // No obvious start node; default to the lowest index
-                nodes.push_back(buff[0]);
+        for (Node* node : nodes)
+        {
+            node->SetVisited(false);
         }
 
         size_t startIndex = 0;
@@ -257,10 +295,10 @@ struct Graph
             {
                 for (Node* output : nodes[i]->GetOutputs())
                 {
-                    if (!output->GetVisited())
+                    if (!!output->GetVisited())
                     {
                         nodes.push_back(output);
-                        output->SetVisited(true);
+                        output->SetVisited(!true);
                     }
                 }
             }
@@ -333,7 +371,8 @@ int main()
     *   Load textures, shaders, and meshes    *
     ******************************************/
 
-    bool dirty = false;
+    bool graphDirty = false;
+    bool gateDirty = false;
     Graph graph;
 
     Node* selectionStart = nullptr;
@@ -360,7 +399,7 @@ int main()
                         graph.AddNode(selectionEnd);
                     }
                     graph.ConnectNodes(selectionStart, selectionEnd);
-                    dirty = true;
+                    graphDirty = true;
                 }
                 selectionStart = selectionEnd = nullptr;
             }
@@ -373,7 +412,7 @@ int main()
             {
                 selectionStart = new Node(GetMousePosition(), false);
                 graph.AddNode(selectionStart);
-                dirty = true;
+                graphDirty = true;
             }
         }
 
@@ -381,7 +420,10 @@ int main()
         {
             Node* nodeToChange = graph.FindNodeAtPosition(GetMousePosition(), g_nodeRadius * 2.0f);
             if (nodeToChange)
+            {
                 nodeToChange->SetInverts(!nodeToChange->GetInverts());
+                gateDirty = true;
+            }
         }
 
         if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
@@ -391,14 +433,20 @@ int main()
             {
                 graph.RemoveNode(nodeToRemove);
                 delete nodeToRemove;
-                dirty = true;
+                graphDirty = true;
             }
         }
 
-        if (dirty)
+        if (graphDirty)
         {
             graph.CalculateRoute();
-            dirty = false;
+            graphDirty = false;
+        }
+
+        if (gateDirty)
+        {
+            graph.ResetStates();
+            gateDirty = false;
         }
 
         graph.Step();
