@@ -449,6 +449,27 @@ int main()
         ******************************************/
 
         Vector2 cursor = Snap(GetMousePosition(), g_nodeRadius * 2.0f);
+        if (selectionStart)
+        {
+            float xSize = abs(selectionStart->GetPosition().x - cursor.x);
+            float ySize = abs(selectionStart->GetPosition().y - cursor.y);
+            float shortLength = std::min(xSize, ySize);
+            float longLength = std::max(xSize, ySize);
+            if (shortLength > longLength * 0.5)
+            {
+                cursor = {
+                    selectionStart->GetPosition().x + (selectionStart->GetPosition().x > cursor.x ? -shortLength : shortLength),
+                    selectionStart->GetPosition().y + (selectionStart->GetPosition().y > cursor.y ? -shortLength : shortLength)
+                };
+            }
+            else
+            {
+                if (xSize < ySize)
+                    cursor.x = selectionStart->GetPosition().x;
+                else
+                    cursor.y = selectionStart->GetPosition().y;
+            }
+        }
 
         Node* hoveredNode = graph.FindNodeAtPosition(cursor, g_nodeRadius * 2.0f);
         Wire hoveredWire = (hoveredNode ? Wire{ nullptr, nullptr }  : graph.FindWireIntersectingPosition(cursor, g_nodeRadius * 2.0f));
