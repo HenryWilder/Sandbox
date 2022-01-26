@@ -554,11 +554,16 @@ int main()
 
             if (hoveredNode)
             {
-                DrawCircleV(hoveredNode->GetPosition(), g_nodeRadius + 2.0f, WHITE);
-                DrawCircleV(hoveredNode->GetPosition(), g_nodeRadius, (hoveredNode->GetState() ? BLUE : GRAY));
-            }
+                DrawRectanglePro({ cursor.x,cursor.y, g_nodeRadius * 4.0f, g_nodeRadius * 4.0f }, { g_nodeRadius * 2.0f, g_nodeRadius * 2.0f }, 45, WHITE);
+                DrawRectanglePro({ cursor.x,cursor.y, g_nodeRadius * 3.0f, g_nodeRadius * 3.0f }, { g_nodeRadius * 1.5f, g_nodeRadius * 1.5f }, 45, BLACK);
 
-            DrawRectanglePro({ cursor.x,cursor.y,6,6 }, {3,3}, 45, RAYWHITE);
+                DrawCircleV(hoveredNode->GetPosition(), g_nodeRadius + 2.0f, (hoveredNode->GetInverts() ? ORANGE : PURPLE));
+                //DrawCircleV(hoveredNode->GetPosition(), g_nodeRadius, (hoveredNode->GetState() ? DARKBLUE : DARKGRAY));
+            }
+            else
+            {
+                DrawRectanglePro({ cursor.x,cursor.y,5,5 }, { 2.5,2.5 }, 45, RAYWHITE);
+            }
 
         } EndDrawing();
     }
