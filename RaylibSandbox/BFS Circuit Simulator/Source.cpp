@@ -213,6 +213,7 @@ struct Graph
         // Node drawing is separate so that cyclic graphs can still draw nodes on top
         for (Node* node : nodes)
         {
+            DrawCircleV(node->GetPosition(), g_nodeRadius + 2.0f, (node->GetInverts() ? DARKBLUE : DARKGRAY));
             DrawCircleV(node->GetPosition(), g_nodeRadius, (node->GetState() ? BLUE : GRAY));
         }
     }
