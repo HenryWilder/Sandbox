@@ -185,14 +185,18 @@ struct Graph
     {
         for (Node* node : nodes)
         {
+            bool finished = false;
             for (Node* input : node->GetInputs())
             {
                 if (input->GetState())
                 {
                     node->SetState(!node->GetInverts());
+                    finished = true;
                     break;
                 }
             }
+            if (!finished)
+                node->SetState(node->GetInverts());
         }
     }
     // Runs every frame
@@ -372,7 +376,19 @@ int main()
         if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON))
         {
             Node* nodeToChange = graph.FindNodeAtPosition(GetMousePosition(), g_nodeRadius * 2.0f);
-            nodeToChange->SetInverts(!nodeToChange->GetInverts());
+            if (nodeToChange)
+                nodeToChange->SetInverts(!nodeToChange->GetInverts());
+        }
+
+        if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
+        {
+            Node* nodeToRemove = graph.FindNodeAtPosition(GetMousePosition(), g_nodeRadius * 2.0f);
+            if (nodeToRemove)
+            {
+                graph.RemoveNode(nodeToRemove);
+                delete nodeToRemove;
+                dirty = true;
+            }
         }
 
         if (dirty)
