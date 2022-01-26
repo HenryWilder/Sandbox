@@ -243,6 +243,9 @@ struct Graph
                 }
             }
             nodes.swap(buff);
+
+            if (nodes.empty()) // No obvious start node; default to the lowest index
+                nodes.push_back(buff[0]);
         }
 
         size_t startIndex = 0;
