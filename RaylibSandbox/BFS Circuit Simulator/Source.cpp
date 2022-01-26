@@ -48,6 +48,31 @@ inline Vector3& operator/=(Vector3& a, float div) { return (a = Vector3Scale(a, 
 
 constexpr float g_nodeRadius = 4.0f;
 
+float Vector2DistanceToLine(Vector2 startPos, Vector2 endPos, Vector2 point)
+{
+    Vector2 direction = Vector2Normalize(endPos - startPos);
+    Vector2 nearestPoint = startPos + direction * Clamp(Vector2DotProduct(direction, point - startPos), 0, Vector2Distance(startPos, endPos));
+    return Vector2Distance(point, nearestPoint);
+}
+bool CheckCollisionLineCircle(Vector2 startPos, Vector2 endPos, Vector2 center, float radius)
+{
+    return Vector2DistanceToLine(startPos, endPos, center) <= radius;
+}
+
+int Snap(int x, int gridsize)
+{
+    x /= gridsize;
+    return x * gridsize;
+}
+
+Vector2 Snap(Vector2 pt, float gridsize)
+{
+    return {
+        roundf(pt.x / gridsize) * gridsize,
+        roundf(pt.y / gridsize) * gridsize
+    };
+}
+
 class Node
 {
 private:
@@ -183,7 +208,7 @@ struct Wire
 
 struct Graph
 {
-    size_t seedCount;
+    size_t seedCount = 0;
     // Sort using CalculateRoute() every time a node is added or removed
     std::vector<Node*> nodes;
 
@@ -207,7 +232,7 @@ struct Graph
         }
     }
     // Runs every frame
-    void Draw()
+    void DrawWires()
     {
         // Draw the wires first so the nodes can be drawn on top
         for (Node* node : nodes)
@@ -217,11 +242,22 @@ struct Graph
                 DrawLineV(node->GetPosition(), output->GetPosition(), (node->GetState() ? DARKBLUE : DARKGRAY));
             }
         }
+    }
+    void DrawNodes()
+    {
         // Node drawing is separate so that cyclic graphs can still draw nodes on top
         for (Node* node : nodes)
         {
             DrawCircleV(node->GetPosition(), g_nodeRadius + 2.0f, (node->GetInverts() ? DARKBLUE : DARKGRAY));
             DrawCircleV(node->GetPosition(), g_nodeRadius, (node->GetState() ? BLUE : GRAY));
+        }
+    }
+
+    void ResetVisited()
+    {
+        for (Node* node : nodes)
+        {
+            node->SetVisited(false);
         }
     }
 
@@ -258,10 +294,7 @@ struct Graph
     // Make sure to run this before simulating a step when the graph has changed
     void CalculateRoute()
     {
-        for (Node* node : nodes)
-        {
-            node->SetVisited(false);
-        }
+        ResetVisited();
 
         size_t totalNodes = nodes.size();
 
@@ -280,11 +313,9 @@ struct Graph
             }
             nodes.swap(buff);
         }
+        seedCount = nodes.size(); // Only the seeds will be in at this time
 
-        for (Node* node : nodes)
-        {
-            node->SetVisited(false);
-        }
+        ResetVisited();
 
         size_t startIndex = 0;
         size_t endIndex;
@@ -318,8 +349,15 @@ struct Graph
 
     void ConnectNodes(Node* start, Node* end)
     {
-        start->AddOutput(end);
-        end->AddInput(start);
+        auto endIt   = std::find(start->GetInputs() .begin(), start->GetInputs() .end(), end  );
+        auto startIt = std::find(end  ->GetOutputs().begin(), end  ->GetOutputs().end(), start);
+
+        if (!(endIt   == start->GetInputs() .end() &&
+              startIt == end  ->GetOutputs().end()))
+            return;
+
+        start->AddOutput(end  );
+        end  ->AddInput (start);
     }
     void DisconnectNodes(Node* start, Node* end)
     {
@@ -358,6 +396,32 @@ struct Graph
         }
         return closest;
     }
+
+    Wire FindWireIntersectingPosition(Vector2 position, float radius)
+    {
+        float shortestDistance = radius;
+        Wire closest = { nullptr, nullptr };
+        ResetVisited();
+        for (Node* start : nodes)
+        {
+            if (start->GetVisited())
+                continue;
+
+            for (Node* end : start->GetOutputs())
+            {
+                if (end->GetVisited())
+                    break;
+
+                float distance = Vector2DistanceToLine(start->GetPosition(), end->GetPosition(), position);
+                if (distance < shortestDistance)
+                {
+                    shortestDistance = distance;
+                    closest = { start, end };
+                }
+            }
+        }
+        return closest;
+    }
 };
 
 int main()
@@ -384,9 +448,14 @@ int main()
         *   Simulate frame and update variables   *
         ******************************************/
 
+        Vector2 cursor = Snap(GetMousePosition(), g_nodeRadius * 2.0f);
+
+        Node* hoveredNode = graph.FindNodeAtPosition(cursor, g_nodeRadius * 2.0f);
+        Wire hoveredWire = (hoveredNode ? Wire{ nullptr, nullptr }  : graph.FindWireIntersectingPosition(cursor, g_nodeRadius * 2.0f));
+
         if (selectionStart)
         {
-            selectionEnd = graph.FindNodeAtPosition(GetMousePosition(), g_nodeRadius * 2.0f);
+            selectionEnd = hoveredNode;
 
             // Finalize
             if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
@@ -395,7 +464,7 @@ int main()
                 {
                     if (!selectionEnd)
                     {
-                        selectionEnd = new Node(GetMousePosition(), false);
+                        selectionEnd = new Node(cursor, false);
                         graph.AddNode(selectionEnd);
                     }
                     graph.ConnectNodes(selectionStart, selectionEnd);
@@ -406,11 +475,11 @@ int main()
         }
         else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
         {
-            selectionStart = graph.FindNodeAtPosition(GetMousePosition(), g_nodeRadius * 2.0f);
+            selectionStart = hoveredNode;
 
             if (!selectionStart)
             {
-                selectionStart = new Node(GetMousePosition(), false);
+                selectionStart = new Node(cursor, false);
                 graph.AddNode(selectionStart);
                 graphDirty = true;
             }
@@ -418,7 +487,7 @@ int main()
 
         if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON))
         {
-            Node* nodeToChange = graph.FindNodeAtPosition(GetMousePosition(), g_nodeRadius * 2.0f);
+            Node* nodeToChange = hoveredNode;
             if (nodeToChange)
             {
                 nodeToChange->SetInverts(!nodeToChange->GetInverts());
@@ -428,11 +497,17 @@ int main()
 
         if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
         {
-            Node* nodeToRemove = graph.FindNodeAtPosition(GetMousePosition(), g_nodeRadius * 2.0f);
-            if (nodeToRemove)
+            if (hoveredNode)
             {
-                graph.RemoveNode(nodeToRemove);
-                delete nodeToRemove;
+                graph.RemoveNode(hoveredNode);
+                delete hoveredNode;
+                hoveredNode = nullptr;
+                graphDirty = true;
+            }
+            else if (hoveredWire.a)
+            {
+                graph.DisconnectNodes(hoveredWire.a, hoveredWire.b);
+                hoveredWire = { nullptr, nullptr };
                 graphDirty = true;
             }
         }
@@ -465,12 +540,25 @@ int main()
                 if (selectionEnd)
                     end = selectionEnd->GetPosition();
                 else
-                    end = GetMousePosition();
+                    end = cursor;
 
                 DrawLineV(selectionStart->GetPosition(), end, GRAY);
             }
 
-            graph.Draw();
+            graph.DrawWires();
+
+            if (hoveredWire.a)
+                DrawLineV(hoveredWire.a->GetPosition(), hoveredWire.b->GetPosition(), LIGHTGRAY);
+
+            graph.DrawNodes();
+
+            if (hoveredNode)
+            {
+                DrawCircleV(hoveredNode->GetPosition(), g_nodeRadius + 2.0f, WHITE);
+                DrawCircleV(hoveredNode->GetPosition(), g_nodeRadius, (hoveredNode->GetState() ? BLUE : GRAY));
+            }
+
+            DrawRectanglePro({ cursor.x,cursor.y,6,6 }, {3,3}, 45, RAYWHITE);
 
         } EndDrawing();
     }
