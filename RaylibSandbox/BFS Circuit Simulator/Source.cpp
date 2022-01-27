@@ -558,6 +558,7 @@ int main()
             ClearBackground(BLACK);
 
             constexpr int gridRadius = 4;
+            // World grid
             for (float x = 0.0f; x < (float)windowWidth; x += 2.0f * g_nodeRadius)
             {
                 DrawLineV({ x, 0 }, { x, (float)windowHeight }, ColorAlpha(DARKGRAY, 0.125f));
@@ -566,6 +567,7 @@ int main()
             {
                 DrawLineV({ 0.0f, y }, { (float)windowWidth, y }, ColorAlpha(DARKGRAY, 0.125f));
             }
+            // Cursor grid
             for (float i = -gridRadius; i <= gridRadius; ++i)
             {
                 float t = ((i / (float)gridRadius) + 1.0f) * 0.5f;
