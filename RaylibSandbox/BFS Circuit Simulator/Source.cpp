@@ -249,7 +249,9 @@ struct Graph
         for (Node* node : nodes)
         {
             DrawCircleV(node->GetPosition(), g_nodeRadius + 2.0f, (node->GetInverts() ? ORANGE : PURPLE));
-            DrawCircleV(node->GetPosition(), g_nodeRadius, (node->GetState() ? BLUE : GRAY));
+            DrawCircleV(node->GetPosition(), g_nodeRadius, (node->GetState() ? BLUE : BLACK));
+            if (node->HasNoInputs())
+                DrawCircleV(node->GetPosition(), g_nodeRadius - 2.0f, GREEN);
         }
     }
 
@@ -508,14 +510,14 @@ int main()
 
         if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON))
         {
-            Node* nodeToChange = hoveredNode;
-            if (nodeToChange)
+            if (hoveredNode)
             {
-                nodeToChange->SetInverts(!nodeToChange->GetInverts());
-                gateDirty = true;
+                hoveredNode->SetInverts(!hoveredNode->GetInverts());
+                if (!hoveredNode->HasNoInputs()) // Inputless nodes take output from the user and therefore are treated as mutable
+                    gateDirty = true;
             }
         }
-
+        
         if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
         {
             if (hoveredNode)
@@ -597,7 +599,6 @@ int main()
                 DrawRectanglePro({ cursor.x,cursor.y, g_nodeRadius * 3.0f, g_nodeRadius * 3.0f }, { g_nodeRadius * 1.5f, g_nodeRadius * 1.5f }, 45, BLACK);
 
                 DrawCircleV(hoveredNode->GetPosition(), g_nodeRadius + 2.0f, (hoveredNode->GetInverts() ? ORANGE : PURPLE));
-                //DrawCircleV(hoveredNode->GetPosition(), g_nodeRadius, (hoveredNode->GetState() ? DARKBLUE : DARKGRAY));
             }
             else
             {
