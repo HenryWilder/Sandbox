@@ -345,18 +345,39 @@ struct Graph
 
         for (Node* node : nodes)
         {
-            bool finished = false;
-            for (Node* input : node->GetInputs())
+            if (node->GetGate() == Gate::XOR)
             {
-                if (input->GetState())
+                node->SetState(false);
+                for (Node* input : node->GetInputs())
                 {
-                    node->SetState(node->GetGate() != Gate::NOR);
-                    finished = true;
-                    break;
+                    if (input->GetState())
+                    {
+                        if (node->GetState())
+                        {
+                            node->SetState(false);
+                            break;
+                        }
+                        else
+                            node->SetState(true);
+                    }
+
                 }
             }
-            if (!finished)
-                node->SetState(node->GetGate() == Gate::NOR);
+            else
+            {
+                bool finished = node->GetGate() == Gate::AND;
+                for (Node* input : node->GetInputs())
+                {
+                    if (input->GetState())
+                    {
+                        node->SetState(node->GetGate() != Gate::NOR);
+                        finished = node->GetGate() != Gate::AND;
+                        break;
+                    }
+                }
+                if (!finished)
+                    node->SetState(node->GetGate() == Gate::NOR);
+            }
         }
     }
 
