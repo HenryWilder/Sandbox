@@ -574,6 +574,7 @@ int main()
             if (!selectionStart)
             {
                 selectionStart = new Node(cursor, false);
+                hoveredNode = selectionStart;
                 graph.AddNode(selectionStart);
                 graphDirty = true;
             }
