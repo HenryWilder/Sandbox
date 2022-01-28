@@ -218,9 +218,9 @@ void DrawGateIcon(Gate type, Vector2 center, float radius, Color color, bool dra
     case Gate::OR:
     {
         constexpr Vector2 offsets[3] = {
-            {  0.0f, -1.1547f },
-            { -1.0f, 0.5774f },
-            { +1.0f, 0.5774f }
+            {  0.0000f, -1.1547f },
+            { -1.0000f,  0.5774f },
+            { +1.0000f,  0.5774f }
         };
         Vector2 points[3];
         for (size_t i = 0; i < 3; ++i)
@@ -232,7 +232,7 @@ void DrawGateIcon(Gate type, Vector2 center, float radius, Color color, bool dra
         if (type == Gate::XOR && drawXORline)
         {
             float outlineRadius = radius + 2.0f;
-            for (size_t i = 1; i < 8; ++i)
+            for (size_t i = 0; i < 3; ++i)
             {
                 points[i] = center + offsets[i] * outlineRadius;
             }
@@ -529,6 +529,7 @@ int main()
     Graph graph;
     bool graphDirty = false;
     bool gateDirty = false;
+    bool drawGateOptions = false;
 
     Node* selectionStart = nullptr;
     Node* selectionEnd = nullptr;
@@ -654,7 +655,7 @@ int main()
                 selectionStart = selectionEnd = nullptr;
             }
         }
-        else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+        else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !selectionStart)
         {
             selectionStart = hoveredNode;
 
@@ -667,19 +668,12 @@ int main()
             }
         }
 
-        if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON))
+        drawGateOptions = (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON) && selectionStart);
+        if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON) && !selectionStart)
         {
             if (hoveredNode)
             {
-                switch (hoveredNode->GetGate())
-                {
-                case Gate::OR:  hoveredNode->SetGate(Gate::NOR); break;
-                case Gate::NOR: hoveredNode->SetGate(Gate::AND); break;
-                case Gate::AND: hoveredNode->SetGate(Gate::XOR); break;
-                case Gate::XOR: hoveredNode->SetGate(Gate::OR ); break;
-                }
-                if (!hoveredNode->HasNoInputs()) // Inputless nodes take output from the user and therefore are treated as mutable
-                    gateDirty = true;
+                selectionStart = hoveredNode;
             }
             else if (hoveredWire.a)
             {
@@ -688,6 +682,39 @@ int main()
                 hoveredWire = { hoveredWire.b, hoveredWire.a };
                 graphDirty = true;
             }
+        }
+        if (IsMouseButtonReleased(MOUSE_MIDDLE_BUTTON) && selectionStart)
+        {
+            // Middle click
+            if (cursor.x == selectionStart->GetPosition().x &&
+                cursor.y == selectionStart->GetPosition().y)
+            {
+                if (selectionStart->GetGate() != Gate::NOR)
+                    selectionStart->SetGate(Gate::NOR);
+                else
+                    selectionStart->SetGate(Gate::OR);
+            }
+            else
+            // Middle drag
+            {
+                // In clockwise order
+                if (cursor.y < selectionStart->GetPosition().y)
+                    selectionStart->SetGate(Gate::OR);
+                else if (cursor.x > selectionStart->GetPosition().x)
+                    selectionStart->SetGate(Gate::NOR);
+                else if (cursor.y > selectionStart->GetPosition().y)
+                    selectionStart->SetGate(Gate::AND);
+                else if (cursor.x < selectionStart->GetPosition().x)
+                    selectionStart->SetGate(Gate::XOR);
+            }
+
+            // Inputless nodes take output from the user and therefore are treated as mutable
+            if (!selectionStart->HasNoInputs())
+                gateDirty = true;
+            else
+                selectionStart->SetState(selectionStart->GetGate() == Gate::NOR);
+
+            selectionStart = nullptr;
         }
         
         if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
