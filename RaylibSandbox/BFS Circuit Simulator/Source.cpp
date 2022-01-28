@@ -75,11 +75,19 @@ Vector2 Snap(Vector2 pt, float gridsize)
     };
 }
 
+enum class Gate : char
+{
+    OR  = '|',
+    NOR = '!',
+    AND = '&',
+    XOR = '^',
+};
+
 class Node
 {
 private:
     Vector2 m_position;
-    bool b_inverts; // Treat this as a NOR gate? If not, treat it as an OR gate
+    Gate m_type;
     bool b_state;
     bool b_visited;
 
@@ -87,7 +95,7 @@ private:
     std::vector<Node*> m_outputs;
 
 public:
-    Node(Vector2 position, bool inverts) : m_position(position), b_inverts(inverts), b_state(false), b_visited(false), m_inputs{}, m_outputs{} {}
+    Node(Vector2 position, Gate type) : m_position(position), m_type(type), b_state(false), b_visited(false), m_inputs{}, m_outputs{} {}
 
     Vector2 GetPosition() const
     {
@@ -98,13 +106,13 @@ public:
         m_position = position;
     }
 
-    bool GetInverts() const
+    Gate GetGate() const
     {
-        return b_inverts;
+        return m_type;
     }
-    void SetInverts(bool inverts)
+    void SetGate(Gate type)
     {
-        b_inverts = inverts;
+        m_type = type;
     }
 
     bool GetState() const
@@ -202,6 +210,55 @@ public:
     }
 };
 
+void DrawGateIcon(Gate type, Vector2 center, float radius, Color color, bool drawXORline = true)
+{
+    switch (type)
+    {
+    case Gate::XOR:
+    case Gate::OR:
+    {
+        static constexpr Vector2 offsets[8] = {
+            {  0.0000f,  0.0000f },
+            {  0.0000f, -1.1547f },
+            { -0.7318f, -0.4223f },
+            { -1.0000f, +0.5774f },
+            {  0.0000f, +0.8453f },
+            { +1.0000f, +0.5774f },
+            { +0.7318f, -0.4223f },
+            {  0.0000f, -1.1547f },
+        };
+        Vector2 points[8];
+        for (size_t i = 0; i < 8; ++i)
+        {
+            points[i] = center + offsets[i] * radius;
+        }
+        DrawTriangleFan(points, 8, color);
+
+        if (type == Gate::XOR && drawXORline)
+        {
+            float outlineRadius = radius + 2.0f;
+            for (size_t i = 1; i < 8; ++i)
+            {
+                points[i] = center + offsets[i] * outlineRadius;
+            }
+            DrawLineStrip(points, 8, color);
+        }
+    }
+        break;
+
+    case Gate::NOR:
+        DrawCircleV(center, radius, color);
+        break;
+
+    case Gate::AND:
+    {
+        float diameter = radius * 2.0f;
+        DrawRectangleV(center - Vector2{ radius, radius }, { diameter, diameter }, color);
+    }
+        break;
+    }
+}
+
 struct Wire
 {
     Node* a;
@@ -227,7 +284,7 @@ struct Graph
     {
         for (Node* node : nodes)
         {
-            node->SetState(node->GetInverts());
+            node->SetState(node->GetGate() == Gate::NOR);
         }
     }
 
@@ -293,13 +350,13 @@ struct Graph
             {
                 if (input->GetState())
                 {
-                    node->SetState(!node->GetInverts());
+                    node->SetState(node->GetGate() != Gate::NOR);
                     finished = true;
                     break;
                 }
             }
             if (!finished)
-                node->SetState(node->GetInverts());
+                node->SetState(node->GetGate() == Gate::NOR);
         }
     }
 
@@ -309,9 +366,16 @@ struct Graph
         // Draw the wires first so the nodes can be drawn on top
         for (Node* node : nodes)
         {
-            for (Node* output : node->GetOutputs())
+            for (Node* next : node->GetOutputs())
             {
-                DrawLineV(node->GetPosition(), output->GetPosition(), (node->GetState() ? DARKBLUE : DARKGRAY));
+                Color color = node->GetState() ? DARKBLUE : DARKGRAY;
+                DrawLineV(node->GetPosition(), next->GetPosition(), color);
+
+                Vector2 midpoint = (node->GetPosition() + next->GetPosition()) * 0.5f;
+                Vector2 angle = Vector2Rotate(Vector2Normalize(next->GetPosition() - node->GetPosition()) * g_gridUnit, 135.0f);
+                DrawLineV(midpoint, midpoint + angle, color);
+                angle = Vector2Rotate(Vector2Normalize(next->GetPosition() - node->GetPosition()) * g_gridUnit, -135.0f);
+                DrawLineV(midpoint, midpoint + angle, color);
             }
         }
     }
@@ -320,10 +384,10 @@ struct Graph
         // Node drawing is separate so that cyclic graphs can still draw nodes on top
         for (Node* node : nodes)
         {
-            DrawCircleV(node->GetPosition(), g_nodeRadius + 2.0f, (node->GetInverts() ? ORANGE : PURPLE));
-            DrawCircleV(node->GetPosition(), g_nodeRadius, (node->GetState() ? BLUE : BLACK));
+            DrawGateIcon(node->GetGate(), node->GetPosition(), g_nodeRadius + 2.0f, GRAY);
+            DrawGateIcon(node->GetGate(), node->GetPosition(), g_nodeRadius, (node->GetState() ? BLUE : BLACK), false);
             if (node->HasNoInputs())
-                DrawCircleV(node->GetPosition(), g_nodeRadius - 2.0f, GREEN);
+                DrawGateIcon(node->GetGate(), node->GetPosition(), g_nodeRadius - 2.0f, GREEN, false);
         }
     }
 
@@ -470,9 +534,9 @@ int main()
                 for (size_t i = 0; i < count; ++i)
                 {
                     Vector2 pos;
-                    bool inverts;
-                    file >> pos.x >> pos.y >> inverts;
-                    graph.AddNode(new Node(pos, inverts));
+                    char gate;
+                    file >> pos.x >> pos.y >> gate;
+                    graph.AddNode(new Node(pos, (Gate)gate));
                 }
                 file >> count;
                 for (size_t i = 0; i < count; ++i)
@@ -489,7 +553,7 @@ int main()
                 file << graph.nodes.size() << '\n';
                 for (Node* node : graph.nodes)
                 {
-                    file << node->GetPosition().x << ' ' << node->GetPosition().y << ' ' << node->GetInverts() << '\n';
+                    file << node->GetPosition().x << ' ' << node->GetPosition().y << ' ' << (char)node->GetGate() << '\n';
                 }
                 size_t connections = 0;
                 graph.ResetVisited();
@@ -565,7 +629,7 @@ int main()
                 {
                     if (!selectionEnd)
                     {
-                        selectionEnd = new Node(cursor, false);
+                        selectionEnd = new Node(cursor, Gate::OR);
                         graph.AddNode(selectionEnd);
                     }
                     graph.ConnectNodes(selectionStart, selectionEnd);
@@ -580,7 +644,7 @@ int main()
 
             if (!selectionStart)
             {
-                selectionStart = new Node(cursor, false);
+                selectionStart = new Node(cursor, Gate::OR);
                 hoveredNode = selectionStart;
                 graph.AddNode(selectionStart);
                 graphDirty = true;
@@ -591,9 +655,22 @@ int main()
         {
             if (hoveredNode)
             {
-                hoveredNode->SetInverts(!hoveredNode->GetInverts());
+                switch (hoveredNode->GetGate())
+                {
+                case Gate::OR:  hoveredNode->SetGate(Gate::NOR); break;
+                case Gate::NOR: hoveredNode->SetGate(Gate::AND); break;
+                case Gate::AND: hoveredNode->SetGate(Gate::XOR); break;
+                case Gate::XOR: hoveredNode->SetGate(Gate::OR ); break;
+                }
                 if (!hoveredNode->HasNoInputs()) // Inputless nodes take output from the user and therefore are treated as mutable
                     gateDirty = true;
+            }
+            else if (hoveredWire.a)
+            {
+                graph.DisconnectNodes(hoveredWire.a, hoveredWire.b);
+                graph.ConnectNodes(hoveredWire.b, hoveredWire.a);
+                hoveredWire = { hoveredWire.b, hoveredWire.a };
+                graphDirty = true;
             }
         }
         
@@ -643,13 +720,14 @@ int main()
 
             constexpr int gridRadius = 8;
             // World grid
+            static const Color worldGridColor = ColorAlpha(DARKGRAY, 0.125f);
             for (float x = 0.0f; x < (float)windowWidth; x += 2.0f * g_nodeRadius)
             {
-                DrawLineV({ x, 0 }, { x, (float)windowHeight }, ColorAlpha(DARKGRAY, 0.125f));
+                DrawLineV({ x, 0 }, { x, (float)windowHeight }, worldGridColor);
             }
             for (float y = 0.0f; y < (float)windowHeight; y += 2.0f * g_nodeRadius)
             {
-                DrawLineV({ 0.0f, y }, { (float)windowWidth, y }, ColorAlpha(DARKGRAY, 0.125f));
+                DrawLineV({ 0.0f, y }, { (float)windowWidth, y }, worldGridColor);
             }
 
             // Current wire being made
@@ -753,7 +831,7 @@ int main()
                 DrawRectanglePro({ cursor.x,cursor.y, g_nodeRadius * 4.0f, g_nodeRadius * 4.0f }, { g_nodeRadius * 2.0f, g_nodeRadius * 2.0f }, 45, WHITE);
                 DrawRectanglePro({ cursor.x,cursor.y, g_nodeRadius * 3.0f, g_nodeRadius * 3.0f }, { g_nodeRadius * 1.5f, g_nodeRadius * 1.5f }, 45, BLACK);
 
-                DrawCircleV(hoveredNode->GetPosition(), g_nodeRadius + 2.0f, (hoveredNode->GetInverts() ? ORANGE : PURPLE));
+                DrawGateIcon(hoveredNode->GetGate(), hoveredNode->GetPosition(), g_nodeRadius + 2.0f, GRAY);
             }
             else
             {
