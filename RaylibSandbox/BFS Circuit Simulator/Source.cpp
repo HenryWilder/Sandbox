@@ -47,6 +47,7 @@ inline Vector3& operator/=(Vector3& a, float div) { return (a = Vector3Scale(a, 
 #pragma endregion
 
 constexpr float g_nodeRadius = 4.0f;
+constexpr float g_gridUnit = g_nodeRadius * 2.0f;
 
 float Vector2DistanceToLine(Vector2 startPos, Vector2 endPos, Vector2 point)
 {
@@ -557,7 +558,7 @@ int main()
 
             ClearBackground(BLACK);
 
-            constexpr int gridRadius = 4;
+            constexpr int gridRadius = 8;
             // World grid
             for (float x = 0.0f; x < (float)windowWidth; x += 2.0f * g_nodeRadius)
             {
@@ -567,16 +568,8 @@ int main()
             {
                 DrawLineV({ 0.0f, y }, { (float)windowWidth, y }, ColorAlpha(DARKGRAY, 0.125f));
             }
-            // Cursor grid
-            for (float i = -gridRadius; i <= gridRadius; ++i)
-            {
-                float t = ((i / (float)gridRadius) + 1.0f) * 0.5f;
-                float a = g_nodeRadius * 2.0f * sinf(t * PI) * gridRadius;
-                float b = g_nodeRadius * 2.0f * i;
-                DrawLineV({ cursor.x - a, cursor.y + b }, { cursor.x + a, cursor.y + b }, ColorAlpha(DARKGRAY, 1.0f - abs(i / (float)gridRadius)));
-                DrawLineV({ cursor.x + b, cursor.y - a }, { cursor.x + b, cursor.y + a }, ColorAlpha(DARKGRAY, 1.0f - abs(i / (float)gridRadius)));
-            }
 
+            // Current wire being made
             if (selectionStart)
             {
                 Vector2 end;
@@ -586,6 +579,77 @@ int main()
                     end = cursor;
 
                 DrawLineV(selectionStart->GetPosition(), end, GRAY);
+
+                // Cursor grid
+                Vector2 p = selectionStart->GetPosition();
+                Vector2 c = cursor;
+
+                float xLength = abs(c.x - p.x);
+                float yLength = abs(c.y - p.y);
+                float s = xLength;
+
+                Vector2 directions[3];
+                directions[0] = { (c.x < p.x ? -1.0f : 1.0f), (c.y < p.y ? -1.0f : 1.0f) };
+                if (xLength == yLength)
+                {
+                    directions[1] = { directions[0].x, 0.0f };
+                    directions[2] = { 0.0f, directions[0].y };
+                }
+                else
+                {
+                    if (xLength > yLength)
+                    {
+                        directions[1] = { directions[0].x, -directions[0].x };
+                        directions[2] = { directions[0].x, +directions[0].x };
+                        directions[0].y = 0.0f;
+                    }
+                    else
+                    {
+                        s = yLength;
+                        directions[1] = { -directions[0].y, directions[0].y };
+                        directions[2] = { +directions[0].y, directions[0].y };
+                        directions[0].x = 0.0f;
+                    }
+                }
+
+                for (int o = -gridRadius; o <= gridRadius; ++o)
+                {
+                    Color color = ColorAlpha(WHITE, 1.0f - abs((float)o / (float)gridRadius));
+                    for (int i = 0; i < 3; ++i)
+                    {
+                        DrawPixelV((p + directions[i] * s) + (directions[i] * g_gridUnit * (float)o), color);
+                    }
+                }
+
+                for (int i = -gridRadius; i <= gridRadius; ++i)
+                {
+                    float offset = i * g_gridUnit - 1;
+                    Color color = ColorAlpha(WHITE, 1.0f - Clamp(abs(i) / (float)gridRadius, 0.0f, 1.0f));
+                    Vector2 offsets[2] = {
+                        { 0.0f, offset },
+                        { offset, 0.0f }
+                    };
+                    for (int i = 0; i < 2; ++i)
+                    {
+                        DrawPixelV(cursor + offsets[i], color);
+                    }
+                }
+            }
+            else
+            {
+                // Cursor grid
+                for (int y = -gridRadius; y <= gridRadius; ++y)
+                {
+                    int halfWidth = lroundf(sqrtf(gridRadius * gridRadius - y * y));
+                    for (int x = -halfWidth; x <= halfWidth; ++x)
+                    {
+                        Vector2 offset;
+                        offset.x = x * g_gridUnit;
+                        offset.y = y * g_gridUnit;
+                        float alpha = 1.0f - Clamp(Vector2Length(offset) / ((float)gridRadius * g_gridUnit), 0.0f, 1.0f);
+                        DrawPixelV(cursor + offset, ColorAlpha(WHITE, alpha));
+                    }
+                }
             }
 
             graph.DrawWires();
