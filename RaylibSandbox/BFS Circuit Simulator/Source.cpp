@@ -1,6 +1,7 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <vector>
+#include <fstream>
 
 #define sign(x) (((x) > (decltype(x))(0)) - ((x) < (decltype(x))(0)))
 
@@ -450,6 +451,75 @@ int main()
         /******************************************
         *   Simulate frame and update variables   *
         ******************************************/
+
+        if (IsKeyPressed(KEY_S) && (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)))
+        {
+            if (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) // Load
+            {
+                std::ifstream file("save.graph");
+                size_t count;
+                file >> count;
+                graph.nodes.reserve(count);
+                for (size_t i = 0; i < count; ++i)
+                {
+                    Vector2 pos;
+                    bool inverts;
+                    file >> pos.x >> pos.y >> inverts;
+                    graph.AddNode(new Node(pos, inverts));
+                }
+                file >> count;
+                for (size_t i = 0; i < count; ++i)
+                {
+                    size_t a, b;
+                    file >> a >> b;
+                    graph.ConnectNodes(graph.nodes[a], graph.nodes[b]);
+                }
+                file.close();
+            }
+            else // Save
+            {
+                std::ofstream file("save.graph");
+                file << graph.nodes.size() << '\n';
+                for (Node* node : graph.nodes)
+                {
+                    file << node->GetPosition().x << ' ' << node->GetPosition().y << ' ' << node->GetInverts() << '\n';
+                }
+                size_t connections = 0;
+                graph.ResetVisited();
+                for (Node* start : graph.nodes)
+                {
+                    if (start->GetVisited())
+                        continue;
+
+                    for (Node* end : start->GetOutputs())
+                    {
+                        if (end->GetVisited())
+                            break;
+
+                        ++connections;
+                    }
+                }
+                file << '\n' << connections << '\n';
+                graph.ResetVisited();
+                for (Node* start : graph.nodes)
+                {
+                    if (start->GetVisited())
+                        continue;
+
+                    for (Node* end : start->GetOutputs())
+                    {
+                        if (end->GetVisited())
+                            break;
+
+                        size_t a = std::find(graph.nodes.begin(), graph.nodes.end(), start) - graph.nodes.begin();
+                        size_t b = std::find(graph.nodes.begin(), graph.nodes.end(), end) - graph.nodes.begin();
+
+                        file << a << ' ' << b << '\n';
+                    }
+                }
+                file.close();
+            }
+        }
 
         Vector2 cursor = Snap(GetMousePosition(), g_nodeRadius * 2.0f);
         if (selectionStart)
