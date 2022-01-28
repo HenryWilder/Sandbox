@@ -211,51 +211,10 @@ struct Wire
 struct Graph
 {
     size_t seedCount = 0;
+    bool routeDirty = false;
+    bool gateDirty = false;
     // Sort using CalculateRoute() every time a node is added or removed
     std::vector<Node*> nodes;
-
-    // Runs every tick
-    void Step()
-    {
-        for (Node* node : nodes)
-        {
-            bool finished = false;
-            for (Node* input : node->GetInputs())
-            {
-                if (input->GetState())
-                {
-                    node->SetState(!node->GetInverts());
-                    finished = true;
-                    break;
-                }
-            }
-            if (!finished)
-                node->SetState(node->GetInverts());
-        }
-    }
-    // Runs every frame
-    void DrawWires()
-    {
-        // Draw the wires first so the nodes can be drawn on top
-        for (Node* node : nodes)
-        {
-            for (Node* output : node->GetOutputs())
-            {
-                DrawLineV(node->GetPosition(), output->GetPosition(), (node->GetState() ? DARKBLUE : DARKGRAY));
-            }
-        }
-    }
-    void DrawNodes()
-    {
-        // Node drawing is separate so that cyclic graphs can still draw nodes on top
-        for (Node* node : nodes)
-        {
-            DrawCircleV(node->GetPosition(), g_nodeRadius + 2.0f, (node->GetInverts() ? ORANGE : PURPLE));
-            DrawCircleV(node->GetPosition(), g_nodeRadius, (node->GetState() ? BLUE : BLACK));
-            if (node->HasNoInputs())
-                DrawCircleV(node->GetPosition(), g_nodeRadius - 2.0f, GREEN);
-        }
-    }
 
     void ResetVisited()
     {
@@ -264,7 +223,6 @@ struct Graph
             node->SetVisited(false);
         }
     }
-
     void ResetStates()
     {
         for (Node* node : nodes)
@@ -273,29 +231,7 @@ struct Graph
         }
     }
 
-    bool FindSeeds(std::vector<Node*>* buff, Node* node)
-    {
-        bool foundSeed = node->HasNoInputs();
-        if (foundSeed)
-            buff->push_back(node);
-
-        node->SetVisited(true);
-
-        for (Node* output : node->GetOutputs())
-        {
-            if (!output->GetVisited())
-                foundSeed = FindSeeds(buff, output) || foundSeed;
-        }
-        for (Node* input : node->GetInputs())
-        {
-            if (!input->GetVisited())
-                foundSeed = FindSeeds(buff, input) || foundSeed;
-        }
-        return foundSeed;
-    }
-
     // Uses modified BFS
-    // Make sure to run this before simulating a step when the graph has changed
     void CalculateRoute()
     {
         ResetVisited();
@@ -339,6 +275,77 @@ struct Graph
             }
             startIndex = endIndex;
         }
+    }
+
+    // Runs every tick
+    void Step()
+    {
+        if (routeDirty)
+            CalculateRoute();
+
+        if (gateDirty)
+            ResetStates();
+
+        for (Node* node : nodes)
+        {
+            bool finished = false;
+            for (Node* input : node->GetInputs())
+            {
+                if (input->GetState())
+                {
+                    node->SetState(!node->GetInverts());
+                    finished = true;
+                    break;
+                }
+            }
+            if (!finished)
+                node->SetState(node->GetInverts());
+        }
+    }
+
+    // Runs every frame
+    void DrawWires()
+    {
+        // Draw the wires first so the nodes can be drawn on top
+        for (Node* node : nodes)
+        {
+            for (Node* output : node->GetOutputs())
+            {
+                DrawLineV(node->GetPosition(), output->GetPosition(), (node->GetState() ? DARKBLUE : DARKGRAY));
+            }
+        }
+    }
+    void DrawNodes()
+    {
+        // Node drawing is separate so that cyclic graphs can still draw nodes on top
+        for (Node* node : nodes)
+        {
+            DrawCircleV(node->GetPosition(), g_nodeRadius + 2.0f, (node->GetInverts() ? ORANGE : PURPLE));
+            DrawCircleV(node->GetPosition(), g_nodeRadius, (node->GetState() ? BLUE : BLACK));
+            if (node->HasNoInputs())
+                DrawCircleV(node->GetPosition(), g_nodeRadius - 2.0f, GREEN);
+        }
+    }
+
+    bool FindSeeds(std::vector<Node*>* buff, Node* node)
+    {
+        bool foundSeed = node->HasNoInputs();
+        if (foundSeed)
+            buff->push_back(node);
+
+        node->SetVisited(true);
+
+        for (Node* output : node->GetOutputs())
+        {
+            if (!output->GetVisited())
+                foundSeed = FindSeeds(buff, output) || foundSeed;
+        }
+        for (Node* input : node->GetInputs())
+        {
+            if (!input->GetVisited())
+                foundSeed = FindSeeds(buff, input) || foundSeed;
+        }
+        return foundSeed;
     }
 
     // Create a node without connections
@@ -439,9 +446,9 @@ int main()
     *   Load textures, shaders, and meshes    *
     ******************************************/
 
+    Graph graph;
     bool graphDirty = false;
     bool gateDirty = false;
-    Graph graph;
 
     Node* selectionStart = nullptr;
     Node* selectionEnd = nullptr;
@@ -726,6 +733,12 @@ int main()
                         DrawPixelV(cursor + offset, ColorAlpha(WHITE, alpha));
                     }
                 }
+            }
+            // Crosshair
+            {
+                Color color = ColorAlpha(WHITE, 0.0625);
+                DrawLineV({ cursor.x, 0 }, { cursor.x, (float)windowHeight }, color);
+                DrawLineV({ 0, cursor.y }, { (float)windowWidth,  cursor.y }, color);
             }
 
             graph.DrawWires();
