@@ -594,6 +594,11 @@ int main()
         {
             if (hoveredNode)
             {
+                if (hoveredNode == selectionStart)
+                    selectionStart = nullptr;
+                if (hoveredNode == selectionEnd)
+                    selectionEnd = nullptr;
+
                 graph.RemoveNode(hoveredNode);
                 delete hoveredNode;
                 hoveredNode = nullptr;
