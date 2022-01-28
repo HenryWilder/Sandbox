@@ -217,22 +217,17 @@ void DrawGateIcon(Gate type, Vector2 center, float radius, Color color, bool dra
     case Gate::XOR:
     case Gate::OR:
     {
-        static constexpr Vector2 offsets[8] = {
-            {  0.0000f,  0.0000f },
-            {  0.0000f, -1.1547f },
-            { -0.7318f, -0.4223f },
-            { -1.0000f, +0.5774f },
-            {  0.0000f, +0.8453f },
-            { +1.0000f, +0.5774f },
-            { +0.7318f, -0.4223f },
-            {  0.0000f, -1.1547f },
+        constexpr Vector2 offsets[3] = {
+            {  0.0f, -1.1547f },
+            { -1.0f, 0.5774f },
+            { +1.0f, 0.5774f }
         };
-        Vector2 points[8];
-        for (size_t i = 0; i < 8; ++i)
+        Vector2 points[3];
+        for (size_t i = 0; i < 3; ++i)
         {
             points[i] = center + offsets[i] * radius;
         }
-        DrawTriangleFan(points, 8, color);
+        DrawTriangle(points[0], points[1], points[2], color);
 
         if (type == Gate::XOR && drawXORline)
         {
@@ -241,7 +236,7 @@ void DrawGateIcon(Gate type, Vector2 center, float radius, Color color, bool dra
             {
                 points[i] = center + offsets[i] * outlineRadius;
             }
-            DrawLineStrip(points, 8, color);
+            DrawTriangleLines(points[0], points[1], points[2], color);
         }
     }
         break;
