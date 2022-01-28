@@ -864,7 +864,7 @@ int main()
 
             graph.DrawWires();
 
-            if (hoveredWire.a)
+            if (hoveredWire.a && !drawGateOptions)
                 DrawLineV(hoveredWire.a->GetPosition(), hoveredWire.b->GetPosition(), LIGHTGRAY);
 
             graph.DrawNodes();
@@ -879,6 +879,51 @@ int main()
             else
             {
                 DrawRectanglePro({ cursor.x,cursor.y,5,5 }, { 2.5,2.5 }, 45, RAYWHITE);
+            }
+
+            if (drawGateOptions)
+            {
+                if (selectionStart)
+                {
+                    DrawRectanglePro(
+                        { selectionStart->GetPosition().x, selectionStart->GetPosition().y, g_nodeRadius * 4.0f, g_nodeRadius * 4.0f },
+                        { g_nodeRadius * 2.0f, g_nodeRadius * 2.0f }, 45, WHITE);
+                    DrawRectanglePro(
+                        { selectionStart->GetPosition().x, selectionStart->GetPosition().y, g_nodeRadius * 3.0f, g_nodeRadius * 3.0f },
+                        { g_nodeRadius * 1.5f, g_nodeRadius * 1.5f }, 45, BLACK);
+
+                    DrawGateIcon(selectionStart->GetGate(), selectionStart->GetPosition(), g_nodeRadius + 2.0f, GRAY);
+                }
+
+                constexpr Vector2 centers[4] = {
+                    Vector2{ 0.0f, g_nodeRadius * +7.0f },
+                    Vector2{ 0.0f, g_nodeRadius * -7.0f },
+                    Vector2{ g_nodeRadius * +7.0f, 0.0f },
+                    Vector2{ g_nodeRadius * -7.0f, 0.0f },
+                };
+                constexpr Gate gates[4] = {
+                    Gate::AND,
+                    Gate::OR,
+                    Gate::NOR,
+                    Gate::XOR,
+                };
+
+                Gate select = (Gate)0;
+                if (cursor.y < selectionStart->GetPosition().y)
+                    select = Gate::OR;
+                else if (cursor.x > selectionStart->GetPosition().x)
+                    select = Gate::NOR;
+                else if (cursor.y > selectionStart->GetPosition().y)
+                    select = Gate::AND;
+                else if (cursor.x < selectionStart->GetPosition().x)
+                    select = Gate::XOR;
+
+                for (size_t i = 0; i < 4; ++i)
+                {
+                    DrawCircleV(selectionStart->GetPosition() + centers[i], g_nodeRadius * 3.0f + 2.0f, GRAY);
+                    DrawCircleV(selectionStart->GetPosition() + centers[i], g_nodeRadius * 3.0f, (select == gates[i] ? GRAY : Color{ 30, 30, 30, 255 }));
+                    DrawGateIcon(gates[i], selectionStart->GetPosition() + centers[i], g_nodeRadius * 1.5f, WHITE);
+                }
             }
 
         } EndDrawing();
