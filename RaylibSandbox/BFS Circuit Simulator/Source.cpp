@@ -562,6 +562,7 @@ int main()
         *   Simulate frame and update variables   *
         ******************************************/
 
+        // Saving and loading
         if (IsKeyPressed(KEY_S) && (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)))
         {
             if (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) // Load
@@ -632,6 +633,7 @@ int main()
         }
 
         Vector2 cursor = Snap(GetMousePosition(), g_nodeRadius * 2.0f);
+        // Lock wire directions
         if (selectionStart)
         {
             float xSize = abs(selectionStart->GetPosition().x - cursor.x);
@@ -657,6 +659,7 @@ int main()
         Node* hoveredNode = graph.FindNodeAtPosition(cursor, g_nodeRadius * 2.0f);
         Wire hoveredWire = (hoveredNode ? Wire{ nullptr, nullptr }  : graph.FindWireIntersectingPosition(cursor, g_nodeRadius * 2.0f));
 
+        // Drag
         if (selectionStart)
         {
             selectionEnd = hoveredNode;
@@ -673,10 +676,19 @@ int main()
                     }
                     graph.ConnectNodes(selectionStart, selectionEnd);
                     graphDirty = true;
+
+                    // Divide wire
+                    if (hoveredWire.a)
+                    {
+                        graph.DisconnectNodes(hoveredWire.a, hoveredWire.b);
+                        graph.ConnectNodes(hoveredWire.a, selectionEnd);
+                        graph.ConnectNodes(selectionEnd, hoveredWire.b);
+                    }
                 }
                 selectionStart = selectionEnd = nullptr;
             }
         }
+        // Create new node
         else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !selectionStart)
         {
             selectionStart = hoveredNode;
@@ -687,6 +699,14 @@ int main()
                 hoveredNode = selectionStart;
                 graph.AddNode(selectionStart);
                 graphDirty = true;
+
+                // Divide wire
+                if (hoveredWire.a)
+                {
+                    graph.DisconnectNodes(hoveredWire.a, hoveredWire.b);
+                    graph.ConnectNodes(hoveredWire.a, selectionStart);
+                    graph.ConnectNodes(selectionStart, hoveredWire.b);
+                }
             }
         }
 
