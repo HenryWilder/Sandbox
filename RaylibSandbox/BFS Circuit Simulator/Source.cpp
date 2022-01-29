@@ -883,9 +883,26 @@ int main()
                 {
                     marqueeDragging = false;
                     Vector2 offset = cursor - marqueeStart;
-                    for (Node* node : selection)
+                    if (IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT))
                     {
-                        node->SetPosition(node->GetPosition() + offset);
+                        std::vector<Node*> copies;
+                        copies.reserve(selection.size());
+                        for (Node* src : selection)
+                        {
+                            copies.push_back(new Node(src->GetPosition() + offset, src->GetGate()));
+                            graph.AddNode(copies.back());
+                        }
+                        for (Node* src : selection)
+                        {
+                            std::find(selection.begin(), selection.end(), src);
+                        }
+                    }
+                    else
+                    {
+                        for (Node* node : selection)
+                        {
+                            node->SetPosition(node->GetPosition() + offset);
+                        }
                     }
                 }
             }
@@ -990,25 +1007,46 @@ int main()
         }
 
         // Make sure no other locally stored nodes can possibly exist at the time, or set them to nullptr
-        if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON) && !selectionStart && !selectionEnd)
+        if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON) && !selectionStart && !selectionEnd && !marqueeSelecting)
         {
-            if (hoveredNode)
+            // Delete selected
+            if (!selection.empty())
             {
-                graph.RemoveNode(hoveredNode);
-                delete hoveredNode;
-                hoveredNode = nullptr;
-                graphDirty = true;
-            }
-            else if (hoveredWire.a)
-            {
-                graph.DisconnectNodes(hoveredWire.a, hoveredWire.b);
-                hoveredWire = { nullptr, nullptr };
-                graphDirty = true;
+                if (hoveredNode)
+                {
+                    for (Node* node : selection)
+                    {
+                        graph.RemoveNode(node);
+                        delete node;
+                    }
+                    selection.clear();
+                }
+                else
+                {
+                    marqueeStart = cursor;
+                    marqueeSelecting = true;
+                }
             }
             else
             {
-                marqueeStart = cursor;
-                marqueeSelecting = true;
+                if (hoveredNode)
+                {
+                    graph.RemoveNode(hoveredNode);
+                    delete hoveredNode;
+                    hoveredNode = nullptr;
+                    graphDirty = true;
+                }
+                else if (hoveredWire.a)
+                {
+                    graph.DisconnectNodes(hoveredWire.a, hoveredWire.b);
+                    hoveredWire = { nullptr, nullptr };
+                    graphDirty = true;
+                }
+                else
+                {
+                    marqueeStart = cursor;
+                    marqueeSelecting = true;
+                }
             }
         }
         if (marqueeSelecting)
@@ -1185,29 +1223,30 @@ int main()
             if (hoveredWire.a && !drawGateOptions)
                 DrawLineV(hoveredWire.a->GetPosition(), hoveredWire.b->GetPosition(), LIGHTGRAY);
 
-            // Nodes
-            graph.DrawNodes();
-
             // Moving points
             if (marqueeDragging)
             {
                 Vector2 offset = cursor - marqueeStart;
                 for (Node* node : selection)
                 {
-                    DrawPixelV(node->GetPosition() + offset, MAGENTA);
+                    DrawCircleV(node->GetPosition() + offset, 2.0f, MAGENTA);
                 }
             }
+
+            // Selection
+            for (Node* selected : selection)
+            {
+                DrawGateIcon(selected->GetGate(), selected->GetPosition(), g_nodeRadius + 2.0f, WHITE); // todo
+            }
+
+            // Nodes
+            graph.DrawNodes();
 
             // Cursor
             if (hoveredNode)
                 DrawHighlightedGate(hoveredNode->GetPosition(), hoveredNode->GetGate());
             else
                 DrawRectanglePro({ cursor.x,cursor.y,5,5 }, { 2.5,2.5 }, 45, RAYWHITE);
-
-            for (Node* selected : selection)
-            {
-                DrawHighlightedGate(selected->GetPosition(), selected->GetGate());
-            }
 
             // Gate options
             if (drawGateOptions)
