@@ -340,8 +340,45 @@ struct Graph
 
         for (Node* node : nodes)
         {
-            if (node->GetGate() == Gate::XOR)
+            switch (node->GetGate())
             {
+            case Gate::OR:
+                node->SetState(false);
+                for (Node* input : node->GetInputs())
+                {
+                    if (input->GetState())
+                    {
+                        node->SetState(true);
+                        break;
+                    }
+                }
+                break;
+
+            case Gate::NOR:
+                node->SetState(true);
+                for (Node* input : node->GetInputs())
+                {
+                    if (input->GetState())
+                    {
+                        node->SetState(false);
+                        break;
+                    }
+                }
+                break;
+
+            case Gate::AND:
+                node->SetState(!node->HasNoInputs());
+                for (Node* input : node->GetInputs())
+                {
+                    if (!input->GetState())
+                    {
+                        node->SetState(false);
+                        break;
+                    }
+                }
+                break;
+
+            case Gate::XOR:
                 node->SetState(false);
                 for (Node* input : node->GetInputs())
                 {
@@ -355,23 +392,8 @@ struct Graph
                         else
                             node->SetState(true);
                     }
-
                 }
-            }
-            else
-            {
-                bool finished = node->GetGate() == Gate::AND;
-                for (Node* input : node->GetInputs())
-                {
-                    if (input->GetState())
-                    {
-                        node->SetState(node->GetGate() != Gate::NOR);
-                        finished = node->GetGate() != Gate::AND;
-                        break;
-                    }
-                }
-                if (!finished)
-                    node->SetState(node->GetGate() == Gate::NOR);
+                break;
             }
         }
     }
