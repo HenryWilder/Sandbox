@@ -91,12 +91,13 @@ private:
     Gate m_type;
     bool b_state;
     bool b_visited;
+    bool b_hidden;
 
     std::vector<Node*> m_inputs;
     std::vector<Node*> m_outputs;
 
 public:
-    Node(Vector2 position, Gate type) : m_position(position), m_type(type), b_state(false), b_visited(false), m_inputs{}, m_outputs{} {}
+    Node(Vector2 position, Gate type) : m_position(position), m_type(type), b_state(false), b_visited(false), b_hidden(false), m_inputs{}, m_outputs{} {}
 
     Vector2 GetPosition() const
     {
@@ -132,6 +133,15 @@ public:
     void SetVisited(bool visited)
     {
         b_visited = visited;
+    }
+
+    bool GetHidden() const
+    {
+        return b_hidden;
+    }
+    void SetHidden(bool hidden)
+    {
+        b_hidden = hidden;
     }
 
     bool HasNoInputs() const
@@ -331,6 +341,50 @@ void CompressNetwork(Node* start, float length)
     wave.clear();
 }
 
+struct NodeBlueprint
+{
+    Gate gate;
+    std::vector<size_t> inputs;
+    std::vector<size_t> outputs;
+};
+
+struct ComponentBlueprint
+{
+    std::vector<NodeBlueprint> nodes;
+};
+struct Component
+{
+    ComponentBlueprint* blueprint;
+    std::vector<Node*> nodes;
+
+    void Regenerate()
+    {
+        for (Node* node : nodes)
+        {
+            delete node;
+        }
+        nodes.clear();
+        nodes.reserve(blueprint->nodes.size());
+        for (NodeBlueprint base : blueprint->nodes)
+        {
+            Node* node = new Node(Vector2Zero(), base.gate);
+            node->SetHidden(true);
+            nodes.push_back(node);
+        }
+        for (size_t i = 0; i < nodes.size(); ++i)
+        {
+            for (size_t input : blueprint->nodes[i].inputs)
+            {
+                nodes[i]->AddInput(nodes[input]);
+            }
+            for (size_t output : blueprint->nodes[i].outputs)
+            {
+                nodes[i]->AddOutput(nodes[output]);
+            }
+        }
+    }
+};
+
 struct Graph
 {
     size_t seedCount = 0;
@@ -470,13 +524,26 @@ struct Graph
     }
 
     // Runs every frame
+    void DrawComponents()
+    {
+        for (Component* comp : components)
+        {
+            // Todo
+        }
+    }
     void DrawWires()
     {
         // Draw the wires first so the nodes can be drawn on top
         for (Node* node : nodes)
         {
+            if (node->GetHidden())
+                continue;
+
             for (Node* next : node->GetOutputs())
             {
+                if (node->GetHidden())
+                    continue;
+
                 Color color = node->GetState() ? DARKBLUE : DARKGRAY;
                 DrawLineV(node->GetPosition(), next->GetPosition(), color);
 
@@ -492,6 +559,9 @@ struct Graph
         // Node drawing is separate so that cyclic graphs can still draw nodes on top
         for (Node* node : nodes)
         {
+            if (node->GetHidden())
+                continue;
+
             DrawGateIcon(node->GetGate(), node->GetPosition(), g_nodeRadius, (node->GetState() ? BLUE : GRAY));
 
             if (node->HasNoOutputs())
