@@ -227,7 +227,7 @@ void DrawGateIcon(Gate type, Vector2 center, float radius, Color color, bool dra
 
         // Compensate for line drawing outside of triangle instead of inside
         if (type == Gate::XOR && drawXORline)
-            radius -= 1.0f;
+            radius += 1.0f;
 
         Vector2 points[3];
         for (size_t i = 0; i < 3; ++i)
@@ -289,6 +289,39 @@ struct Wire
     Node* a;
     Node* b;
 };
+
+float Signf(float value)
+{
+    return (value > 0.01f ? 1.0f : (value < -0.01f ? -1.0f : 0.0f));
+}
+void CompressWires(Node* start, float length)
+{
+    // TODO: put in stack!
+    start->SetVisited(true);
+    for (Node* output : start->GetOutputs())
+    {
+        if (!output->GetVisited())
+        {
+            Vector2 pos = output->GetPosition();
+            pos.x = start->GetPosition().x + length * Signf(pos.x - start->GetPosition().x);
+            pos.y = start->GetPosition().y + length * Signf(pos.y - start->GetPosition().y);
+            output->SetPosition(pos);
+            CompressWires(output, length);
+        }
+    }
+    for (Node* input : start->GetInputs())
+    {
+        if (!input->GetVisited())
+        {
+            Vector2 pos = input->GetPosition();
+            pos.x = start->GetPosition().x + length * Signf(pos.x - start->GetPosition().x);
+            pos.y = start->GetPosition().y + length * Signf(pos.y - start->GetPosition().y);
+            input->SetPosition(pos);
+            CompressWires(input, length);
+        }
+    }
+
+}
 
 struct Graph
 {
@@ -854,6 +887,26 @@ int main()
                 graph.DisconnectNodes(hoveredWire.a, hoveredWire.b);
                 hoveredWire = { nullptr, nullptr };
                 graphDirty = true;
+            }
+            else
+            {
+                // Todo: marquee select
+            }
+        }
+
+        // Make graph have length-1 wires
+        if (IsKeyPressed(KEY_SPACE))
+        {
+            // Relative to the hovered node
+            if (hoveredNode)
+            {
+                graph.ResetVisited();
+                CompressWires(hoveredNode, g_gridUnit);
+            }
+            // Only the hovered wire (relative to its center)
+            else if (hoveredWire.a)
+            {
+
             }
         }
 
