@@ -47,7 +47,7 @@ inline Vector3& operator/=(Vector3& a, float div) { return (a = Vector3Scale(a, 
 
 #pragma endregion
 
-constexpr float g_nodeRadius = 4.0f;
+constexpr float g_nodeRadius = 6.0f;
 constexpr float g_gridUnit = g_nodeRadius * 2.0f;
 
 float Vector2DistanceToLine(Vector2 startPos, Vector2 endPos, Vector2 point)
@@ -440,8 +440,9 @@ struct Graph
                 DrawLineV(node->GetPosition(), next->GetPosition(), color);
 
                 Vector2 midpoint = (node->GetPosition() + next->GetPosition()) * 0.5f;
-                Vector2 angle = Vector2Rotate(Vector2Normalize(next->GetPosition() - node->GetPosition()) * g_gridUnit, -135.0f);
-                DrawLineV(midpoint, midpoint + angle, color);
+                Vector2 direction = Vector2Normalize(next->GetPosition() - node->GetPosition()) * g_gridUnit * 0.5f;
+                Vector2 angle = Vector2Rotate(direction, -135.0f);
+                DrawLineV(midpoint + direction, midpoint + direction + angle, color);
             }
         }
     }
@@ -450,10 +451,13 @@ struct Graph
         // Node drawing is separate so that cyclic graphs can still draw nodes on top
         for (Node* node : nodes)
         {
-            DrawGateIcon(node->GetGate(), node->GetPosition(), g_nodeRadius + 2.0f, GRAY);
-            DrawGateIcon(node->GetGate(), node->GetPosition(), g_nodeRadius, (node->GetState() ? BLUE : BLACK), false);
+            DrawGateIcon(node->GetGate(), node->GetPosition(), g_nodeRadius, (node->GetState() ? BLUE : GRAY));
+
+            if (node->HasNoOutputs())
+                DrawCircleV(node->GetPosition(), g_nodeRadius * 0.35f, ORANGE);
+
             if (node->HasNoInputs())
-                DrawGateIcon(node->GetGate(), node->GetPosition(), g_nodeRadius - 2.0f, GREEN, false);
+                DrawCircleV(node->GetPosition(), g_nodeRadius * 0.35f, GREEN);
         }
     }
 
