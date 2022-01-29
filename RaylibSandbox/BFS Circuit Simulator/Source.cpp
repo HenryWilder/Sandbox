@@ -392,6 +392,7 @@ struct Graph
     bool gateDirty = false;
     // Sort using CalculateRoute() every time a node is added or removed
     std::vector<Node*> nodes;
+    std::vector<Component*> components;
 
     void ResetVisited()
     {
@@ -526,9 +527,10 @@ struct Graph
     // Runs every frame
     void DrawComponents()
     {
+        // Todo
         for (Component* comp : components)
         {
-            // Todo
+            // DrawRectangleRec(comp);
         }
     }
     void DrawWires()
@@ -732,6 +734,72 @@ GateSelection ClosestHoveredGateOption(Vector2 cursor, Vector2 origin)
     return { 0, true };
 }
 
+void Save(Graph* graph)
+{
+    std::ofstream file("save.graph");
+    file << graph->nodes.size() << '\n';
+    for (Node* node : graph->nodes)
+    {
+        file << node->GetPosition().x << ' ' << node->GetPosition().y << ' ' << (char)node->GetGate() << '\n';
+    }
+    size_t connections = 0;
+    graph->ResetVisited();
+    for (Node* start : graph->nodes)
+    {
+        if (start->GetVisited())
+            continue;
+
+        for (Node* end : start->GetOutputs())
+        {
+            if (end->GetVisited())
+                break;
+
+            ++connections;
+        }
+    }
+    file << '\n' << connections << '\n';
+    graph->ResetVisited();
+    for (Node* start : graph->nodes)
+    {
+        if (start->GetVisited())
+            continue;
+
+        for (Node* end : start->GetOutputs())
+        {
+            if (end->GetVisited())
+                break;
+
+            size_t a = std::find(graph->nodes.begin(), graph->nodes.end(), start) - graph->nodes.begin();
+            size_t b = std::find(graph->nodes.begin(), graph->nodes.end(), end) - graph->nodes.begin();
+
+            file << a << ' ' << b << '\n';
+        }
+    }
+    file.close();
+}
+void Load(Graph* graph)
+{
+    std::ifstream file("save.graph");
+    size_t count;
+    file >> count;
+    graph->nodes.reserve(count);
+    for (size_t i = 0; i < count; ++i)
+    {
+        Vector2 pos;
+        char gate;
+        file >> pos.x >> pos.y >> gate;
+        graph->AddNode(new Node(pos, (Gate)gate));
+    }
+    file >> count;
+    for (size_t i = 0; i < count; ++i)
+    {
+        size_t a, b;
+        file >> a >> b;
+        graph->ConnectNodes(graph->nodes[a], graph->nodes[b]);
+    }
+    file.close();
+}
+
 int main()
 {
     int windowWidth = 1280;
@@ -751,6 +819,11 @@ int main()
     Node* selectionStart = nullptr;
     Node* selectionEnd = nullptr;
 
+    Vector2 marqueeStart = Vector2Zero();
+    bool marqueeSelecting = false;
+    Rectangle selectionRec;
+    std::vector<Node*> selection;
+
     while (!WindowShouldClose())
     {
         /******************************************
@@ -761,72 +834,13 @@ int main()
         if (IsKeyPressed(KEY_S) && (IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL)))
         {
             if (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) // Load
-            {
-                std::ifstream file("save.graph");
-                size_t count;
-                file >> count;
-                graph.nodes.reserve(count);
-                for (size_t i = 0; i < count; ++i)
-                {
-                    Vector2 pos;
-                    char gate;
-                    file >> pos.x >> pos.y >> gate;
-                    graph.AddNode(new Node(pos, (Gate)gate));
-                }
-                file >> count;
-                for (size_t i = 0; i < count; ++i)
-                {
-                    size_t a, b;
-                    file >> a >> b;
-                    graph.ConnectNodes(graph.nodes[a], graph.nodes[b]);
-                }
-                file.close();
-            }
+                Load(&graph);
             else // Save
-            {
-                std::ofstream file("save.graph");
-                file << graph.nodes.size() << '\n';
-                for (Node* node : graph.nodes)
-                {
-                    file << node->GetPosition().x << ' ' << node->GetPosition().y << ' ' << (char)node->GetGate() << '\n';
-                }
-                size_t connections = 0;
-                graph.ResetVisited();
-                for (Node* start : graph.nodes)
-                {
-                    if (start->GetVisited())
-                        continue;
-
-                    for (Node* end : start->GetOutputs())
-                    {
-                        if (end->GetVisited())
-                            break;
-
-                        ++connections;
-                    }
-                }
-                file << '\n' << connections << '\n';
-                graph.ResetVisited();
-                for (Node* start : graph.nodes)
-                {
-                    if (start->GetVisited())
-                        continue;
-
-                    for (Node* end : start->GetOutputs())
-                    {
-                        if (end->GetVisited())
-                            break;
-
-                        size_t a = std::find(graph.nodes.begin(), graph.nodes.end(), start) - graph.nodes.begin();
-                        size_t b = std::find(graph.nodes.begin(), graph.nodes.end(), end) - graph.nodes.begin();
-
-                        file << a << ' ' << b << '\n';
-                    }
-                }
-                file.close();
-            }
+                Save(&graph);
         }
 
+
+        // Grid-snapped cursor
         Vector2 cursor = Snap(GetMousePosition(), g_nodeRadius * 2.0f);
         // Lock wire directions
         if (selectionStart)
@@ -850,9 +864,10 @@ int main()
                     cursor.y = selectionStart->GetPosition().y;
             }
         }
-
+        // Hover
         Node* hoveredNode = graph.FindNodeAtPosition(cursor, g_nodeRadius * 2.0f);
         Wire hoveredWire = (hoveredNode ? Wire{ nullptr, nullptr }  : graph.FindWireIntersectingPosition(cursor, g_nodeRadius * 2.0f));
+
 
         // Drag
         if (selectionStart)
@@ -949,7 +964,7 @@ int main()
             selectionStart = nullptr;
             selectionEnd = nullptr;
         }
-        
+
         // Make sure no other locally stored nodes can possibly exist at the time, or set them to nullptr
         if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON) && !selectionStart && !selectionEnd)
         {
@@ -968,8 +983,27 @@ int main()
             }
             else
             {
-                // Todo: marquee select
+                marqueeStart = cursor;
+                marqueeSelecting = true;
             }
+        }
+        if (marqueeSelecting)
+        {
+            Vector2 a = {
+                std::min(marqueeStart.x, cursor.x),
+                std::min(marqueeStart.y, cursor.y)
+            };
+            selectionRec = {
+                    a.x,
+                    a.y,
+                    std::max(marqueeStart.x, cursor.x) - a.x,
+                    std::max(marqueeStart.y, cursor.y) - a.y,
+            };
+            graph.FindNodesInRectangle(&selection, selectionRec);
+
+            // Finalize
+            if (IsMouseButtonReleased(MOUSE_RIGHT_BUTTON))
+                marqueeSelecting = false;
         }
 
         // Make graph have length-1 wires
@@ -988,18 +1022,18 @@ int main()
             }
         }
 
+
+        // Cleanup
         if (graphDirty)
         {
             graph.CalculateRoute();
             graphDirty = false;
         }
-
         if (gateDirty)
         {
             graph.ResetStates();
             gateDirty = false;
         }
-
         graph.Step();
 
         /******************************************
@@ -1011,6 +1045,7 @@ int main()
             ClearBackground(BLACK);
 
             constexpr int gridRadius = 8;
+
             // World grid
             static const Color worldGridColor = ColorAlpha(DARKGRAY, 0.125f);
             for (float x = 0.0f; x < (float)windowWidth; x += 2.0f * g_nodeRadius)
@@ -1021,6 +1056,13 @@ int main()
             {
                 DrawLineV({ 0.0f, y }, { (float)windowWidth, y }, worldGridColor);
             }
+
+            if (marqueeSelecting)
+            {
+                DrawRectangleRec(selectionRec, ColorAlpha(GRAY, 0.125));
+                DrawRectangleLines(selectionRec.x, selectionRec.y, selectionRec.width, selectionRec.height, GRAY);
+            }
+
 
             // Current wire being made
             if (selectionStart)
@@ -1104,6 +1146,7 @@ int main()
                     }
                 }
             }
+
             // Crosshair
             {
                 Color color = ColorAlpha(WHITE, 0.0625);
@@ -1111,18 +1154,29 @@ int main()
                 DrawLineV({ 0, cursor.y }, { (float)windowWidth,  cursor.y }, color);
             }
 
+            // Wires
             graph.DrawWires();
 
+            // Hovered wire
             if (hoveredWire.a && !drawGateOptions)
                 DrawLineV(hoveredWire.a->GetPosition(), hoveredWire.b->GetPosition(), LIGHTGRAY);
 
+            // Nodes
             graph.DrawNodes();
 
+            // Cursor
             if (hoveredNode)
                 DrawHighlightedGate(hoveredNode->GetPosition(), hoveredNode->GetGate());
             else
                 DrawRectanglePro({ cursor.x,cursor.y,5,5 }, { 2.5,2.5 }, 45, RAYWHITE);
 
+
+            for (Node* selected : selection)
+            {
+                DrawHighlightedGate(selected->GetPosition(), selected->GetGate());
+            }
+
+            // Gate options
             if (drawGateOptions)
             {
                 if (selectionStart)
