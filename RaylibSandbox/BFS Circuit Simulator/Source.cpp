@@ -533,6 +533,16 @@ struct Graph
         }
         return closest;
     }
+
+    void FindNodesInRectangle(std::vector<Node*>* output, Rectangle search)
+    {
+        output->clear();
+        for (Node* node : nodes)
+        {
+            if (CheckCollisionPointRec(node->GetPosition(), search))
+                output->push_back(node);
+        }
+    }
 };
 
 int main()
