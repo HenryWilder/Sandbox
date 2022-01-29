@@ -410,9 +410,7 @@ struct Graph
                 DrawLineV(node->GetPosition(), next->GetPosition(), color);
 
                 Vector2 midpoint = (node->GetPosition() + next->GetPosition()) * 0.5f;
-                Vector2 angle = Vector2Rotate(Vector2Normalize(next->GetPosition() - node->GetPosition()) * g_gridUnit, 135.0f);
-                DrawLineV(midpoint, midpoint + angle, color);
-                angle = Vector2Rotate(Vector2Normalize(next->GetPosition() - node->GetPosition()) * g_gridUnit, -135.0f);
+                Vector2 angle = Vector2Rotate(Vector2Normalize(next->GetPosition() - node->GetPosition()) * g_gridUnit, -135.0f);
                 DrawLineV(midpoint, midpoint + angle, color);
             }
         }
@@ -757,6 +755,7 @@ int main()
                 selectionStart->SetState(selectionStart->GetGate() == Gate::NOR);
 
             selectionStart = nullptr;
+            selectionEnd = nullptr;
         }
         
         // Make sure no other locally stored nodes can possibly exist at the time, or set them to nullptr
