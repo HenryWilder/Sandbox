@@ -739,15 +739,11 @@ int main()
             selectionStart = nullptr;
         }
         
-        if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
+        // Make sure no other locally stored nodes can possibly exist at the time, or set them to nullptr
+        if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON) && !selectionStart && !selectionEnd)
         {
             if (hoveredNode)
             {
-                if (hoveredNode == selectionStart)
-                    selectionStart = nullptr;
-                if (hoveredNode == selectionEnd)
-                    selectionEnd = nullptr;
-
                 graph.RemoveNode(hoveredNode);
                 delete hoveredNode;
                 hoveredNode = nullptr;
