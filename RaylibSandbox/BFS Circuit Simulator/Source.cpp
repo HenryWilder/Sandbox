@@ -819,8 +819,9 @@ int main()
     Node* selectionStart = nullptr;
     Node* selectionEnd = nullptr;
 
-    Vector2 marqueeStart = Vector2Zero();
     bool marqueeSelecting = false;
+    bool marqueeDragging = false;
+    Vector2 marqueeStart = Vector2Zero();
     Rectangle selectionRec;
     std::vector<Node*> selection;
 
@@ -868,101 +869,124 @@ int main()
         Node* hoveredNode = graph.FindNodeAtPosition(cursor, g_nodeRadius * 2.0f);
         Wire hoveredWire = (hoveredNode ? Wire{ nullptr, nullptr }  : graph.FindWireIntersectingPosition(cursor, g_nodeRadius * 2.0f));
 
-
-        // Drag
-        if (selectionStart)
+        if (!marqueeSelecting)
         {
-            selectionEnd = hoveredNode;
-
-            // Finalize
-            if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+            if (!selection.empty())
             {
-                if (selectionEnd != selectionStart)
+                if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
                 {
-                    if (!selectionEnd)
-                    {
-                        selectionEnd = new Node(cursor, Gate::OR);
-                        graph.AddNode(selectionEnd);
-                    }
-                    graph.ConnectNodes(selectionStart, selectionEnd);
-                    graphDirty = true;
+                    marqueeStart = cursor;
+                    marqueeDragging = true;
+                }
 
-                    // Divide wire
-                    if (hoveredWire.a)
+                if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+                {
+                    marqueeDragging = false;
+                    Vector2 offset = cursor - marqueeStart;
+                    for (Node* node : selection)
+                    {
+                        node->SetPosition(node->GetPosition() + offset);
+                    }
+                }
+            }
+            else
+            {
+                // Drag
+                if (selectionStart)
+                {
+                    selectionEnd = hoveredNode;
+
+                    // Finalize
+                    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+                    {
+                        if (selectionEnd != selectionStart)
+                        {
+                            if (!selectionEnd)
+                            {
+                                selectionEnd = new Node(cursor, Gate::OR);
+                                graph.AddNode(selectionEnd);
+                            }
+                            graph.ConnectNodes(selectionStart, selectionEnd);
+                            graphDirty = true;
+
+                            // Divide wire
+                            if (hoveredWire.a)
+                            {
+                                graph.DisconnectNodes(hoveredWire.a, hoveredWire.b);
+                                graph.ConnectNodes(hoveredWire.a, selectionEnd);
+                                graph.ConnectNodes(selectionEnd, hoveredWire.b);
+                            }
+                        }
+                        selectionStart = selectionEnd = nullptr;
+                    }
+                }
+                // Create new node
+                else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !selectionStart)
+                {
+                    selectionStart = hoveredNode;
+
+                    if (!selectionStart)
+                    {
+                        selectionStart = new Node(cursor, Gate::OR);
+                        hoveredNode = selectionStart;
+                        graph.AddNode(selectionStart);
+                        graphDirty = true;
+
+                        // Divide wire
+                        if (hoveredWire.a)
+                        {
+                            graph.DisconnectNodes(hoveredWire.a, hoveredWire.b);
+                            graph.ConnectNodes(hoveredWire.a, selectionStart);
+                            graph.ConnectNodes(selectionStart, hoveredWire.b);
+                        }
+                    }
+                }
+
+                drawGateOptions = (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON) && selectionStart);
+                if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON) && !selectionStart)
+                {
+                    if (hoveredNode)
+                    {
+                        selectionStart = hoveredNode;
+                    }
+                    else if (hoveredWire.a)
                     {
                         graph.DisconnectNodes(hoveredWire.a, hoveredWire.b);
-                        graph.ConnectNodes(hoveredWire.a, selectionEnd);
-                        graph.ConnectNodes(selectionEnd, hoveredWire.b);
+                        graph.ConnectNodes(hoveredWire.b, hoveredWire.a);
+                        hoveredWire = { hoveredWire.b, hoveredWire.a };
+                        graphDirty = true;
                     }
                 }
-                selectionStart = selectionEnd = nullptr;
-            }
-        }
-        // Create new node
-        else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !selectionStart)
-        {
-            selectionStart = hoveredNode;
-
-            if (!selectionStart)
-            {
-                selectionStart = new Node(cursor, Gate::OR);
-                hoveredNode = selectionStart;
-                graph.AddNode(selectionStart);
-                graphDirty = true;
-
-                // Divide wire
-                if (hoveredWire.a)
+                if (IsMouseButtonReleased(MOUSE_MIDDLE_BUTTON) && selectionStart)
                 {
-                    graph.DisconnectNodes(hoveredWire.a, hoveredWire.b);
-                    graph.ConnectNodes(hoveredWire.a, selectionStart);
-                    graph.ConnectNodes(selectionStart, hoveredWire.b);
+
+                    // Middle click
+                    if (cursor.x == selectionStart->GetPosition().x &&
+                        cursor.y == selectionStart->GetPosition().y)
+                    {
+                        if (selectionStart->GetGate() != Gate::NOR)
+                            selectionStart->SetGate(Gate::NOR);
+                        else
+                            selectionStart->SetGate(Gate::OR);
+                    }
+                    else
+                        // Middle drag
+                    {
+                        // In clockwise order
+                        GateSelection select = ClosestHoveredGateOption(cursor, selectionStart->GetPosition());
+                        selectionStart->SetGate(GateSelection::gates[select.index]);
+                    }
+
+                    // Inputless nodes take output from the user and therefore are treated as mutable
+                    if (!selectionStart->HasNoInputs())
+                        gateDirty = true;
+                    else
+                        selectionStart->SetState(selectionStart->GetGate() == Gate::NOR);
+
+                    selectionStart = nullptr;
+                    selectionEnd = nullptr;
                 }
             }
-        }
-
-        drawGateOptions = (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON) && selectionStart);
-        if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON) && !selectionStart)
-        {
-            if (hoveredNode)
-            {
-                selectionStart = hoveredNode;
-            }
-            else if (hoveredWire.a)
-            {
-                graph.DisconnectNodes(hoveredWire.a, hoveredWire.b);
-                graph.ConnectNodes(hoveredWire.b, hoveredWire.a);
-                hoveredWire = { hoveredWire.b, hoveredWire.a };
-                graphDirty = true;
-            }
-        }
-        if (IsMouseButtonReleased(MOUSE_MIDDLE_BUTTON) && selectionStart)
-        {
-
-            // Middle click
-            if (cursor.x == selectionStart->GetPosition().x &&
-                cursor.y == selectionStart->GetPosition().y)
-            {
-                if (selectionStart->GetGate() != Gate::NOR)
-                    selectionStart->SetGate(Gate::NOR);
-                else
-                    selectionStart->SetGate(Gate::OR);
-            }
-            else
-            // Middle drag
-            {
-                // In clockwise order
-                GateSelection select = ClosestHoveredGateOption(cursor, selectionStart->GetPosition());
-                selectionStart->SetGate(GateSelection::gates[select.index]);
-            }
-
-            // Inputless nodes take output from the user and therefore are treated as mutable
-            if (!selectionStart->HasNoInputs())
-                gateDirty = true;
-            else
-                selectionStart->SetState(selectionStart->GetGate() == Gate::NOR);
-
-            selectionStart = nullptr;
-            selectionEnd = nullptr;
         }
 
         // Make sure no other locally stored nodes can possibly exist at the time, or set them to nullptr
@@ -1164,12 +1188,21 @@ int main()
             // Nodes
             graph.DrawNodes();
 
+            // Moving points
+            if (marqueeDragging)
+            {
+                Vector2 offset = cursor - marqueeStart;
+                for (Node* node : selection)
+                {
+                    DrawPixelV(node->GetPosition() + offset, MAGENTA);
+                }
+            }
+
             // Cursor
             if (hoveredNode)
                 DrawHighlightedGate(hoveredNode->GetPosition(), hoveredNode->GetGate());
             else
                 DrawRectanglePro({ cursor.x,cursor.y,5,5 }, { 2.5,2.5 }, 45, RAYWHITE);
-
 
             for (Node* selected : selection)
             {
