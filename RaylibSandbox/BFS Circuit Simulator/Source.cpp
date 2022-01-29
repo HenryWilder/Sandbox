@@ -217,41 +217,71 @@ void DrawGateIcon(Gate type, Vector2 center, float radius, Color color, bool dra
     case Gate::XOR:
     case Gate::OR:
     {
-        constexpr Vector2 offsets[3] = {
-            {  0.0000f, -1.1547f },
-            { -1.0000f,  0.5774f },
-            { +1.0000f,  0.5774f }
+        static const float b = sqrt(3.0f) / 3.0f;
+        static const float a = b * 2.0f;
+        static const Vector2 offsets[3] = {
+            {  0.0f, -a },
+            { -1.0f, +b },
+            { +1.0f, +b }
         };
+
+        // Compensate for line drawing outside of triangle instead of inside
+        if (type == Gate::XOR && drawXORline)
+            radius -= 1.0f;
+
         Vector2 points[3];
         for (size_t i = 0; i < 3; ++i)
         {
-            points[i] = center + offsets[i] * radius;
+            points[i] = center + (offsets[i] * radius);
         }
-        DrawTriangle(points[0], points[1], points[2], color);
 
         if (type == Gate::XOR && drawXORline)
         {
-            float outlineRadius = radius + 2.0f;
-            for (size_t i = 0; i < 3; ++i)
-            {
-                points[i] = center + offsets[i] * outlineRadius;
-            }
             DrawTriangleLines(points[0], points[1], points[2], color);
+            DrawGateIcon(Gate::OR, center, radius - 2.0f, color);
         }
+        else
+            DrawTriangle(points[0], points[1], points[2], color);
+
     }
         break;
 
     case Gate::NOR:
-        DrawCircleV(center, radius, color);
+        DrawCircleV(center, radius - 1, color);
         break;
 
     case Gate::AND:
     {
+        radius -= sqrt(2.0f);
         float diameter = radius * 2.0f;
         DrawRectangleV(center - Vector2{ radius, radius }, { diameter, diameter }, color);
     }
         break;
     }
+}
+
+void DrawHighlightedGate(Vector2 position, Gate type)
+{
+    constexpr float outerEdge = g_nodeRadius * 4.0f;
+    constexpr float innerEdge = g_nodeRadius * 3.0f;
+    constexpr Vector2 origin1 = { g_nodeRadius * 2.0f, g_nodeRadius * 2.0f };
+    constexpr Vector2 origin2 = { g_nodeRadius * 1.5f, g_nodeRadius * 1.5f };
+    Rectangle outerRec = {
+        position.x,
+        position.y,
+        outerEdge,
+        outerEdge
+    };
+    Rectangle innerRec = {
+        position.x,
+        position.y,
+        innerEdge,
+        innerEdge
+    };
+    DrawRectanglePro(outerRec, origin1, 45, WHITE);
+    DrawRectanglePro(innerRec, origin2, 45, BLACK);
+
+    DrawGateIcon(type, position, g_nodeRadius + 2.0f, GRAY);
 }
 
 struct Wire
@@ -545,6 +575,48 @@ struct Graph
     }
 };
 
+struct GateSelection
+{
+    static constexpr Gate gates[4] = {
+        Gate::OR,
+        Gate::AND,
+        Gate::NOR,
+        Gate::XOR,
+    };
+    static constexpr Vector2 sectors[_countof(gates)] =
+    {
+        Vector2{ 0, -1 },
+        Vector2{ +1, 0 },
+        Vector2{ 0, +1 },
+        Vector2{ -1, 0 },
+    };
+
+    size_t index;
+    bool b_toggle;
+};
+
+GateSelection ClosestHoveredGateOption(Vector2 cursor, Vector2 origin)
+{
+    if (Vector2Distance(cursor, origin) > 0.01f)
+    {
+        Vector2 direction = Vector2Normalize(cursor - origin);
+        float cloesetDot = -1;
+        size_t closestIndex = -1;
+        for (size_t i = 0; i < 4; ++i)
+        {
+            float dot = Vector2DotProduct(direction, Vector2Normalize(GateSelection::sectors[i]));
+            if (dot > cloesetDot)
+            {
+                cloesetDot = dot;
+                closestIndex = i;
+            }
+        }
+        if (cloesetDot >= 0.5f)
+            return { closestIndex, false };
+    }
+    return { 0, true };
+}
+
 int main()
 {
     int windowWidth = 1280;
@@ -735,6 +807,7 @@ int main()
         }
         if (IsMouseButtonReleased(MOUSE_MIDDLE_BUTTON) && selectionStart)
         {
+
             // Middle click
             if (cursor.x == selectionStart->GetPosition().x &&
                 cursor.y == selectionStart->GetPosition().y)
@@ -748,14 +821,8 @@ int main()
             // Middle drag
             {
                 // In clockwise order
-                if (cursor.y < selectionStart->GetPosition().y)
-                    selectionStart->SetGate(Gate::OR);
-                else if (cursor.x > selectionStart->GetPosition().x)
-                    selectionStart->SetGate(Gate::NOR);
-                else if (cursor.y > selectionStart->GetPosition().y)
-                    selectionStart->SetGate(Gate::AND);
-                else if (cursor.x < selectionStart->GetPosition().x)
-                    selectionStart->SetGate(Gate::XOR);
+                GateSelection select = ClosestHoveredGateOption(cursor, selectionStart->GetPosition());
+                selectionStart->SetGate(GateSelection::gates[select.index]);
             }
 
             // Inputless nodes take output from the user and therefore are treated as mutable
@@ -917,59 +984,29 @@ int main()
             graph.DrawNodes();
 
             if (hoveredNode)
-            {
-                DrawRectanglePro({ cursor.x,cursor.y, g_nodeRadius * 4.0f, g_nodeRadius * 4.0f }, { g_nodeRadius * 2.0f, g_nodeRadius * 2.0f }, 45, WHITE);
-                DrawRectanglePro({ cursor.x,cursor.y, g_nodeRadius * 3.0f, g_nodeRadius * 3.0f }, { g_nodeRadius * 1.5f, g_nodeRadius * 1.5f }, 45, BLACK);
-
-                DrawGateIcon(hoveredNode->GetGate(), hoveredNode->GetPosition(), g_nodeRadius + 2.0f, GRAY);
-            }
+                DrawHighlightedGate(hoveredNode->GetPosition(), hoveredNode->GetGate());
             else
-            {
                 DrawRectanglePro({ cursor.x,cursor.y,5,5 }, { 2.5,2.5 }, 45, RAYWHITE);
-            }
 
             if (drawGateOptions)
             {
                 if (selectionStart)
-                {
-                    DrawRectanglePro(
-                        { selectionStart->GetPosition().x, selectionStart->GetPosition().y, g_nodeRadius * 4.0f, g_nodeRadius * 4.0f },
-                        { g_nodeRadius * 2.0f, g_nodeRadius * 2.0f }, 45, WHITE);
-                    DrawRectanglePro(
-                        { selectionStart->GetPosition().x, selectionStart->GetPosition().y, g_nodeRadius * 3.0f, g_nodeRadius * 3.0f },
-                        { g_nodeRadius * 1.5f, g_nodeRadius * 1.5f }, 45, BLACK);
+                    DrawHighlightedGate(selectionStart->GetPosition(), selectionStart->GetGate());
 
-                    DrawGateIcon(selectionStart->GetGate(), selectionStart->GetPosition(), g_nodeRadius + 2.0f, GRAY);
-                }
-
-                constexpr Vector2 centers[4] = {
-                    Vector2{ 0.0f, g_nodeRadius * +7.0f },
-                    Vector2{ 0.0f, g_nodeRadius * -7.0f },
-                    Vector2{ g_nodeRadius * +7.0f, 0.0f },
-                    Vector2{ g_nodeRadius * -7.0f, 0.0f },
-                };
-                constexpr Gate gates[4] = {
-                    Gate::AND,
-                    Gate::OR,
-                    Gate::NOR,
-                    Gate::XOR,
-                };
-
-                Gate select = (Gate)0;
-                if (cursor.y < selectionStart->GetPosition().y)
-                    select = Gate::OR;
-                else if (cursor.x > selectionStart->GetPosition().x)
-                    select = Gate::NOR;
-                else if (cursor.y > selectionStart->GetPosition().y)
-                    select = Gate::AND;
-                else if (cursor.x < selectionStart->GetPosition().x)
-                    select = Gate::XOR;
+                GateSelection select = ClosestHoveredGateOption(cursor, selectionStart->GetPosition());
+                Gate pick;
+                if (select.b_toggle)
+                    pick = (selectionStart->GetGate() != Gate::NOR ? Gate::NOR : Gate::OR);
+                else
+                    pick = GateSelection::gates[select.index];
 
                 for (size_t i = 0; i < 4; ++i)
                 {
-                    DrawCircleV(selectionStart->GetPosition() + centers[i], g_nodeRadius * 3.0f + 2.0f, GRAY);
-                    DrawCircleV(selectionStart->GetPosition() + centers[i], g_nodeRadius * 3.0f, (select == gates[i] ? GRAY : Color{ 30, 30, 30, 255 }));
-                    DrawGateIcon(gates[i], selectionStart->GetPosition() + centers[i], g_nodeRadius * 1.5f, WHITE);
+                    constexpr float l = g_nodeRadius * 7.0f;
+                    Vector2 center = GateSelection::sectors[i] * l;
+                    DrawCircleV(selectionStart->GetPosition() + center, g_nodeRadius * 3.0f + 2.0f, GRAY);
+                    DrawCircleV(selectionStart->GetPosition() + center, g_nodeRadius * 3.0f, (pick == GateSelection::gates[i] ? GRAY : Color{ 30, 30, 30, 255 }));
+                    DrawGateIcon(GateSelection::gates[i], selectionStart->GetPosition() + center, g_nodeRadius * 1.5f, WHITE);
                 }
             }
 
