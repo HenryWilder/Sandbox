@@ -2,6 +2,7 @@
 #include <raymath.h>
 #include <vector>
 #include <fstream>
+#include <stack>
 
 #define sign(x) (((x) > (decltype(x))(0)) - ((x) < (decltype(x))(0)))
 
@@ -294,33 +295,40 @@ float Signf(float value)
 {
     return (value > 0.01f ? 1.0f : (value < -0.01f ? -1.0f : 0.0f));
 }
-void CompressWires(Node* start, float length)
+void CompressWire(Node* start, Node* end, float length)
 {
-    // TODO: put in stack!
+    Vector2 pos = end->GetPosition();
+    pos.x = start->GetPosition().x + length * Signf(pos.x - start->GetPosition().x);
+    pos.y = start->GetPosition().y + length * Signf(pos.y - start->GetPosition().y);
+    end->SetPosition(pos);
+}
+void CompressNetwork(Node* start, float length)
+{
+    std::vector<Node*> wave;
     start->SetVisited(true);
+
+
     for (Node* output : start->GetOutputs())
     {
         if (!output->GetVisited())
-        {
-            Vector2 pos = output->GetPosition();
-            pos.x = start->GetPosition().x + length * Signf(pos.x - start->GetPosition().x);
-            pos.y = start->GetPosition().y + length * Signf(pos.y - start->GetPosition().y);
-            output->SetPosition(pos);
-            CompressWires(output, length);
-        }
+            wave.push_back(output);
     }
     for (Node* input : start->GetInputs())
     {
         if (!input->GetVisited())
-        {
-            Vector2 pos = input->GetPosition();
-            pos.x = start->GetPosition().x + length * Signf(pos.x - start->GetPosition().x);
-            pos.y = start->GetPosition().y + length * Signf(pos.y - start->GetPosition().y);
-            input->SetPosition(pos);
-            CompressWires(input, length);
-        }
+            wave.push_back(input);
     }
 
+    for (Node* node : wave)
+    {
+        node->SetVisited(true);
+        CompressWire(start, node, length);
+    }
+    for (Node* node : wave)
+    {
+        CompressNetwork(node, length);
+    }
+    wave.clear();
 }
 
 struct Graph
@@ -901,7 +909,7 @@ int main()
             if (hoveredNode)
             {
                 graph.ResetVisited();
-                CompressWires(hoveredNode, g_gridUnit);
+                CompressNetwork(hoveredNode, g_gridUnit);
             }
             // Only the hovered wire (relative to its center)
             else if (hoveredWire.a)
