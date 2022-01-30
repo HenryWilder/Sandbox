@@ -93,12 +93,13 @@ private:
     bool b_state;
     mutable bool b_visited;
     bool b_hidden;
+    bool b_inComponent;
 
     std::vector<Node*> m_inputs;
     std::vector<Node*> m_outputs;
 
 public:
-    Node(Vector2 position, Gate type) : m_position(position), m_type(type), b_state(false), b_visited(false), b_hidden(false), m_inputs{}, m_outputs{} {}
+    Node(Vector2 position, Gate type) : m_position(position), m_type(type), b_state(false), b_visited(false), b_hidden(false), b_inComponent(false), m_inputs{}, m_outputs{} {}
 
     Vector2 GetPosition() const
     {
@@ -131,7 +132,7 @@ public:
     {
         return b_visited;
     }
-    void SetVisited(bool visited)
+    void SetVisited(bool visited) const
     {
         b_visited = visited;
     }
@@ -143,6 +144,15 @@ public:
     void SetHidden(bool hidden)
     {
         b_hidden = hidden;
+    }
+
+    bool GetInComponent() const
+    {
+        return b_inComponent;
+    }
+    void SetInComponent(bool inComponent)
+    {
+        b_inComponent = inComponent;
     }
 
     bool HasNoInputs() const
@@ -567,6 +577,12 @@ public:
         {
             m_nodes[i]->SetHidden(true);
         }
+
+        // Let them know who's the boss
+        for (Node* node : m_nodes)
+        {
+            node->SetInComponent(true);
+        }
     }
 
     size_t GetInputCount() const
@@ -596,7 +612,7 @@ public:
     }
     Vector2 GetPosition() const
     {
-        return { m_casingLeft.x, m_casingLeft.y };
+        return { m_casingLeft.x, m_casingLeft.y + g_gridUnit };
     }
     void SetPosition(Vector2 topLeft)
     {
@@ -1033,21 +1049,21 @@ struct Graph
         }
         return closest;
     }
-    void FindNodesInRectangle(std::vector<Node*>* output, Rectangle search) const
-    {
-        output->clear();
-        for (Node* node : nodes)
-        {
-            if (CheckCollisionPointRec(node->GetPosition(), search))
-                output->push_back(node);
-        }
-    }
+    //void FindNodesInRectangle(std::vector<Node*>* output, Rectangle search) const
+    //{
+    //    output->clear();
+    //    for (Node* node : nodes)
+    //    {
+    //        if (CheckCollisionPointRec(node->GetPosition(), search))
+    //            output->push_back(node);
+    //    }
+    //}
     void FindSelectablesInRectangle(std::vector<Selectable>* output, Rectangle search) const
     {
         output->clear();
         for (Node* node : nodes)
         {
-            if (CheckCollisionPointRec(node->GetPosition(), search))
+            if (!node->GetInComponent() && CheckCollisionPointRec(node->GetPosition(), search))
                 output->push_back(Selectable(node));
         }
         for (Component* comp : components)
@@ -1735,12 +1751,12 @@ int main()
                         const Rectangle& b = element.comp->GetCasingB();
 
                         Vector2 points[7] = {
-                            { a.x, a.y },
-                            { b.x + b.width, a.y },
-                            { b.x + b.width, b.y + b.height },
-                            { b.x, b.y + b.height },
-                            { b.x, a.y + a.height },
-                            { a.x, a.y + a.height },
+                            { a.x + offset.x,           a.y + offset.y            },
+                            { b.x + offset.x + b.width, a.y + offset.y            },
+                            { b.x + offset.x + b.width, b.y + offset.y + b.height },
+                            { b.x + offset.x,           b.y + offset.y + b.height },
+                            { b.x + offset.x,           a.y + offset.y + a.height },
+                            { a.x + offset.x,           a.y + offset.y + a.height },
                             points[0]
                         };
 
