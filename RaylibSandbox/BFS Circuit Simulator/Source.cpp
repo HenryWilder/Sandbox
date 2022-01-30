@@ -713,6 +713,7 @@ struct Graph
     void CloneComponentAtPosition(ComponentBlueprint* blueprint, Vector2 position)
     {
         Component* comp = new Component(blueprint);
+        components.push_back(comp);
         RegenerateSingleComponent(comp);
         comp->SetPosition(position);
     }
@@ -1378,7 +1379,7 @@ int main()
         }
 
         // Make sure no other locally stored nodes can possibly exist at the time, or set them to nullptr
-        if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON) && !selectionStart && !selectionEnd && !marqueeSelecting && selection.empty())
+        if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON) && !selectionStart && !selectionEnd && !marqueeSelecting)
         {
             if (hoveredNode)
             {
@@ -1422,12 +1423,25 @@ int main()
         if (IsKeyPressed(KEY_SPACE) && !selection.empty())
         {
             ComponentBlueprint* blueprint = new ComponentBlueprint(selection);
+            Vector2 minPoint = { INFINITY, INFINITY };
+            for (Node* node : selection)
+            {
+                if (node->GetPosition().x < minPoint.x)
+                    minPoint.x = node->GetPosition().x;
+
+                if (node->GetPosition().y < minPoint.y)
+                    minPoint.y = node->GetPosition().y;
+            }
+            graph.CloneComponentAtPosition(blueprint, minPoint);
+
             for (Node* node : selection)
             {
                 graph.RemoveNode(node);
                 delete node;
             }
-            graph.CloneComponentAtPosition(blueprint, cursor);
+            selection.clear();
+
+            graphDirty = true;
         }
 
 
