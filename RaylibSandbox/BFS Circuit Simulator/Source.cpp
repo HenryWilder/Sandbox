@@ -205,6 +205,10 @@ public:
     }
 
     // Warning: Affects input/output nodes
+    // Always use this before deleting the node
+    // It *can* be skipped when it is certain no references to this node can possibly exist
+    // Or if it is certain all inputs and outputs are also being deleted
+    // Forgetting to call this function when removing a node with references to it can lead to a crash!
     void ClearReferencesToSelf()
     {
         for (Node* input : m_inputs)
@@ -1058,47 +1062,37 @@ int main()
             }
         }
 
-        // Make sure no other locally stored nodes can possibly exist at the time, or set them to nullptr
-        if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON) && !selectionStart && !selectionEnd && !marqueeSelecting)
+        // Delete selected
+        if ((IsKeyPressed(KEY_DELETE) || IsKeyPressed(KEY_BACKSPACE)) && !selection.empty())
         {
-            // Delete selected
-            if (!selection.empty())
+            for (Node* node : selection)
             {
-                if (hoveredNode)
-                {
-                    for (Node* node : selection)
-                    {
-                        graph.RemoveNode(node);
-                        delete node;
-                    }
-                    selection.clear();
-                }
-                else
-                {
-                    marqueeStart = cursor;
-                    marqueeSelecting = true;
-                }
+                graph.RemoveNode(node);
+                delete node;
+            }
+            selection.clear();
+        }
+
+        // Make sure no other locally stored nodes can possibly exist at the time, or set them to nullptr
+        if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON) && !selectionStart && !selectionEnd && !marqueeSelecting && selection.empty())
+        {
+            if (hoveredNode)
+            {
+                graph.RemoveNode(hoveredNode);
+                delete hoveredNode;
+                hoveredNode = nullptr;
+                graphDirty = true;
+            }
+            else if (hoveredWire.a)
+            {
+                graph.DisconnectNodes(hoveredWire.a, hoveredWire.b);
+                hoveredWire = { nullptr, nullptr };
+                graphDirty = true;
             }
             else
             {
-                if (hoveredNode)
-                {
-                    graph.RemoveNode(hoveredNode);
-                    delete hoveredNode;
-                    hoveredNode = nullptr;
-                    graphDirty = true;
-                }
-                else if (hoveredWire.a)
-                {
-                    graph.DisconnectNodes(hoveredWire.a, hoveredWire.b);
-                    hoveredWire = { nullptr, nullptr };
-                    graphDirty = true;
-                }
-                else
-                {
-                    marqueeStart = cursor;
-                    marqueeSelecting = true;
-                }
+                marqueeStart = cursor;
+                marqueeSelecting = true;
             }
         }
         if (marqueeSelecting)
