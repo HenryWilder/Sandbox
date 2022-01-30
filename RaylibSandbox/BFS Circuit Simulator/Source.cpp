@@ -406,51 +406,94 @@ struct ComponentBlueprint
 
         struct Vert
         {
-            NodeBlueprint bp;
+            NodeBlueprint* bp;
             float y;
 
             bool operator<(const Vert& other) const
             {
                 return y < other.y;
             }
-            bool operator>(const Vert& other) const
-            {
-                return y > other.y;
-            }
         };
 
         // Inputs
         {
+            // Count
+            inputs = 0;
+            for (size_t i = 0; i < nodes.size(); ++i)
+            {
+                // No inputs
+                if (nodes[i].inputs.empty())
+                    ++inputs;
+            }
+
+            // Storage for vertical comparison
             std::vector<Vert> temp;
+            temp.reserve(inputs);
+
+            // Add components that are inputs
             for (size_t i = 0; i < nodes.size(); ++i)
             {
                 // No inputs
                 if (nodes[i].inputs.empty())
                 {
-                    temp.push_back(Vert{ NodeBlueprint{ nodes[i] }, source[i]->GetPosition().y });
+                    temp.push_back(Vert{ &nodes[i], source[i]->GetPosition().y });
                     visited[i] = true;
-                    ++inputs;
                 }
             }
+
+            // Sort vertically
             std::sort(temp.begin(), temp.end());
+
+            // Push blueprints to buffer
+            for (const Vert& vert : temp)
+            {
+                buff.push_back(*vert.bp);
+            }
         }
 
         // Outputs
-        for (size_t i = 0; i < nodes.size(); ++i)
         {
-            if (visited[i])
-                continue;
-
-            // No outputs
-            if (nodes[i].outputs.empty())
+            // Count
+            outputs = 0;
+            for (size_t i = 0; i < nodes.size(); ++i)
             {
-                buff.push_back(nodes[i]);
-                visited[i] = true;
-                ++outputs;
+                if (visited[i])
+                    continue;
+
+                // No inputs
+                if (nodes[i].outputs.empty())
+                    ++outputs;
+            }
+
+            // Storage for vertical comparison
+            std::vector<Vert> temp;
+            temp.reserve(outputs);
+
+            // Add components that are outputs
+            for (size_t i = 0; i < nodes.size(); ++i)
+            {
+                if (visited[i])
+                    continue;
+
+                // No inputs
+                if (nodes[i].outputs.empty())
+                {
+                    temp.push_back(Vert{ &nodes[i], source[i]->GetPosition().y });
+                    visited[i] = true;
+                }
+            }
+
+            // Sort vertically
+            std::sort(temp.begin(), temp.end());
+
+            // Push blueprints to buffer
+            for (const Vert& vert : temp)
+            {
+                buff.push_back(*vert.bp);
             }
         }
 
-        // Remaining
+        // Remaining (vertical sorting is not important)
         for (size_t i = 0; i < nodes.size(); ++i)
         {
             if (visited[i])
@@ -471,12 +514,14 @@ class Component
 {
 private:
     ComponentBlueprint* m_blueprint;
-    size_t inputs;
-    size_t outputs;
+    Rectangle m_casingLeft;
+    Rectangle m_casingRight;
+    size_t m_inputs;
+    size_t m_outputs;
     std::vector<Node*> m_nodes; // Sorted by blueprint
 
 public:
-    Component(ComponentBlueprint* blueprint) : m_blueprint(blueprint), inputs(blueprint->inputs), outputs(blueprint->outputs), m_nodes{} {}
+    Component(ComponentBlueprint* blueprint) : m_blueprint(blueprint), m_casingLeft{ 0,0,0,0 }, m_casingRight{ 0,0,0,0 }, m_inputs(blueprint->inputs), m_outputs(blueprint->outputs), m_nodes{} {}
 
     ComponentBlueprint* const GetBlueprint() const
     {
@@ -489,8 +534,8 @@ public:
     // Parameters are vectors of the nodes that need to be added/removed
     void Regenerate(std::vector<Node*>* add, std::vector<Node*>* remove)
     {
-        inputs = m_blueprint->inputs;
-        outputs = m_blueprint->outputs;
+        m_inputs = m_blueprint->inputs;
+        m_outputs = m_blueprint->outputs;
 
         int difference = m_blueprint->nodes.size() - m_nodes.size();
 
@@ -550,15 +595,49 @@ public:
 
     size_t GetInputCount() const
     {
-        return inputs;
+        return m_inputs;
     }
     size_t GetOutputCount() const
     {
-        return outputs;
+        return m_outputs;
     }
     size_t GetInternalCount() const
     {
-        return m_nodes.size() - (inputs + outputs);
+        return m_nodes.size() - (m_inputs + m_outputs);
+    }
+
+    Rectangle GetCasingA() const
+    {
+        return m_casingLeft;
+    }
+    Rectangle GetCasingB() const
+    {
+        return m_casingRight;
+    }
+    void SetPosition(Vector2 topLeft)
+    {
+        constexpr float halfWidth = 2 * g_gridUnit;
+
+        m_casingLeft.x = topLeft.x;
+        m_casingLeft.y = topLeft.y;
+        m_casingLeft.width = halfWidth;
+        m_casingLeft.height = g_gridUnit * m_inputs;
+
+        m_casingRight.x = topLeft.x + halfWidth;
+        m_casingRight.y = topLeft.y;
+        m_casingRight.width = halfWidth;
+        m_casingRight.height = g_gridUnit * m_outputs;
+
+        float x = topLeft.x;
+        for (size_t i = 0; i < m_inputs; ++i)
+        {
+            m_nodes[i]->SetPosition({ x, topLeft.y + halfWidth * i });
+        }
+        x += halfWidth * 2;
+        for (size_t i = 0; i < m_outputs; ++i)
+        {
+            m_nodes[i + m_inputs]->SetPosition({ x, topLeft.y + halfWidth * i });
+        }
     }
 };
 
@@ -569,7 +648,6 @@ struct Graph
     bool gateDirty = false;
     // Sort using CalculateRoute() every time a node is added or removed
     std::vector<Node*> nodes;
-    std::vector<ComponentBlueprint*> blueprints;
     std::vector<Component*> components;
 
     void ResetVisited()
@@ -630,6 +708,13 @@ struct Graph
     void RegenerateAllComponents()
     {
         RegenerateComponents(components);
+    }
+
+    void CloneComponentAtPosition(ComponentBlueprint* blueprint, Vector2 position)
+    {
+        Component* comp = new Component(blueprint);
+        RegenerateSingleComponent(comp);
+        comp->SetPosition(position);
     }
 
     // Uses modified BFS
@@ -750,10 +835,10 @@ struct Graph
     // Runs every frame
     void DrawComponents()
     {
-        // Todo
         for (Component* comp : components)
         {
-            // DrawRectangleRec(comp);
+            DrawRectangleRec(comp->GetCasingA(), GRAY);
+            DrawRectangleRec(comp->GetCasingB(), GRAY);
         }
     }
     void DrawWires()
@@ -1337,9 +1422,12 @@ int main()
         if (IsKeyPressed(KEY_SPACE) && !selection.empty())
         {
             ComponentBlueprint* blueprint = new ComponentBlueprint(selection);
-            
-            Component* component = new Component(blueprint);
-            component->Regenerate();
+            for (Node* node : selection)
+            {
+                graph.RemoveNode(node);
+                delete node;
+            }
+            graph.CloneComponentAtPosition(blueprint, cursor);
         }
 
 
@@ -1473,6 +1561,8 @@ int main()
                 DrawLineV({ cursor.x, 0 }, { cursor.x, (float)windowHeight }, color);
                 DrawLineV({ 0, cursor.y }, { (float)windowWidth,  cursor.y }, color);
             }
+
+            graph.DrawComponents();
 
             // Wires
             graph.DrawWires();
