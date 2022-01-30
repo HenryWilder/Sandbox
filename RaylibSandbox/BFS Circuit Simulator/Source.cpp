@@ -349,22 +349,88 @@ void CompressNetwork(Node* start, float length)
 struct NodeBlueprint
 {
     Gate gate;
-    std::vector<size_t> inputs;
     std::vector<size_t> outputs;
 };
 
 struct ComponentBlueprint
 {
+    struct NodeBP_Helper
+    {
+        Gate gate = Gate::OR;
+        Vector2 position = Vector2Zero();
+        bool noInputs = false;
+        bool noOutputs = false;
+        std::vector<NodeBP_Helper*> outputs;
+
+        bool operator<(const NodeBP_Helper& other) const
+        {
+            if (noInputs != other.noInputs)
+            {
+                return noInputs && !other.noInputs;
+            }
+            else if (noOutputs != other.noOutputs)
+            {
+                return noOutputs && !other.noOutputs;
+            }
+            else
+            {
+                if (position.y == other.position.y)
+                    return position.x < other.position.x;
+                else
+                    return position.y < other.position.y;
+            }
+        }
+    };
+
     ComponentBlueprint(std::vector<Node*>& source)
     {
-        // Write the number of nodes
-        nodes.reserve(source.size());
+        std::vector<NodeBP_Helper*> helpers;
+        helpers.reserve(source.size());
+
+        inputs = 0;
+        outputs = 0;
 
         // Write node data
         for (Node* src : source)
         {
             src->SetVisited(false);
-            nodes.push_back(NodeBlueprint{ src->GetGate() });
+            helpers.push_back(new NodeBP_Helper{ src->GetGate(), src->GetPosition() });
+
+            if (src->HasNoInputs())
+            {
+                helpers.back()->noInputs = true;
+                ++inputs;
+            }
+            else
+            {
+                for (Node* input : src->GetInputs())
+                {
+                    if (std::find(src->GetInputs().begin(), src->GetInputs().end(), input) == src->GetInputs().end())
+                    {
+                        helpers.back()->noInputs = true;
+                        ++inputs;
+                        break;
+                    }
+                }
+            }
+
+            if (src->HasNoOutputs())
+            {
+                helpers.back()->noOutputs = true;
+                ++outputs;
+            }
+            else
+            {
+                for (Node* input : src->GetOutputs())
+                {
+                    if (std::find(src->GetOutputs().begin(), src->GetOutputs().end(), input) == src->GetOutputs().end())
+                    {
+                        helpers.back()->noOutputs = true;
+                        ++outputs;
+                        break;
+                    }
+                }
+            }
         }
 
         // Write wire data as relative indices
@@ -380,7 +446,7 @@ struct ComponentBlueprint
             for (Node* end : start->GetOutputs())
             {
                 if (end->GetVisited())
-                    break;
+                    continue;
 
                 // Find the index of the end node
                 auto it = std::find(source.begin(), source.end(), end);
@@ -389,120 +455,31 @@ struct ComponentBlueprint
                 if (it != source.end())
                 {
                     size_t b = it - source.begin();
-                    nodes[a].outputs.push_back(b);
-                    nodes[b].inputs.push_back(a);
+                    helpers[a]->outputs.push_back(helpers[b]);
                 }
             }
         }
 
-        //
         // Sort
-        //
+        std::sort(helpers.begin(), helpers.end());
+        nodes.reserve(source.size());
 
-
-        std::vector<NodeBlueprint> buff;
-        buff.reserve(nodes.size());
-        std::vector<bool> visited(nodes.size(), false);
-
-        struct Vert
+        for (NodeBP_Helper* help : helpers)
         {
-            NodeBlueprint* bp;
-            float y;
-
-            bool operator<(const Vert& other) const
+            nodes.push_back(NodeBlueprint{ help->gate });
+            nodes.back().outputs.reserve(help->outputs.size());
+            for (NodeBP_Helper* next : help->outputs)
             {
-                return y < other.y;
-            }
-        };
-
-        // Inputs
-        {
-            // Count
-            inputs = 0;
-            for (size_t i = 0; i < nodes.size(); ++i)
-            {
-                // No inputs
-                if (nodes[i].inputs.empty())
-                    ++inputs;
-            }
-
-            // Storage for vertical comparison
-            std::vector<Vert> temp;
-            temp.reserve(inputs);
-
-            // Add components that are inputs
-            for (size_t i = 0; i < nodes.size(); ++i)
-            {
-                // No inputs
-                if (nodes[i].inputs.empty())
-                {
-                    temp.push_back(Vert{ &nodes[i], source[i]->GetPosition().y });
-                    visited[i] = true;
-                }
-            }
-
-            // Sort vertically
-            std::sort(temp.begin(), temp.end());
-
-            // Push blueprints to buffer
-            for (const Vert& vert : temp)
-            {
-                buff.push_back(*vert.bp);
+                auto it = std::find(helpers.begin(), helpers.end(), next);
+                size_t outputIndex = it - helpers.begin();
+                nodes.back().outputs.push_back(outputIndex);
             }
         }
 
-        // Outputs
+        for (NodeBP_Helper* help : helpers)
         {
-            // Count
-            outputs = 0;
-            for (size_t i = 0; i < nodes.size(); ++i)
-            {
-                if (visited[i])
-                    continue;
-
-                // No inputs
-                if (nodes[i].outputs.empty())
-                    ++outputs;
-            }
-
-            // Storage for vertical comparison
-            std::vector<Vert> temp;
-            temp.reserve(outputs);
-
-            // Add components that are outputs
-            for (size_t i = 0; i < nodes.size(); ++i)
-            {
-                if (visited[i])
-                    continue;
-
-                // No inputs
-                if (nodes[i].outputs.empty())
-                {
-                    temp.push_back(Vert{ &nodes[i], source[i]->GetPosition().y });
-                    visited[i] = true;
-                }
-            }
-
-            // Sort vertically
-            std::sort(temp.begin(), temp.end());
-
-            // Push blueprints to buffer
-            for (const Vert& vert : temp)
-            {
-                buff.push_back(*vert.bp);
-            }
+            delete help;
         }
-
-        // Remaining (vertical sorting is not important)
-        for (size_t i = 0; i < nodes.size(); ++i)
-        {
-            if (visited[i])
-                continue;
-
-            buff.push_back(nodes[i]);
-        }
-
-        nodes.swap(buff);
     }
 
     size_t inputs;
@@ -578,6 +555,17 @@ public:
             }
         }
 
+        // Add connections
+        // Adding/removing nodes requires permission from the Graph structure, but wires only require the nodes.
+        for (size_t i = 0; i < m_nodes.size(); ++i)
+        {
+            for (size_t outputIndex : m_blueprint->nodes[i].outputs)
+            {
+                m_nodes[i]->AddOutput(m_nodes[outputIndex]);
+                m_nodes[outputIndex]->AddInput(m_nodes[i]);
+            }
+        }
+
         // Hide internals
         for (size_t i = 0; i < m_inputs + m_outputs; ++i)
         {
@@ -586,20 +574,6 @@ public:
         for (size_t i = m_inputs + m_outputs; i < m_nodes.size(); ++i)
         {
             m_nodes[i]->SetHidden(true);
-        }
-
-        // Add connections
-        // Adding/removing nodes requires permission from the Graph structure, but wires only require the nodes.
-        for (size_t i = 0; i < m_nodes.size(); ++i)
-        {
-            for (size_t input : m_blueprint->nodes[i].inputs)
-            {
-                m_nodes[i]->AddInput(m_nodes[input]);
-            }
-            for (size_t output : m_blueprint->nodes[i].outputs)
-            {
-                m_nodes[i]->AddOutput(m_nodes[output]);
-            }
         }
     }
 
@@ -615,6 +589,10 @@ public:
     {
         return m_nodes.size() - (m_inputs + m_outputs);
     }
+    size_t GetNodeCount() const
+    {
+        return m_nodes.size();
+    }
 
     Rectangle GetCasingA() const
     {
@@ -623,6 +601,10 @@ public:
     Rectangle GetCasingB() const
     {
         return m_casingRight;
+    }
+    Vector2 GetPosition() const
+    {
+        return { m_casingLeft.x, m_casingLeft.y };
     }
     void SetPosition(Vector2 topLeft)
     {
@@ -860,13 +842,13 @@ struct Graph
         // Draw the wires first so the nodes can be drawn on top
         for (Node* node : nodes)
         {
-            //if (node->GetHidden())
-            //    continue;
+            if (node->GetHidden())
+                continue;
 
             for (Node* next : node->GetOutputs())
             {
-                //if (node->GetHidden())
-                //    continue;
+                if (node->GetHidden())
+                    continue;
 
                 Color color = node->GetState() ? DARKBLUE : DARKGRAY;
                 DrawLineV(node->GetPosition(), next->GetPosition(), color);
@@ -883,8 +865,8 @@ struct Graph
         // Node drawing is separate so that cyclic graphs can still draw nodes on top
         for (Node* node : nodes)
         {
-            //if (node->GetHidden())
-            //    continue;
+            if (node->GetHidden())
+                continue;
 
             DrawGateIcon(node->GetGate(), node->GetPosition(), g_nodeRadius, (node->GetState() ? BLUE : GRAY));
 
@@ -967,6 +949,9 @@ struct Graph
         Node* closest = nullptr;
         for (Node* node : nodes)
         {
+            if (node->GetHidden())
+                continue;
+
             float distance = Vector2Distance(position, node->GetPosition());
             if (distance < shortestDistance)
             {
@@ -987,10 +972,16 @@ struct Graph
             if (start->GetVisited())
                 continue;
 
+            if (start->GetHidden())
+                continue;
+
             for (Node* end : start->GetOutputs())
             {
                 if (end->GetVisited())
                     break;
+
+                if (end->GetHidden())
+                    continue;
 
                 float distance = Vector2DistanceToLine(start->GetPosition(), end->GetPosition(), position);
                 if (distance < shortestDistance)
@@ -1648,7 +1639,15 @@ int main()
                 }
             }
 
-            DrawText(TextFormat("Nodes: %i", graph.nodes.size()), 0,0,8,WHITE);
+            DrawText(TextFormat("Total nodes: %i", graph.nodes.size()), 0, 0, 8, RAYWHITE);
+
+            if (hoveredNode)
+                DrawText(TextFormat("Node: %i", std::find(graph.nodes.begin(), graph.nodes.end(), hoveredNode) - graph.nodes.begin()), 0, 9, 8, RAYWHITE);
+
+            if (hoveredWire.a)
+                DrawText(TextFormat("Wire: %i->%i",
+                    std::find(graph.nodes.begin(), graph.nodes.end(), hoveredWire.a) - graph.nodes.begin(),
+                    std::find(graph.nodes.begin(), graph.nodes.end(), hoveredWire.b) - graph.nodes.begin()), 0, 9, 8, RAYWHITE);
 
         } EndDrawing();
     }
