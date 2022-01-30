@@ -3,6 +3,7 @@
 #include <vector>
 #include <fstream>
 #include <stack>
+#include <algorithm>
 
 #define sign(x) (((x) > (decltype(x))(0)) - ((x) < (decltype(x))(0)))
 
@@ -394,21 +395,44 @@ struct ComponentBlueprint
             }
         }
 
+        //
         // Sort
+        //
+
+
         std::vector<NodeBlueprint> buff;
         buff.reserve(nodes.size());
         std::vector<bool> visited(nodes.size(), false);
 
-        // Inputs
-        for (size_t i = 0; i < nodes.size(); ++i)
+        struct Vert
         {
-            // No inputs
-            if (nodes[i].inputs.empty())
+            NodeBlueprint bp;
+            float y;
+
+            bool operator<(const Vert& other) const
             {
-                buff.push_back(nodes[i]);
-                visited[i] = true;
-                ++inputs;
+                return y < other.y;
             }
+            bool operator>(const Vert& other) const
+            {
+                return y > other.y;
+            }
+        };
+
+        // Inputs
+        {
+            std::vector<Vert> temp;
+            for (size_t i = 0; i < nodes.size(); ++i)
+            {
+                // No inputs
+                if (nodes[i].inputs.empty())
+                {
+                    temp.push_back(Vert{ NodeBlueprint{ nodes[i] }, source[i]->GetPosition().y });
+                    visited[i] = true;
+                    ++inputs;
+                }
+            }
+            std::sort(temp.begin(), temp.end());
         }
 
         // Outputs
@@ -465,6 +489,9 @@ public:
     // Parameters are vectors of the nodes that need to be added/removed
     void Regenerate(std::vector<Node*>* add, std::vector<Node*>* remove)
     {
+        inputs = m_blueprint->inputs;
+        outputs = m_blueprint->outputs;
+
         int difference = m_blueprint->nodes.size() - m_nodes.size();
 
         // Nodes that need to be removed
@@ -485,6 +512,7 @@ public:
         for (size_t i = 0; i < m_nodes.size(); ++i)
         {
             m_nodes[i]->SetGate(m_blueprint->nodes[i].gate);
+            m_nodes[i]->ClearReferencesToSelf(); // Make this node effectively a new one
         }
         // Create
         for (size_t i = m_nodes.size(); i < m_blueprint->nodes.size(); ++i)
@@ -506,6 +534,7 @@ public:
         }
 
         // Add connections
+        // Adding/removing nodes requires permission from the Graph structure, but wires only require the nodes.
         for (size_t i = 0; i < m_nodes.size(); ++i)
         {
             for (size_t input : m_blueprint->nodes[i].inputs)
@@ -559,33 +588,48 @@ struct Graph
     }
 
     // For components
-    void Regenerate(Component* comp)
+    void RegenerateSingleComponent(Component* component)
     {
-        ComponentBlueprint* blueprint = comp->GetBlueprint();
-        for (Node* node : comp->m_nodes)
+        std::vector<Node*> add;
+        std::vector<Node*> remove;
+
+        component->Regenerate(&add, &remove);
+
+        for (Node* node : add)
+        {
+            AddNode(node);
+        }
+
+        for (Node* node : remove)
         {
             RemoveNode(node);
             delete node;
         }
-        comp->ClearNodes();
-        comp->m_nodes.reserve(blueprint->nodes.size());
-        for (NodeBlueprint base : blueprint->nodes)
+    }
+    void RegenerateComponents(std::vector<Component*>& components)
+    {
+        std::vector<Node*> add;
+        std::vector<Node*> remove;
+
+        for (Component* comp : components)
         {
-            Node* node = new Node(Vector2Zero(), base.gate);
-            node->SetHidden(true);
-            comp->m_nodes.push_back(node);
+            comp->Regenerate(&add, &remove);
         }
-        for (size_t i = 0; i < comp->m_nodes.size(); ++i)
+
+        for (Node* node : add)
         {
-            for (size_t input : blueprint->nodes[i].inputs)
-            {
-                comp->m_nodes[i]->AddInput(comp->m_nodes[input]);
-            }
-            for (size_t output : blueprint->nodes[i].outputs)
-            {
-                comp->m_nodes[i]->AddOutput(comp->m_nodes[output]);
-            }
+            AddNode(node);
         }
+
+        for (Node* node : remove)
+        {
+            RemoveNode(node);
+            delete node;
+        }
+    }
+    void RegenerateAllComponents()
+    {
+        RegenerateComponents(components);
     }
 
     // Uses modified BFS
