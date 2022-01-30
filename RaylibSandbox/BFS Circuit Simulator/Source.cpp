@@ -91,7 +91,7 @@ private:
     Vector2 m_position;
     Gate m_type;
     bool b_state;
-    bool b_visited;
+    mutable bool b_visited;
     bool b_hidden;
 
     std::vector<Node*> m_inputs;
@@ -506,7 +506,7 @@ public:
         m_inputs = m_blueprint->inputs;
         m_outputs = m_blueprint->outputs;
 
-        int difference = m_blueprint->nodes.size() - m_nodes.size();
+        long difference = (long)m_blueprint->nodes.size() - (long)m_nodes.size();
 
         // Nodes that need to be removed
         if (difference < 0)
@@ -626,7 +626,42 @@ public:
             y += g_gridUnit;
         }
     }
+    
+    const std::vector<Node*>& GetNodes() const
+    {
+        return m_nodes;
+    }
 };
+
+struct Selectable
+{
+    Selectable(Node* node) : type(Type::NODE), node(node) {}
+    Selectable(Component* comp) : type(Type::COMP), comp(comp) {}
+
+    enum class Type
+    {
+        NODE,
+        COMP,
+    } type;
+
+    union
+    {
+        Node* node;
+        Component* comp;
+    };
+
+    bool operator==(const Selectable& other) const
+    {
+        if (other.type != type)
+            return false;
+
+        if (type == Type::COMP)
+            return other.comp == comp;
+        else
+            return other.node == node;
+    }
+};
+
 
 struct Graph
 {
@@ -637,7 +672,7 @@ struct Graph
     std::vector<Node*> nodes;
     std::vector<Component*> components;
 
-    void ResetVisited()
+    void ResetVisited() const
     {
         for (Node* node : nodes)
         {
@@ -821,7 +856,7 @@ struct Graph
     }
 
     // Runs every frame
-    void DrawComponents()
+    void DrawComponents() const
     {
         for (Component* comp : components)
         {
@@ -829,7 +864,7 @@ struct Graph
             DrawRectangleRec(comp->GetCasingB(), DARKGRAY);
         }
     }
-    void DrawWires()
+    void DrawWires() const
     {
         // Draw the wires first so the nodes can be drawn on top
         for (Node* node : nodes)
@@ -852,7 +887,7 @@ struct Graph
             }
         }
     }
-    void DrawNodes()
+    void DrawNodes() const
     {
         // Node drawing is separate so that cyclic graphs can still draw nodes on top
         for (Node* node : nodes)
@@ -930,12 +965,26 @@ struct Graph
         {
             node->ClearReferencesToSelf();
             nodes.erase(it);
+        }
+    }
+    void RemoveComponent(Component* comp)
+    {
+        if (!comp)
+            return;
 
-            CalculateRoute();
+        auto it = std::find(components.begin(), components.end(), comp);
+        if (it != components.end())
+        {
+            for (Node* node : comp->GetNodes())
+            {
+                RemoveNode(node);
+                delete node;
+            }
+            components.erase(it);
         }
     }
 
-    Node* FindNodeAtPosition(Vector2 position, float radius)
+    Node* FindNodeAtPosition(Vector2 position, float radius) const
     {
         float shortestDistance = radius;
         Node* closest = nullptr;
@@ -953,8 +1002,7 @@ struct Graph
         }
         return closest;
     }
-
-    Wire FindWireIntersectingPosition(Vector2 position, float radius)
+    Wire FindWireIntersectingPosition(Vector2 position, float radius) const
     {
         float shortestDistance = radius;
         Wire closest = { nullptr, nullptr };
@@ -985,14 +1033,35 @@ struct Graph
         }
         return closest;
     }
-
-    void FindNodesInRectangle(std::vector<Node*>* output, Rectangle search)
+    void FindNodesInRectangle(std::vector<Node*>* output, Rectangle search) const
     {
         output->clear();
         for (Node* node : nodes)
         {
             if (CheckCollisionPointRec(node->GetPosition(), search))
                 output->push_back(node);
+        }
+    }
+    void FindSelectablesInRectangle(std::vector<Selectable>* output, Rectangle search) const
+    {
+        output->clear();
+        for (Node* node : nodes)
+        {
+            if (CheckCollisionPointRec(node->GetPosition(), search))
+                output->push_back(Selectable(node));
+        }
+        for (Component* comp : components)
+        {
+            if (CheckCollisionRecs(search, comp->GetCasingA()) || CheckCollisionRecs(search, comp->GetCasingB()))
+                output->push_back(Selectable(comp));
+        }
+    }
+    Component* FindComponentAtPosition(Vector2 position) const
+    {
+        for (Component* comp : components)
+        {
+            if (CheckCollisionPointRec(position, comp->GetCasingA()) || CheckCollisionPointRec(position, comp->GetCasingB()))
+                return comp;
         }
     }
 };
@@ -1157,7 +1226,7 @@ int main()
     bool marqueeDragging = false;
     Vector2 marqueeStart = Vector2Zero();
     Rectangle selectionRec;
-    std::vector<Node*> selection;
+    std::vector<Selectable> selection;
 
     while (!WindowShouldClose())
     {
@@ -1221,24 +1290,32 @@ int main()
                     // Copy
                     if (IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT))
                     {
-                        std::vector<Node*> copies;
+                        std::vector<Selectable> copies;
 
                         copies.reserve(selection.size());
-                        for (Node* src : selection)
+                        for (Selectable src : selection)
                         {
-                            copies.push_back(new Node(src->GetPosition() + offset, src->GetGate()));
-                            graph.AddNode(copies.back());
+                            if (src.type == Selectable::Type::COMP)
+                            {
+                                graph.CloneComponentAtPosition(src.comp->GetBlueprint(), src.comp->GetPosition());
+                            }
+                            else
+                            {
+                                Selectable copy = Selectable(new Node(src.node->GetPosition() + offset, src.node->GetGate()));
+                                copies.push_back(copy);
+                                graph.AddNode(copies.back().node);
+                            }
                         }
 
                         graph.ResetVisited();
-                        for (Node* start : selection)
+                        for (Selectable start : selection)
                         {
-                            if (start->GetVisited())
+                            if (start.node->GetVisited())
                                 continue;
 
                             size_t a = std::find(selection.begin(), selection.end(), start) - selection.begin();
 
-                            for (Node* end : start->GetOutputs())
+                            for (Node* end : start.node->GetOutputs())
                             {
                                 if (end->GetVisited())
                                     break;
@@ -1248,7 +1325,7 @@ int main()
                                 if (it != selection.end())
                                 {
                                     size_t b = it - selection.begin();
-                                    graph.ConnectNodes(copies[a], copies[b]);
+                                    graph.ConnectNodes(copies[a].node, copies[b].node);
                                 }
                             }
                         }
@@ -1256,9 +1333,16 @@ int main()
                     // Move
                     else
                     {
-                        for (Node* node : selection)
+                        for (Selectable element : selection)
                         {
-                            node->SetPosition(node->GetPosition() + offset);
+                            switch (element.type)
+                            {
+                            case Selectable::Type::NODE:
+                                element.node->SetPosition(element.node->GetPosition() + offset);
+                                break;
+                            case Selectable::Type::COMP:
+                                element.comp->SetPosition(element.comp->GetPosition() + offset);
+                            }
                         }
                     }
                 }
@@ -1366,10 +1450,18 @@ int main()
         // Delete selected
         if ((IsKeyPressed(KEY_DELETE) || IsKeyPressed(KEY_BACKSPACE)) && !selection.empty())
         {
-            for (Node* node : selection)
+            for (Selectable element : selection)
             {
-                graph.RemoveNode(node);
-                delete node;
+                if (element.type == Selectable::Type::COMP)
+                {
+                    graph.RemoveComponent(element.comp);
+                    delete element.comp;
+                }
+                else
+                {
+                    graph.RemoveNode(element.node);
+                    delete element.node;
+                }
             }
             selection.clear();
         }
@@ -1408,7 +1500,7 @@ int main()
                     std::max(marqueeStart.x, cursor.x) - a.x,
                     std::max(marqueeStart.y, cursor.y) - a.y,
             };
-            graph.FindNodesInRectangle(&selection, selectionRec);
+            graph.FindSelectablesInRectangle(&selection, selectionRec);
 
             // Finalize
             if (IsMouseButtonReleased(MOUSE_RIGHT_BUTTON))
@@ -1418,22 +1510,63 @@ int main()
         // Package up components
         if (IsKeyPressed(KEY_SPACE) && selection.size() > 1)
         {
-            ComponentBlueprint* blueprint = new ComponentBlueprint(selection);
-            Vector2 minPoint = { INFINITY, INFINITY };
-            for (Node* node : selection)
+            size_t nodeCount = selection.size();
+            for (Selectable element : selection)
             {
-                if (node->GetPosition().x < minPoint.x)
-                    minPoint.x = node->GetPosition().x;
+                if (element.type == Selectable::Type::COMP)
+                {
+                    nodeCount += element.comp->GetNodeCount() - 1;
+                }
+            }
+            std::vector<Node*> breakdown;
+            breakdown.reserve(nodeCount);
+            for (Selectable element : selection)
+            {
+                if (element.type == Selectable::Type::COMP)
+                {
+                    for (Node* node : element.comp->GetNodes())
+                    {
+                        breakdown.push_back(node);
+                    }
+                }
+                else
+                {
+                    breakdown.push_back(element.node);
+                }
+            }
 
-                if (node->GetPosition().y < minPoint.y)
-                    minPoint.y = node->GetPosition().y;
+            ComponentBlueprint* blueprint = new ComponentBlueprint(breakdown);
+
+            Vector2 minPoint = { INFINITY, INFINITY };
+            for (Selectable element : selection)
+            {
+                Vector2 pos;
+
+                if (element.type == Selectable::Type::COMP)
+                    pos = element.comp->GetPosition();
+                else
+                    pos = element.node->GetPosition();
+
+                if (pos.x < minPoint.x)
+                    minPoint.x = pos.x;
+
+                if (pos.y < minPoint.y)
+                    minPoint.y = pos.y;
             }
             graph.CloneComponentAtPosition(blueprint, minPoint);
 
-            for (Node* node : selection)
+            for (Selectable element : selection)
             {
-                graph.RemoveNode(node);
-                delete node;
+                if (element.type == Selectable::Type::COMP)
+                {
+                    graph.RemoveComponent(element.comp);
+                    delete element.comp;
+                }
+                else
+                {
+                    graph.RemoveNode(element.node);
+                    delete element.node;
+                }
             }
             selection.clear();
 
@@ -1478,7 +1611,7 @@ int main()
             if (marqueeSelecting)
             {
                 DrawRectangleRec(selectionRec, ColorAlpha(GRAY, 0.125));
-                DrawRectangleLines(selectionRec.x, selectionRec.y, selectionRec.width, selectionRec.height, GRAY);
+                DrawRectangleLines((int)lroundf(selectionRec.x), (int)lroundf(selectionRec.y), (int)lroundf(selectionRec.width), (int)lroundf(selectionRec.height), GRAY);
             }
 
 
@@ -1553,7 +1686,7 @@ int main()
                 // Cursor grid
                 for (int y = -gridRadius; y <= gridRadius; ++y)
                 {
-                    int halfWidth = lroundf(sqrtf(gridRadius * gridRadius - y * y));
+                    int halfWidth = (int)lroundf(sqrtf((float)(gridRadius * gridRadius - y * y)));
                     for (int x = -halfWidth; x <= halfWidth; ++x)
                     {
                         Vector2 offset;
@@ -1587,16 +1720,60 @@ int main()
             if (marqueeDragging)
             {
                 Vector2 offset = cursor - marqueeStart;
-                for (Node* node : selection)
+                for (Selectable element : selection)
                 {
-                    DrawCircleV(node->GetPosition() + offset, 2.0f, MAGENTA);
+                    if (element.type == Selectable::Type::COMP)
+                    {
+                        /*
+                        * 0---1
+                        * | 3-2
+                        * 5-4
+                        * 
+                        * 0 is repeated for 6
+                        */
+                        const Rectangle& a = element.comp->GetCasingA();
+                        const Rectangle& b = element.comp->GetCasingB();
+
+                        Vector2 points[7] = {
+                            { a.x, a.y },
+                            { b.x + b.width, a.y },
+                            { b.x + b.width, b.y + b.height },
+                            { b.x, b.y + b.height },
+                            { b.x, a.y + a.height },
+                            { a.x, a.y + a.height },
+                            points[0]
+                        };
+
+                        DrawLineStrip(points, 7, MAGENTA);
+                    }
+                    else
+                        DrawCircleV(element.node->GetPosition() + offset, 2.0f, MAGENTA);
                 }
             }
 
             // Selection
-            for (Node* selected : selection)
+            for (Selectable element : selection)
             {
-                DrawGateIcon(selected->GetGate(), selected->GetPosition(), g_nodeRadius + 2.0f, WHITE); // todo
+                if (element.type == Selectable::Type::COMP)
+                {
+                    Rectangle rec;
+
+                    rec = element.comp->GetCasingA();
+                    rec.x -= 2.0f;
+                    rec.y -= 2.0f;
+                    rec.width += 4.0f;
+                    rec.height += 4.0f;
+                    DrawRectangleRec(rec, WHITE);
+
+                    rec = element.comp->GetCasingB();
+                    rec.x -= 2.0f;
+                    rec.y -= 2.0f;
+                    rec.width += 4.0f;
+                    rec.height += 4.0f;
+                    DrawRectangleRec(rec, WHITE);
+                }
+                else
+                    DrawGateIcon(element.node->GetGate(), element.node->GetPosition(), g_nodeRadius + 2.0f, WHITE);
             }
 
             // Nodes
