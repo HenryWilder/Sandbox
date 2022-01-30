@@ -1313,7 +1313,7 @@ int main()
                         {
                             if (src.type == Selectable::Type::COMP)
                             {
-                                graph.CloneComponentAtPosition(src.comp->GetBlueprint(), src.comp->GetPosition());
+                                graph.CloneComponentAtPosition(src.comp->GetBlueprint(), src.comp->GetPosition() + offset);
                             }
                             else
                             {
@@ -1443,8 +1443,8 @@ int main()
                         else
                             selectionStart->SetGate(Gate::OR);
                     }
+                    // Middle drag
                     else
-                        // Middle drag
                     {
                         // In clockwise order
                         GateSelection select = ClosestHoveredGateOption(cursor, selectionStart->GetPosition());
