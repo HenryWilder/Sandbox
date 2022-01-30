@@ -764,12 +764,13 @@ void Save(Graph* graph)
         if (start->GetVisited())
             continue;
 
+        size_t a = std::find(graph->nodes.begin(), graph->nodes.end(), start) - graph->nodes.begin();
+
         for (Node* end : start->GetOutputs())
         {
             if (end->GetVisited())
                 break;
 
-            size_t a = std::find(graph->nodes.begin(), graph->nodes.end(), start) - graph->nodes.begin();
             size_t b = std::find(graph->nodes.begin(), graph->nodes.end(), end) - graph->nodes.begin();
 
             file << a << ' ' << b << '\n';
@@ -883,20 +884,43 @@ int main()
                 {
                     marqueeDragging = false;
                     Vector2 offset = cursor - marqueeStart;
+
+                    // Copy
                     if (IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT))
                     {
                         std::vector<Node*> copies;
+
                         copies.reserve(selection.size());
                         for (Node* src : selection)
                         {
                             copies.push_back(new Node(src->GetPosition() + offset, src->GetGate()));
                             graph.AddNode(copies.back());
                         }
-                        for (Node* src : selection)
+
+                        graph.ResetVisited();
+                        for (Node* start : selection)
                         {
-                            std::find(selection.begin(), selection.end(), src);
+                            if (start->GetVisited())
+                                continue;
+
+                            size_t a = std::find(selection.begin(), selection.end(), start) - selection.begin();
+
+                            for (Node* end : start->GetOutputs())
+                            {
+                                if (end->GetVisited())
+                                    break;
+
+                                auto it = std::find(selection.begin(), selection.end(), end);
+
+                                if (it != selection.end())
+                                {
+                                    size_t b = it - selection.begin();
+                                    graph.ConnectNodes(selection[a], selection[b]);
+                                }
+                            }
                         }
                     }
+                    // Move
                     else
                     {
                         for (Node* node : selection)
