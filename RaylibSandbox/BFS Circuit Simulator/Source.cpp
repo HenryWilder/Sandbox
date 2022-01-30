@@ -736,12 +736,19 @@ GateSelection ClosestHoveredGateOption(Vector2 cursor, Vector2 origin)
 
 void Save(Graph* graph)
 {
+    // Open the file for writing
     std::ofstream file("save.graph");
+
+    // Write the number of nodes
     file << graph->nodes.size() << '\n';
+
+    // Write node data
     for (Node* node : graph->nodes)
     {
         file << node->GetPosition().x << ' ' << node->GetPosition().y << ' ' << (char)node->GetGate() << '\n';
     }
+
+    // Count wires
     size_t connections = 0;
     graph->ResetVisited();
     for (Node* start : graph->nodes)
@@ -757,33 +764,49 @@ void Save(Graph* graph)
             ++connections;
         }
     }
+
+    // Write number of wires
     file << '\n' << connections << '\n';
+
+    // Write wire data as relative indices
     graph->ResetVisited();
     for (Node* start : graph->nodes)
     {
         if (start->GetVisited())
             continue;
 
+        // Find the index of the start node
         size_t a = std::find(graph->nodes.begin(), graph->nodes.end(), start) - graph->nodes.begin();
 
+        // We don't need to look at the inputs because that information is implied by the outputs
         for (Node* end : start->GetOutputs())
         {
             if (end->GetVisited())
                 break;
 
+            // Find the index of the end node
             size_t b = std::find(graph->nodes.begin(), graph->nodes.end(), end) - graph->nodes.begin();
 
+            // Write the wire
             file << a << ' ' << b << '\n';
         }
     }
+
+    // Close the file
     file.close();
 }
 void Load(Graph* graph)
 {
     std::ifstream file("save.graph");
+
+    // Read number of nodes
     size_t count;
     file >> count;
+
+    // Prep storage for the incoming number of nodes
     graph->nodes.reserve(count);
+
+    // Read node data
     for (size_t i = 0; i < count; ++i)
     {
         Vector2 pos;
@@ -791,13 +814,18 @@ void Load(Graph* graph)
         file >> pos.x >> pos.y >> gate;
         graph->AddNode(new Node(pos, (Gate)gate));
     }
+
+    // Read number of wires
     file >> count;
+
+    // Read wire data
     for (size_t i = 0; i < count; ++i)
     {
         size_t a, b;
         file >> a >> b;
         graph->ConnectNodes(graph->nodes[a], graph->nodes[b]);
     }
+
     file.close();
 }
 
@@ -915,7 +943,7 @@ int main()
                                 if (it != selection.end())
                                 {
                                     size_t b = it - selection.begin();
-                                    graph.ConnectNodes(selection[a], selection[b]);
+                                    graph.ConnectNodes(copies[a], copies[b]);
                                 }
                             }
                         }
