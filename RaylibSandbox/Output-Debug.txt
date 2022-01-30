@@ -1,0 +1,84 @@
+﻿'BFS Circuit Simulator.exe' (Win32): Loaded 'D:\Repo\Sandbox\RaylibSandbox\x64\Debug\BFS Circuit Simulator.exe'. Symbols loaded.
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\ntdll.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\kernel32.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\KernelBase.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'D:\Repo\Sandbox\RaylibSandbox\x64\Debug\raylib.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\user32.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\win32u.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\gdi32.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\gdi32full.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\msvcp_win.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\ucrtbase.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\shell32.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\msvcp140d.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\vcruntime140d.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\vcruntime140_1d.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\ucrtbased.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\winmm.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\msvcrt.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\imm32.dll'. 
+The thread 0x9bec has exited with code 0 (0x0).
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\uxtheme.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\combase.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\rpcrt4.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\dinput8.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\advapi32.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\sechost.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\XInput1_4.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\cfgmgr32.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\devobj.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\dwmapi.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\InputHost.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\SHCore.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\CoreMessaging.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\oleaut32.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\ws2_32.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\propsys.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\WinTypes.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\CoreUIComponents.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\bcryptprimitives.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\kernel.appcore.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\ntmarta.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\kernel.appcore.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Unloaded 'C:\Windows\System32\kernel.appcore.dll'
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\msctf.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\opengl32.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\glu32.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\clbcatq.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\AppXDeploymentClient.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Unloaded 'C:\Windows\System32\AppXDeploymentClient.dll'
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\DriverStore\FileRepository\nv_dispi.inf_amd64_1c83a5d7cffd7bff\nvoglv64.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\setupapi.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\bcrypt.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\ole32.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\version.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\wtsapi32.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\msasn1.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\cryptnet.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\crypt32.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\cryptbase.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\wintrust.dll'. 
+The thread 0x8cb4 has exited with code 0 (0x0).
+The thread 0x7aa4 has exited with code 0 (0x0).
+The thread 0x82c8 has exited with code 0 (0x0).
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\DXCore.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\windows.storage.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\wldp.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\shlwapi.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\nvspcap64.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\profapi.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\powrprof.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\umpdc.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\winsta.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\TextInputFramework.dll'. 
+'BFS Circuit Simulator.exe' (Win32): Loaded 'C:\Windows\System32\hid.dll'. 
+The thread 0x999c has exited with code 0 (0x0).
+The thread 0x4bd4 has exited with code 0 (0x0).
+The thread 0xb550 has exited with code 0 (0x0).
+The thread 0xacf8 has exited with code 0 (0x0).
+The thread 0xa908 has exited with code 0 (0x0).
+The thread 0xa788 has exited with code 0 (0x0).
+The thread 0x94c0 has exited with code 0 (0x0).
+The thread 0xb1e0 has exited with code 0 (0x0).
+The thread 0xc8c has exited with code 0 (0x0).
+The program '[41920] BFS Circuit Simulator.exe' has exited with code 0 (0x0).

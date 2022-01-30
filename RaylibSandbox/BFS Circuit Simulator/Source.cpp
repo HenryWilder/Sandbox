@@ -572,10 +572,20 @@ public:
         if (difference > 0)
         {
             add->reserve(add->size() + difference);
-            for (size_t i = m_nodes.size() - 1; i < m_blueprint->nodes.size(); ++i)
+            for (size_t i = m_blueprint->nodes.size() - difference; i < m_blueprint->nodes.size(); ++i)
             {
                 add->push_back(m_nodes[i]);
             }
+        }
+
+        // Hide internals
+        for (size_t i = 0; i < m_inputs + m_outputs; ++i)
+        {
+            m_nodes[i]->SetHidden(false);
+        }
+        for (size_t i = m_inputs + m_outputs; i < m_nodes.size(); ++i)
+        {
+            m_nodes[i]->SetHidden(true);
         }
 
         // Add connections
@@ -619,24 +629,27 @@ public:
         constexpr float halfWidth = 2 * g_gridUnit;
 
         m_casingLeft.x = topLeft.x;
-        m_casingLeft.y = topLeft.y;
+        m_casingLeft.y = topLeft.y - g_gridUnit;
         m_casingLeft.width = halfWidth;
-        m_casingLeft.height = g_gridUnit * m_inputs;
+        m_casingLeft.height = g_gridUnit * m_inputs + g_gridUnit;
 
         m_casingRight.x = topLeft.x + halfWidth;
-        m_casingRight.y = topLeft.y;
+        m_casingRight.y = topLeft.y - g_gridUnit;
         m_casingRight.width = halfWidth;
-        m_casingRight.height = g_gridUnit * m_outputs;
-
-        float x = topLeft.x;
+        m_casingRight.height = g_gridUnit * m_outputs + g_gridUnit;
+        
+        float y = topLeft.y;
         for (size_t i = 0; i < m_inputs; ++i)
         {
-            m_nodes[i]->SetPosition({ x, topLeft.y + halfWidth * i });
+            m_nodes[i]->SetPosition({ topLeft.x, y });
+            y += g_gridUnit;
         }
-        x += halfWidth * 2;
+        float rightSide = topLeft.x + halfWidth * 2;
+        y = topLeft.y;
         for (size_t i = 0; i < m_outputs; ++i)
         {
-            m_nodes[i + m_inputs]->SetPosition({ x, topLeft.y + halfWidth * i });
+            m_nodes[i + m_inputs]->SetPosition({ rightSide, y });
+            y += g_gridUnit;
         }
     }
 };
@@ -838,8 +851,8 @@ struct Graph
     {
         for (Component* comp : components)
         {
-            DrawRectangleRec(comp->GetCasingA(), GRAY);
-            DrawRectangleRec(comp->GetCasingB(), GRAY);
+            DrawRectangleRec(comp->GetCasingA(), DARKGRAY);
+            DrawRectangleRec(comp->GetCasingB(), DARKGRAY);
         }
     }
     void DrawWires()
@@ -847,13 +860,13 @@ struct Graph
         // Draw the wires first so the nodes can be drawn on top
         for (Node* node : nodes)
         {
-            if (node->GetHidden())
-                continue;
+            //if (node->GetHidden())
+            //    continue;
 
             for (Node* next : node->GetOutputs())
             {
-                if (node->GetHidden())
-                    continue;
+                //if (node->GetHidden())
+                //    continue;
 
                 Color color = node->GetState() ? DARKBLUE : DARKGRAY;
                 DrawLineV(node->GetPosition(), next->GetPosition(), color);
@@ -870,8 +883,8 @@ struct Graph
         // Node drawing is separate so that cyclic graphs can still draw nodes on top
         for (Node* node : nodes)
         {
-            if (node->GetHidden())
-                continue;
+            //if (node->GetHidden())
+            //    continue;
 
             DrawGateIcon(node->GetGate(), node->GetPosition(), g_nodeRadius, (node->GetState() ? BLUE : GRAY));
 
@@ -1576,10 +1589,12 @@ int main()
                 DrawLineV({ 0, cursor.y }, { (float)windowWidth,  cursor.y }, color);
             }
 
-            graph.DrawComponents();
 
             // Wires
             graph.DrawWires();
+
+            // Components
+            graph.DrawComponents();
 
             // Hovered wire
             if (hoveredWire.a && !drawGateOptions)
@@ -1632,6 +1647,8 @@ int main()
                     DrawGateIcon(GateSelection::gates[i], selectionStart->GetPosition() + center, g_nodeRadius * 1.5f, WHITE);
                 }
             }
+
+            DrawText(TextFormat("Nodes: %i", graph.nodes.size()), 0,0,8,WHITE);
 
         } EndDrawing();
     }
