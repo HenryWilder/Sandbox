@@ -354,38 +354,153 @@ struct NodeBlueprint
 
 struct ComponentBlueprint
 {
-    std::vector<NodeBlueprint> nodes;
-};
-struct Component
-{
-    ComponentBlueprint* blueprint;
-    std::vector<Node*> nodes;
-
-    void Regenerate()
+    ComponentBlueprint(std::vector<Node*>& source)
     {
-        for (Node* node : nodes)
+        // Write the number of nodes
+        nodes.reserve(source.size());
+
+        // Write node data
+        for (Node* src : source)
         {
-            delete node;
+            src->SetVisited(false);
+            nodes.push_back(NodeBlueprint{ src->GetGate() });
         }
-        nodes.clear();
-        nodes.reserve(blueprint->nodes.size());
+
+        // Write wire data as relative indices
+        for (Node* start : source)
+        {
+            if (start->GetVisited())
+                continue;
+
+            // Find the index of the start node
+            size_t a = std::find(source.begin(), source.end(), start) - source.begin();
+
+            // We don't need to look at the inputs because that information is implied by the outputs
+            for (Node* end : start->GetOutputs())
+            {
+                if (end->GetVisited())
+                    break;
+
+                // Find the index of the end node
+                auto it = std::find(source.begin(), source.end(), end);
+
+                // Write the wire
+                if (it != source.end())
+                {
+                    size_t b = it - source.begin();
+                    nodes[a].outputs.push_back(b);
+                    nodes[b].inputs.push_back(a);
+                }
+            }
+        }
+
+        // Sort
+        std::vector<NodeBlueprint> buff;
+        buff.reserve(nodes.size());
+        std::vector<bool> visited(nodes.size(), false);
+
+        // Inputs
+        for (size_t i = 0; i < nodes.size(); ++i)
+        {
+            // No inputs
+            if (nodes[i].inputs.empty())
+            {
+                buff.push_back(nodes[i]);
+                visited[i] = true;
+                ++inputs;
+            }
+        }
+
+        // Outputs
+        for (size_t i = 0; i < nodes.size(); ++i)
+        {
+            if (visited[i])
+                continue;
+
+            // No outputs
+            if (nodes[i].outputs.empty())
+            {
+                buff.push_back(nodes[i]);
+                visited[i] = true;
+                ++outputs;
+            }
+        }
+
+        // Remaining
+        for (size_t i = 0; i < nodes.size(); ++i)
+        {
+            if (visited[i])
+                continue;
+
+            buff.push_back(nodes[i]);
+        }
+
+        nodes.swap(buff);
+    }
+
+    size_t inputs;
+    size_t outputs;
+    std::vector<NodeBlueprint> nodes; // Sort: [inputs][outputs][internals]
+};
+
+class Component
+{
+private:
+    ComponentBlueprint* m_blueprint;
+    size_t inputs;
+    size_t outputs;
+    std::vector<Node*> m_nodes; // Sorted by blueprint
+
+public:
+    Component(ComponentBlueprint* blueprint) : m_blueprint(blueprint), inputs(blueprint->inputs), outputs(blueprint->outputs), m_nodes{} {}
+
+    ComponentBlueprint* const GetBlueprint() const
+    {
+        return m_blueprint;
+    }
+    void SetBlueprint(ComponentBlueprint* blueprint)
+    {
+        m_blueprint = blueprint;
+    }
+    // Parameters are vectors of the nodes that need to be added/removed
+    void Regenerate(std::vector<Node*>* add, std::vector<Node*>* remove)
+    {
+        if (m_nodes.size() != m_blueprint->nodes.size())
+        {
+
+        }
+
+        comp->m_nodes.reserve(blueprint->nodes.size());
         for (NodeBlueprint base : blueprint->nodes)
         {
             Node* node = new Node(Vector2Zero(), base.gate);
             node->SetHidden(true);
-            nodes.push_back(node);
+            comp->m_nodes.push_back(node);
         }
-        for (size_t i = 0; i < nodes.size(); ++i)
+        for (size_t i = 0; i < comp->m_nodes.size(); ++i)
         {
             for (size_t input : blueprint->nodes[i].inputs)
             {
-                nodes[i]->AddInput(nodes[input]);
+                comp->m_nodes[i]->AddInput(comp->m_nodes[input]);
             }
             for (size_t output : blueprint->nodes[i].outputs)
             {
-                nodes[i]->AddOutput(nodes[output]);
+                comp->m_nodes[i]->AddOutput(comp->m_nodes[output]);
             }
         }
+    }
+
+    size_t GetInputCount() const
+    {
+        return inputs;
+    }
+    size_t GetOutputCount() const
+    {
+        return outputs;
+    }
+    size_t GetInternalCount() const
+    {
+        return m_nodes.size() - (inputs + outputs);
     }
 };
 
@@ -396,6 +511,7 @@ struct Graph
     bool gateDirty = false;
     // Sort using CalculateRoute() every time a node is added or removed
     std::vector<Node*> nodes;
+    std::vector<ComponentBlueprint*> blueprints;
     std::vector<Component*> components;
 
     void ResetVisited()
@@ -410,6 +526,36 @@ struct Graph
         for (Node* node : nodes)
         {
             node->SetState(node->GetGate() == Gate::NOR);
+        }
+    }
+
+    // For components
+    void Regenerate(Component* comp)
+    {
+        ComponentBlueprint* blueprint = comp->GetBlueprint();
+        for (Node* node : comp->m_nodes)
+        {
+            RemoveNode(node);
+            delete node;
+        }
+        comp->ClearNodes();
+        comp->m_nodes.reserve(blueprint->nodes.size());
+        for (NodeBlueprint base : blueprint->nodes)
+        {
+            Node* node = new Node(Vector2Zero(), base.gate);
+            node->SetHidden(true);
+            comp->m_nodes.push_back(node);
+        }
+        for (size_t i = 0; i < comp->m_nodes.size(); ++i)
+        {
+            for (size_t input : blueprint->nodes[i].inputs)
+            {
+                comp->m_nodes[i]->AddInput(comp->m_nodes[input]);
+            }
+            for (size_t output : blueprint->nodes[i].outputs)
+            {
+                comp->m_nodes[i]->AddOutput(comp->m_nodes[output]);
+            }
         }
     }
 
@@ -1114,20 +1260,13 @@ int main()
                 marqueeSelecting = false;
         }
 
-        // Make graph have length-1 wires
-        if (IsKeyPressed(KEY_SPACE))
+        // Package up components
+        if (IsKeyPressed(KEY_SPACE) && !selection.empty())
         {
-            // Relative to the hovered node
-            if (hoveredNode)
-            {
-                graph.ResetVisited();
-                CompressNetwork(hoveredNode, g_gridUnit);
-            }
-            // Only the hovered wire (relative to its center)
-            else if (hoveredWire.a)
-            {
-
-            }
+            ComponentBlueprint* blueprint = new ComponentBlueprint(selection);
+            
+            Component* component = new Component(blueprint);
+            component->Regenerate();
         }
 
 
