@@ -465,27 +465,56 @@ public:
     // Parameters are vectors of the nodes that need to be added/removed
     void Regenerate(std::vector<Node*>* add, std::vector<Node*>* remove)
     {
-        if (m_nodes.size() != m_blueprint->nodes.size())
-        {
+        int difference = m_blueprint->nodes.size() - m_nodes.size();
 
-        }
-
-        comp->m_nodes.reserve(blueprint->nodes.size());
-        for (NodeBlueprint base : blueprint->nodes)
+        // Nodes that need to be removed
+        if (difference < 0)
         {
-            Node* node = new Node(Vector2Zero(), base.gate);
-            node->SetHidden(true);
-            comp->m_nodes.push_back(node);
-        }
-        for (size_t i = 0; i < comp->m_nodes.size(); ++i)
-        {
-            for (size_t input : blueprint->nodes[i].inputs)
+            remove->reserve(remove->size() - difference);
+            for (size_t i = m_blueprint->nodes.size() - 1; i < m_nodes.size(); ++i)
             {
-                comp->m_nodes[i]->AddInput(comp->m_nodes[input]);
+                remove->push_back(m_nodes[i]);
             }
-            for (size_t output : blueprint->nodes[i].outputs)
+        }
+
+        // Save space for the nodes -- some can be reused, while the excess get dropped off.
+        // Do not worry about leaking the excess, as their pointers have been saved above for external removal.
+        m_nodes.reserve(m_blueprint->nodes.size());
+
+        // Modify
+        for (size_t i = 0; i < m_nodes.size(); ++i)
+        {
+            m_nodes[i]->SetGate(m_blueprint->nodes[i].gate);
+        }
+        // Create
+        for (size_t i = m_nodes.size(); i < m_blueprint->nodes.size(); ++i)
+        {
+            Node* node = new Node(Vector2Zero(), m_blueprint->nodes[i].gate);
+            m_nodes.push_back(node);
+        }
+
+        // At this point, m_nodes and m_blueprint->nodes have the same size.
+
+        // Nodes that need to be added
+        if (difference > 0)
+        {
+            add->reserve(add->size() + difference);
+            for (size_t i = m_nodes.size() - 1; i < m_blueprint->nodes.size(); ++i)
             {
-                comp->m_nodes[i]->AddOutput(comp->m_nodes[output]);
+                add->push_back(m_nodes[i]);
+            }
+        }
+
+        // Add connections
+        for (size_t i = 0; i < m_nodes.size(); ++i)
+        {
+            for (size_t input : m_blueprint->nodes[i].inputs)
+            {
+                m_nodes[i]->AddInput(m_nodes[input]);
+            }
+            for (size_t output : m_blueprint->nodes[i].outputs)
+            {
+                m_nodes[i]->AddOutput(m_nodes[output]);
             }
         }
     }
