@@ -364,21 +364,7 @@ struct ComponentBlueprint
 
         bool operator<(const NodeBP_Helper& other) const
         {
-            if (noInputs != other.noInputs)
-            {
-                return noInputs && !other.noInputs;
-            }
-            else if (noOutputs != other.noOutputs)
-            {
-                return noOutputs && !other.noOutputs;
-            }
-            else
-            {
-                if (position.y == other.position.y)
-                    return position.x < other.position.x;
-                else
-                    return position.y < other.position.y;
-            }
+            return (position.y == other.position.y ? position.x < other.position.x : position.y < other.position.y);
         }
     };
 
@@ -461,7 +447,13 @@ struct ComponentBlueprint
         }
 
         // Sort
-        std::sort(helpers.begin(), helpers.end());
+        std::partition(helpers.begin(), helpers.end(), [](const NodeBP_Helper* a) { return a->noInputs; });
+        std::partition(helpers.begin() + inputs, helpers.end(), [](const NodeBP_Helper* a) { return a->noOutputs; });
+
+        std::sort(helpers.begin(), helpers.begin() + inputs);
+        std::sort(helpers.begin() + inputs, helpers.begin() + inputs + outputs);
+        std::sort(helpers.begin() + inputs + outputs, helpers.end());
+
         nodes.reserve(source.size());
 
         for (NodeBP_Helper* help : helpers)
@@ -1424,7 +1416,7 @@ int main()
         }
 
         // Package up components
-        if (IsKeyPressed(KEY_SPACE) && !selection.empty())
+        if (IsKeyPressed(KEY_SPACE) && selection.size() > 1)
         {
             ComponentBlueprint* blueprint = new ComponentBlueprint(selection);
             Vector2 minPoint = { INFINITY, INFINITY };
