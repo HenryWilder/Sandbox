@@ -839,7 +839,7 @@ struct Graph
 
             for (Node* next : node->GetOutputs())
             {
-                if (node->GetHidden())
+                if (next->GetHidden())
                     continue;
 
                 Color color = node->GetState() ? DARKBLUE : DARKGRAY;
