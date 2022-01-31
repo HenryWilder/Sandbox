@@ -378,6 +378,8 @@ struct ComponentBlueprint
         }
     };
 
+    ComponentBlueprint(size_t inputs, size_t outputs) : inputs(inputs), outputs(outputs), nodes{} {}
+
     ComponentBlueprint(std::vector<Node*>& source)
     {
         std::vector<NodeBP_Helper*> helpers;
@@ -642,7 +644,15 @@ public:
         }
     }
     
+    Node* GetNode(size_t index) const
+    {
+        return m_nodes[index];
+    }
     const std::vector<Node*>& GetNodes() const
+    {
+        return m_nodes;
+    }
+    std::vector<Node*>& GetNodesVector()
     {
         return m_nodes;
     }
@@ -1122,7 +1132,7 @@ void Save(Graph* graph)
     // Open the file for writing
     std::ofstream file("save.graph");
 
-    file << "version: 0.0.2\n";
+    file << "version: 3.0.1\n";
 
     std::vector<ComponentBlueprint*> blueprints;
 
@@ -1231,32 +1241,137 @@ void Save(Graph* graph)
 void Load(Graph* graph)
 {
     std::ifstream file("save.graph");
+    file.ignore(256, ':');
+    int api, version, patch;
+    file >> api;
+    file.ignore(1);
+    file >> version;
+    file.ignore(1);
+    file >> patch;
 
-    // Read number of nodes
-    size_t count;
-    file >> count;
+    if (api != 3)
+        return;
+    if (version > 0)
+        return;
+    if (patch > 1)
+        return;
 
-    // Prep storage for the incoming number of nodes
-    graph->nodes.reserve(count);
+    graph->nodes.clear();
+    graph->components.clear();
 
-    // Read node data
-    for (size_t i = 0; i < count; ++i)
+    file.ignore(256,':');
+
+    std::vector<ComponentBlueprint*> blueprints;
+
+    // Blueprints
     {
-        Vector2 pos;
-        char gate;
-        file >> pos.x >> pos.y >> gate;
-        graph->AddNode(new Node(pos, (Gate)gate));
+        // Read number of blueprints
+        size_t count;
+        file >> count;
+
+        blueprints.reserve(count);
+
+        for (size_t i = 0; i < count; ++i)
+        {
+            size_t in, out;
+            file >> in >> out;
+            blueprints.push_back(new ComponentBlueprint(in,out));
+            size_t nodes;
+            file >> nodes;
+            blueprints.back()->nodes.reserve(nodes);
+            for (size_t j = 0; j < nodes; ++j)
+            {
+                char gate;
+                file >> gate;
+                blueprints.back()->nodes.push_back(NodeBlueprint{ (Gate)gate });
+                size_t outputCount;
+                file >> outputCount;
+                blueprints.back()->nodes.back().outputs.reserve(outputCount);
+                for (size_t k = 0; k < outputCount; ++k)
+                {
+                    size_t index;
+                    file >> index;
+                    blueprints.back()->nodes.back().outputs.push_back(index);
+                }
+            }
+        }
     }
 
-    // Read number of wires
-    file >> count;
+    file.ignore(256,':');
 
-    // Read wire data
-    for (size_t i = 0; i < count; ++i)
+    // Nodes
     {
-        size_t a, b;
-        file >> a >> b;
-        graph->ConnectNodes(graph->nodes[a], graph->nodes[b]);
+        // Read number of nodes
+        size_t count;
+        file >> count;
+
+        // Prep storage for the incoming number of nodes
+        graph->nodes.reserve(count);
+
+        // Read node data
+        for (size_t i = 0; i < count; ++i)
+        {
+            Vector2 pos;
+            char gate;
+            file >> pos.x >> pos.y >> gate;
+            graph->AddNode(new Node(pos, (Gate)gate));
+        }
+    }
+
+    file.ignore(256, ':');
+
+    // Wires
+    {
+        // Read number of wires
+        size_t count;
+        file >> count;
+
+        // Read wire data
+        for (size_t i = 0; i < count; ++i)
+        {
+            size_t a, b;
+            file >> a >> b;
+            graph->ConnectNodes(graph->nodes[a], graph->nodes[b]);
+        }
+    }
+
+    file.ignore(256, ':');
+
+    // Components
+    {
+        size_t count;
+        file >> count;
+        graph->components.reserve(count);
+
+        for (size_t i = 0; i < count; ++i)
+        {
+            size_t bpIndex;
+            Vector2 position;
+            size_t nodeCount;
+            file >> bpIndex >> position.x >> position.y >> nodeCount;
+
+            Component* comp = new Component(blueprints[bpIndex]);
+            graph->components.push_back(comp);
+            comp->SetPosition(position);
+
+            // Save space for the nodes -- some can be reused, while the excess get dropped off.
+            // Do not worry about leaking the excess, as their pointers have been saved above for external removal.
+            comp->GetNodesVector().reserve(nodeCount);
+            
+            for (size_t i = 0; i < blueprints[bpIndex]->nodes.size(); ++i)
+            {
+                size_t nodeIndex;
+                file >> nodeIndex;
+                comp->GetNodesVector().push_back(graph->nodes[nodeIndex]);
+                graph->nodes[nodeIndex]->SetInComponent(true);
+            }
+
+            // Hide internals
+            for (size_t i = blueprints[bpIndex]->inputs + blueprints[bpIndex]->outputs; i < comp->GetNodeCount(); ++i)
+            {
+                comp->GetNode(i)->SetHidden(true);
+            }
+        }
     }
 
     file.close();
