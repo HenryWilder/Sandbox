@@ -164,10 +164,18 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Component.cpp" />
+    <ClCompile Include="Graph.cpp" />
+    <ClCompile Include="Node.cpp" />
     <ClCompile Include="Source.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="save.graph" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="Component.h" />
+    <ClInclude Include="Graph.h" />
+    <ClInclude Include="Node.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
