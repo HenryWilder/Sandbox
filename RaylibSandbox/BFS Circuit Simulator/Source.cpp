@@ -4,6 +4,7 @@
 #include <fstream>
 #include <stack>
 #include <algorithm>
+#include <unordered_map>
 
 #define sign(x) (((x) > (decltype(x))(0)) - ((x) < (decltype(x))(0)))
 
@@ -235,6 +236,56 @@ public:
         m_outputs.clear();
     }
 };
+
+// Helper function for finding the relative indices of nodes in a vector
+// Destination map is expected to be empty
+void MapNodeRelativeIndices(const std::vector<const Node*>& source, std::unordered_map<const Node*,size_t>& dest)
+{
+    dest.reserve(source.size());
+    for (size_t i = 0; i < source.size(); ++i)
+    {
+        dest.insert({ source[i],i });
+    }
+}
+
+struct WireRelative
+{
+    size_t a;
+    size_t b;
+};
+
+// Helper function for finding the relative indices of nodes for all contained wires in a vector
+// Destination vector is expected to be empty
+void ListWireRelativeIndices(const std::vector<const Node*>& source, std::vector<WireRelative>& dest)
+{
+    std::unordered_map<const Node*, size_t> map;
+    MapNodeRelativeIndices(source, map);
+
+    size_t totalWires = 0;
+    for (const Node* start : source)
+    {
+        for (const Node* end : start->GetOutputs())
+        {
+            if (map.find(end) != map.end())
+                ++totalWires;
+        }
+    }
+    dest.reserve(totalWires);
+
+    for (const Node* start : source)
+    {
+        size_t startIndex = map.find(start)->second;
+        for (const Node* end : start->GetOutputs())
+        {
+            auto it = map.find(end);
+            if (it == map.end())
+                continue;
+
+            size_t endIndex = it->second;
+            dest.push_back({ startIndex, endIndex });
+        }
+    }
+}
 
 void DrawGateIcon(Gate type, Vector2 center, float radius, Color color, bool drawXORline = true)
 {
