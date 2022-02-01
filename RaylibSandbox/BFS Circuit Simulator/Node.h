@@ -105,7 +105,10 @@ struct WireRelative
 };
 
 bool IsNodeInVector(const std::vector<Node*>& vector, const Node* node);
-bool NodeIndexInVector(const std::vector<Node*>& vector, const Node* node, size_t* index);
+// Use if you aren't sure whether the node is in the vector or not
+bool FindNodeIndexInVector(const std::vector<Node*>& vector, const Node* node, size_t* index);
+// Use if you are sure the node is in the vector
+size_t NodeIndexInVector(const std::vector<Node*>& vector, const Node* node);
 
 // Helper function for finding the relative indices of nodes in a vector
 // Destination map is expected to be empty

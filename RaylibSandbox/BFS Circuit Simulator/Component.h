@@ -19,10 +19,10 @@ struct NodeBP_Helper
 struct ComponentBlueprint
 {
     ComponentBlueprint() = default;
+
     ComponentBlueprint(size_t inputs, size_t outputs) :
         inputs(inputs),
-        outputs(outputs),
-        nodes{}
+        outputs(outputs)
     {}
 
     size_t inputs;
@@ -46,8 +46,7 @@ public:
     Component(ComponentBlueprint* blueprint) :
         m_blueprint(blueprint),
         m_casingLeft{ 0,0,0,0 },
-        m_casingRight{ 0,0,0,0 },
-        m_nodes{}
+        m_casingRight{ 0,0,0,0 }
     {}
 
     ComponentBlueprint* const GetBlueprint() const;

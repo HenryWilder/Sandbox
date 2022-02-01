@@ -16,107 +16,98 @@ bool NodeBP_Helper::operator<(const NodeBP_Helper& other) const
 
 void ComponentBlueprint::GenerateBlueprintFromSelection(const std::vector<Node*>& source)
 {
+    size_t helperIndex = 0;
+    NodeBP_Helper* helpers_block = new NodeBP_Helper[source.size()]; // Draw memory from this block to save on "new" calls
+
     std::vector<NodeBP_Helper*> helpers;
     helpers.reserve(source.size());
 
+    // Write wire data as relative indices
+    std::unordered_map<const Node*, size_t> nodeIndex;
+    MapNodeRelativeIndices(source, nodeIndex);
+
+    // Nodes
     inputs = 0;
     outputs = 0;
-
-    // Write node data
     for (Node* src : source)
     {
-        src->SetVisited(false);
-        helpers.push_back(new NodeBP_Helper{ src->GetGate(), src->GetPosition() });
+        helpers_block[helperIndex] = NodeBP_Helper{ src->GetGate(), src->GetPosition() };
+        helpers.push_back(helpers_block + helperIndex);
+        ++helperIndex;
 
-        if (src->HasNoInputs())
+        // No inputs on source means it is an input for the component
+        bool isInput = src->HasNoInputs();
+        for (Node* input : src->GetInputs())
         {
-            helpers.back()->noInputs = true;
+            if (nodeIndex.find(input) == nodeIndex.end()) // Inputs from external node
+            {
+                isInput = true;
+                break;
+            }
+        }
+        if (helpers.back()->noInputs = isInput)
             ++inputs;
-        }
-        else
-        {
-            for (Node* input : src->GetInputs())
-            {
-                if (std::find(src->GetInputs().begin(), src->GetInputs().end(), input) == src->GetInputs().end())
-                {
-                    helpers.back()->noInputs = true;
-                    ++inputs;
-                    break;
-                }
-            }
-        }
 
-        if (src->HasNoOutputs())
+        bool isOutput = src->HasNoOutputs();
+        for (Node* output : src->GetOutputs())
         {
-            helpers.back()->noOutputs = true;
-            ++outputs;
-        }
-        else
-        {
-            for (Node* input : src->GetOutputs())
+            if (nodeIndex.find(output) == nodeIndex.end()) // Outputs to external node
             {
-                if (std::find(src->GetOutputs().begin(), src->GetOutputs().end(), input) == src->GetOutputs().end())
-                {
-                    helpers.back()->noOutputs = true;
-                    ++outputs;
-                    break;
-                }
+                isOutput = true;
+                break;
             }
         }
+        if (isOutput)
+            ++outputs;
     }
 
-    // Write wire data as relative indices
+    // Wires
     for (Node* start : source)
     {
-        if (start->GetVisited())
-            continue;
-
-        // Find the index of the start node
-        size_t a = std::find(source.begin(), source.end(), start) - source.begin();
-
-        // We don't need to look at the inputs because that information is implied by the outputs
+        size_t a = nodeIndex.find(start)->second;
         for (Node* end : start->GetOutputs())
         {
-            if (end->GetVisited())
-                continue;
-
-            // Find the index of the end node
-            auto it = std::find(source.begin(), source.end(), end);
-
-            // Write the wire
-            if (it != source.end())
-            {
-                size_t b = it - source.begin();
-                helpers[a]->outputs.push_back(helpers[b]);
-            }
+            auto it = nodeIndex.find(end);
+            if (it != nodeIndex.end())
+                helpers[a]->outputs.push_back(helpers[it->second]);
         }
     }
 
     // Sort
-    std::partition(helpers.begin(), helpers.end(), [](const NodeBP_Helper* a) { return a->noInputs; });
-    std::partition(helpers.begin() + inputs, helpers.end(), [](const NodeBP_Helper* a) { return a->noOutputs; });
+    auto inputsBegin    = helpers.begin();
+    auto outputsBegin   = helpers.begin() + inputs;
+    auto internalsBegin = helpers.begin() + (inputs + outputs);
 
-    std::sort(helpers.begin(), helpers.begin() + inputs);
-    std::sort(helpers.begin() + inputs, helpers.begin() + (inputs + outputs));
+    std::partition(inputsBegin,  helpers.end(), [](const NodeBP_Helper* node) { return node->noInputs;        });
+    std::partition(outputsBegin, helpers.end(), [](const NodeBP_Helper* node) { return node->outputs.empty(); });
 
+    std::sort(inputsBegin,  outputsBegin  );
+    std::sort(outputsBegin, internalsBegin);
+    // Internals don't need to be sorted
+
+    // Write wire data as relative indices
+    std::unordered_map<const NodeBP_Helper*, size_t> helperIndexMap;
+    {
+        helperIndexMap.reserve(helpers.size());
+        for (size_t i = 0; i < helpers.size(); ++i)
+        {
+            helperIndexMap.insert({ helpers[i],i });
+        }
+    }
+
+    // Convert helpers to node blueprints
     nodes.reserve(source.size());
-
     for (NodeBP_Helper* help : helpers)
     {
         nodes.push_back(NodeBlueprint{ help->gate });
         nodes.back().outputs.reserve(help->outputs.size());
-        for (NodeBP_Helper* next : help->outputs)
+        for (NodeBP_Helper* output : help->outputs)
         {
-            auto it = std::find(helpers.begin(), helpers.end(), next);
-            size_t outputIndex = it - helpers.begin();
-            nodes.back().outputs.push_back(outputIndex);
+            nodes.back().outputs.push_back(helperIndexMap.find(output)->second);
         }
     }
 
-    for (NodeBP_Helper* help : helpers)
-    {
-        delete help;
-    }
+    delete[] helpers_block;
 }
 
 
@@ -131,9 +122,6 @@ void Component::SetBlueprint(ComponentBlueprint* blueprint)
 // Parameters are vectors of the nodes that need to be added/removed
 void Component::Regenerate(std::vector<Node*>* add, std::vector<Node*>* remove)
 {
-    m_inputs = m_blueprint->inputs;
-    m_outputs = m_blueprint->outputs;
-
     long difference = (long)m_blueprint->nodes.size() - (long)m_nodes.size();
 
     // Nodes that need to be removed

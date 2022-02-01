@@ -261,11 +261,16 @@ bool IsNodeInVector(const std::vector<const Node*>& vector, const Node* node)
     return std::find(vector.begin(), vector.end(), node) != vector.end();
 }
 
-bool NodeIndexInVector(const std::vector<const Node*>& vector, const Node* node, size_t* index)
+bool FindNodeIndexInVector(const std::vector<const Node*>& vector, const Node* node, size_t* index)
 {
     auto it = std::find(vector.begin(), vector.end(), node);
     *index = it - vector.begin();
     return it != vector.end();
+}
+
+size_t NodeIndexInVector(const std::vector<Node*>& vector, const Node* node)
+{
+    return std::find(vector.begin(), vector.end(), node) - vector.begin();
 }
 
 // Helper function for finding the relative indices of nodes in a vector

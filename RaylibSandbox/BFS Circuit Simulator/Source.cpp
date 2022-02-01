@@ -514,7 +514,8 @@ int main()
                 }
             }
 
-            ComponentBlueprint* blueprint = new ComponentBlueprint(breakdown);
+            ComponentBlueprint* blueprint = new ComponentBlueprint();
+            blueprint->GenerateBlueprintFromSelection(breakdown);
 
             Vector2 minPoint = { INFINITY, INFINITY };
             for (Selectable element : selection)

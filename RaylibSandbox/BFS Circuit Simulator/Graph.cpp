@@ -25,9 +25,9 @@ bool Graph::IsNodeInGraph(const Node* node) const
 {
     return IsNodeInVector(nodes, node);
 }
-bool Graph::NodeIndexInGraph(const Node* node, size_t* index) const
+bool Graph::FindNodeIndexInGraph(const Node* node, size_t* index) const
 {
-    return NodeIndexInVector(nodes, node, index);
+    return FindNodeIndexInVector(nodes, node, index);
 }
 
 void Graph::ResetVisited() const
