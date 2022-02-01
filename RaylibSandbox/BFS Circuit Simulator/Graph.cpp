@@ -41,6 +41,10 @@ bool Graph::FindNodeIndexInGraph(const Node* node, size_t* index) const
 {
     return FindNodeIndexInVector(nodes, node, index);
 }
+size_t Graph::NodeIndexInGraph(const Node* node) const
+{
+    return NodeIndexInVector(nodes, node);
+}
 
 void Graph::ResetVisited() const
 {
@@ -437,7 +441,8 @@ void Graph::FindSelectablesInRectangle(std::vector<Selectable>* output, Rectangl
     }
     for (Component* comp : components)
     {
-        if (CheckCollisionRecs(search, comp->GetCasingA()) || CheckCollisionRecs(search, comp->GetCasingB()))
+        if (CheckCollisionRecs(search, comp->GetCasingA()) ||
+            CheckCollisionRecs(search, comp->GetCasingB()))
             output->push_back(Selectable(comp));
     }
 }
@@ -445,7 +450,8 @@ Component* Graph::FindComponentAtPosition(Vector2 position) const
 {
     for (Component* comp : components)
     {
-        if (CheckCollisionPointRec(position, comp->GetCasingA()) || CheckCollisionPointRec(position, comp->GetCasingB()))
+        if (CheckCollisionPointRec(position, comp->GetCasingA()) ||
+            CheckCollisionPointRec(position, comp->GetCasingB()))
             return comp;
     }
     return nullptr;
@@ -470,10 +476,13 @@ void Graph::Save(const char* filename)
         file << "\nblueprints: " << blueprints.size() << '\n';
         for (ComponentBlueprint* bp : blueprints)
         {
-            file << bp->inputs << ' ' << bp->outputs << ' ' << bp->nodes.size() << ' ';
+            file << bp->inputs << ' '
+                 << bp->outputs << ' '
+                 << bp->nodes.size() << ' ';
             for (const NodeBlueprint& node : bp->nodes)
             {
-                file << (char)node.gate << ' ' << node.outputs.size();
+                file << (char)node.gate << ' '
+                     << node.outputs.size();
                 for (size_t index : node.outputs)
                 {
                     file << ' ' << index;
@@ -492,54 +501,25 @@ void Graph::Save(const char* filename)
         // Write node data
         for (Node* node : nodes)
         {
-            file << node->GetPosition().x << ' ' << node->GetPosition().y << ' ' << (char)node->GetGate() << '\n';
+            file << node->GetPosition().x << ' '
+                 << node->GetPosition().y << ' '
+                 << (char)node->GetGate() << '\n';
         }
     }
 
     // Wires
     {
-        // Count wires
-        size_t connections = 0;
-        ResetVisited();
-        for (Node* start : nodes)
-        {
-            if (start->GetVisited())
-                continue;
-
-            for (Node* end : start->GetOutputs())
-            {
-                if (end->GetVisited())
-                    break;
-
-                ++connections;
-            }
-        }
+        std::vector<WireRelative> wires;
+        ListWireRelativeIndices(nodes, wires);
 
         // Write number of wires
-        file << "\nwires: " << connections << '\n';
+        file << "\nwires: " << wires.size() << '\n';
 
         // Write wire data as relative indices
-        ResetVisited();
-        for (Node* start : nodes)
+        for (WireRelative wire : wires)
         {
-            if (start->GetVisited())
-                continue;
-
-            // Find the index of the start node
-            size_t a = std::find(nodes.begin(), nodes.end(), start) - nodes.begin();
-
-            // We don't need to look at the inputs because that information is implied by the outputs
-            for (Node* end : start->GetOutputs())
-            {
-                if (end->GetVisited())
-                    break;
-
-                // Find the index of the end node
-                size_t b = std::find(nodes.begin(), nodes.end(), end) - nodes.begin();
-
-                // Write the wire
-                file << a << ' ' << b << '\n';
-            }
+            file << wire.a << ' '
+                 << wire.b << '\n';
         }
     }
 
@@ -548,11 +528,14 @@ void Graph::Save(const char* filename)
         file << "\ncomponents: " << components.size() << '\n';
         for (Component* comp : components)
         {
-            file << (std::find(blueprints.begin(), blueprints.end(), comp->GetBlueprint()) - blueprints.begin()) << ' '
-                << comp->GetPosition().x << ' ' << comp->GetPosition().y << ' ' << comp->GetNodeCount();
+            size_t blueprintIndex = std::find(blueprints.begin(), blueprints.end(), comp->GetBlueprint()) - blueprints.begin();
+            file << blueprintIndex << ' '
+                 << comp->GetPosition().x << ' '
+                 << comp->GetPosition().y;
+
             for (Node* node : comp->GetNodes())
             {
-                file << ' ' << std::find(nodes.begin(), nodes.end(), node) - nodes.begin();
+                file << ' ' << NodeIndexInGraph(node);
             }
             file << '\n';
         }

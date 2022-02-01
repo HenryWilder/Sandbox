@@ -50,6 +50,7 @@ public:
 
     bool IsNodeInGraph(const Node* node) const;
     bool FindNodeIndexInGraph(const Node* node, size_t* index) const;
+    size_t NodeIndexInGraph(const Node* node) const;
 
     void ResetVisited() const;
     void ResetStates();
