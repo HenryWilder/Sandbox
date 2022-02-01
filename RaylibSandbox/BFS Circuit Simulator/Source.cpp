@@ -202,8 +202,8 @@ int main()
         }
 
         // Hover
-        Node* hoveredNode = graph.FindNodeAtPosition(cursor, g_nodeRadius * 2.0f);
-        Wire hoveredWire = (hoveredNode ? Wire{ nullptr, nullptr }  : graph.FindWireIntersectingPosition(cursor, g_nodeRadius * 2.0f));
+        Node* hoveredNode = graph.FindNodeAtGridPoint(cursor);
+        Wire hoveredWire = (hoveredNode ? Wire{ nullptr, nullptr }  : graph.FindWireIntersectingGridPoint(cursor));
 
         if (!marqueeSelecting)
         {

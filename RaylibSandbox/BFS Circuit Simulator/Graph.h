@@ -6,6 +6,8 @@ enum class Gate : char;
 class Node;
 struct Wire;
 
+bool Vector2Equals(Vector2 a, Vector2 b);
+
 float Vector2DistanceToLine(Vector2 startPos, Vector2 endPos, Vector2 point);
 bool CheckCollisionLineCircle(Vector2 startPos, Vector2 endPos, Vector2 center, float radius);
 
@@ -89,8 +91,12 @@ public:
     void RemoveNode(Node* node);
     void RemoveComponent(Component* comp);
 
+    [[deprecated("Prefer FindNodeAtGridPoint().")]]
     Node* FindNodeAtPosition(Vector2 position, float radius) const;
+    Node* FindNodeAtGridPoint(Vector2 point) const; // Returns the first encountered node that meets the criteria
+    [[deprecated("Prefer FindWireIntersectingGridPoint().")]]
     Wire FindWireIntersectingPosition(Vector2 position, float radius) const;
+    Wire FindWireIntersectingGridPoint(Vector2 point) const; // Returns the first encountered wire that meets the criteria
     void FindSelectablesInRectangle(std::vector<Selectable>* output, Rectangle search) const;
     Component* FindComponentAtPosition(Vector2 position) const;
 

@@ -10,6 +10,11 @@
 #include "Component.h"
 #include "Graph.h"
 
+bool Vector2Equals(Vector2 a, Vector2 b)
+{
+    return a.x == b.x && a.y == b.y;
+}
+
 float Vector2DistanceToLine(Vector2 startPos, Vector2 endPos, Vector2 point)
 {
     Vector2 direction = Vector2Normalize(Vector2Subtract(endPos, startPos));
@@ -397,6 +402,18 @@ Node* Graph::FindNodeAtPosition(Vector2 position, float radius) const
     }
     return closest;
 }
+Node* Graph::FindNodeAtGridPoint(Vector2 point) const
+{
+    for (Node* node : nodes)
+    {
+        if (node->GetHidden())
+            continue;
+
+        if (Vector2Equals(node->GetPosition(), point))
+            return node;
+    }
+    return nullptr;
+}
 Wire Graph::FindWireIntersectingPosition(Vector2 position, float radius) const
 {
     float shortestDistance = radius;
@@ -430,6 +447,61 @@ Wire Graph::FindWireIntersectingPosition(Vector2 position, float radius) const
         }
     }
     return closest;
+}
+Wire Graph::FindWireIntersectingGridPoint(Vector2 point) const
+{
+    ResetVisited();
+    for (Node* start : nodes)
+    {
+        if (start->GetVisited() || start->GetHidden())
+            continue;
+
+        Vector2 a = start->GetPosition();
+
+        for (Node* end : start->GetOutputs())
+        {
+            if (end->GetVisited() || end->GetHidden() || (start->IsInComponent() && end->IsInComponent()))
+                continue;
+
+            Vector2 b = end->GetPosition();
+
+            // Vertical
+            if (a.x == b.x)
+            {
+                if (point.x != a.x)
+                    continue;
+
+                auto [min, max] = std::minmax(a.y, b.y);
+                if (min <= point.y && point.y <= max)
+                    return Wire{ start, end };
+            }
+            // Horizontal
+            else if (a.y == b.y)
+            {
+                if (point.y != a.y)
+                    continue;
+
+                auto [min, max] = std::minmax(a.x, b.x);
+                if (min <= point.x && point.x <= max)
+                    return Wire{ start, end };
+            }
+            // Diagonal
+            else
+            {
+                auto [minx, maxx] = std::minmax(a.x, b.x);
+                auto [miny, maxy] = std::minmax(a.y, b.y);
+
+                // Bounding box
+                if (minx < point.x && point.x < maxx &&
+                    miny < point.y && point.y < maxy &&
+                    abs(point.x - a.x) == abs(point.y - a.y))
+                {
+                    return Wire{ start, end };
+                }
+            }
+        }
+    }
+    return Wire{ nullptr, nullptr };
 }
 void Graph::FindSelectablesInRectangle(std::vector<Selectable>* output, Rectangle search) const
 {
