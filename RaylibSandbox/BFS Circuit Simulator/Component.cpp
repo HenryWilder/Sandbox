@@ -14,6 +14,9 @@ bool NodeBP_Helper::operator<(const NodeBP_Helper& other) const
     return position.y < other.position.y;
 }
 
+ComponentBlueprint::ComponentBlueprint() : inputs(), outputs(), nodes{} {}
+ComponentBlueprint::ComponentBlueprint(size_t inputs, size_t outputs) : inputs(inputs), outputs(outputs), nodes{} {}
+
 void ComponentBlueprint::GenerateBlueprintFromSelection(const std::vector<Node*>& source)
 {
     size_t helperIndex = 0;
@@ -110,6 +113,7 @@ void ComponentBlueprint::GenerateBlueprintFromSelection(const std::vector<Node*>
     delete[] helpers_block;
 }
 
+Component::Component(ComponentBlueprint* blueprint) : m_blueprint(blueprint), m_casingLeft{ 0,0,0,0 }, m_casingRight{ 0,0,0,0 } {}
 
 ComponentBlueprint* const Component::GetBlueprint() const
 {
@@ -141,27 +145,22 @@ void Component::Regenerate(std::vector<Node*>* add, std::vector<Node*>* remove)
     // Modify
     for (size_t i = 0; i < m_nodes.size(); ++i)
     {
-        m_nodes[i]->SetGate(m_blueprint->nodes[i].gate);
         m_nodes[i]->ClearReferencesToSelf(); // Make this node effectively a new one
+        m_nodes[i]->SetGate(m_blueprint->nodes[i].gate);
     }
     // Create
+    if (difference > 0)
+        add->reserve(add->size() + difference);
     for (size_t i = m_nodes.size(); i < m_blueprint->nodes.size(); ++i)
     {
         Node* node = new Node(Vector2Zero(), m_blueprint->nodes[i].gate);
+        node->SetContainingComponent(this);
         m_nodes.push_back(node);
+        if (difference > 0)
+            add->push_back(node);
     }
 
-    // At this point, m_nodes and m_blueprint->nodes have the same size.
-
-    // Nodes that need to be added
-    if (difference > 0)
-    {
-        add->reserve(add->size() + difference);
-        for (size_t i = m_blueprint->nodes.size() - difference; i < m_blueprint->nodes.size(); ++i)
-        {
-            add->push_back(m_nodes[i]);
-        }
-    }
+    // !At this point, m_nodes and m_blueprint->nodes have the same size!
 
     // Add connections
     // Adding/removing nodes requires permission from the Graph structure, but wires only require the nodes.
@@ -175,17 +174,20 @@ void Component::Regenerate(std::vector<Node*>* add, std::vector<Node*>* remove)
     }
 
     // Hide internals
-    for (size_t i = 0; i < m_inputs; ++i)
+    size_t i = 0;
+    for (; i < GetInputCount(); ++i)
     {
         m_nodes[i]->SetHidden(false);
         m_nodes[i]->SetComponentInput();
     }
-    for (size_t i = m_inputs; i < m_inputs + m_outputs; ++i)
+    ++i;
+    for (; i < GetInputCount() + GetOutputCount(); ++i)
     {
         m_nodes[i]->SetHidden(false);
         m_nodes[i]->SetComponentOutput();
     }
-    for (size_t i = m_inputs + m_outputs; i < m_nodes.size(); ++i)
+    ++i;
+    for (; i < m_nodes.size(); ++i)
     {
         m_nodes[i]->SetHidden(true);
         m_nodes[i]->SetComponentInternal();
@@ -194,15 +196,15 @@ void Component::Regenerate(std::vector<Node*>* add, std::vector<Node*>* remove)
 
 size_t Component::GetInputCount() const
 {
-    return m_inputs;
+    return m_blueprint->inputs;
 }
 size_t Component::GetOutputCount() const
 {
-    return m_outputs;
+    return m_blueprint->outputs;
 }
 size_t Component::GetInternalCount() const
 {
-    return m_nodes.size() - (m_inputs + m_outputs);
+    return m_nodes.size() - (m_blueprint->inputs + m_blueprint->outputs);
 }
 size_t Component::GetNodeCount() const
 {
@@ -228,24 +230,24 @@ void Component::SetPosition(Vector2 topLeft)
     m_casingLeft.x = topLeft.x;
     m_casingLeft.y = topLeft.y - g_gridUnit;
     m_casingLeft.width = halfWidth;
-    m_casingLeft.height = g_gridUnit * m_inputs + g_gridUnit;
+    m_casingLeft.height = g_gridUnit * GetInputCount() + g_gridUnit;
 
     m_casingRight.x = topLeft.x + halfWidth;
     m_casingRight.y = topLeft.y - g_gridUnit;
     m_casingRight.width = halfWidth;
-    m_casingRight.height = g_gridUnit * m_outputs + g_gridUnit;
+    m_casingRight.height = g_gridUnit * GetOutputCount() + g_gridUnit;
 
     float y = topLeft.y;
-    for (size_t i = 0; i < m_inputs; ++i)
+    for (size_t i = 0; i < GetInputCount(); ++i)
     {
         m_nodes[i]->SetPosition({ topLeft.x, y });
         y += g_gridUnit;
     }
     float rightSide = topLeft.x + halfWidth * 2;
     y = topLeft.y;
-    for (size_t i = 0; i < m_outputs; ++i)
+    for (size_t i = 0; i < GetOutputCount(); ++i)
     {
-        m_nodes[i + m_inputs]->SetPosition({ rightSide, y });
+        m_nodes[i + GetInputCount()]->SetPosition({ rightSide, y });
         y += g_gridUnit;
     }
 }

@@ -10,6 +10,18 @@
 #include "Component.h"
 #include "Graph.h"
 
+float Vector2DistanceToLine(Vector2 startPos, Vector2 endPos, Vector2 point)
+{
+    Vector2 direction = Vector2Normalize(Vector2Subtract(endPos, startPos));
+    Vector2 nearestPoint = Vector2Add(startPos, Vector2Scale(direction, Clamp(Vector2DotProduct(direction, Vector2Subtract(point, startPos)), 0, Vector2Distance(startPos, endPos))));
+    return Vector2Distance(point, nearestPoint);
+}
+
+bool CheckCollisionLineCircle(Vector2 startPos, Vector2 endPos, Vector2 center, float radius)
+{
+    return Vector2DistanceToLine(startPos, endPos, center) <= radius;
+}
+
 bool Selectable::operator==(const Selectable& other) const
 {
     if (other.type != type)
@@ -258,10 +270,11 @@ void Graph::DrawWires() const
             Color color = node->GetState() ? DARKBLUE : DARKGRAY;
             DrawLineV(node->GetPosition(), next->GetPosition(), color);
 
-            Vector2 midpoint = (node->GetPosition() + next->GetPosition()) * 0.5f;
-            Vector2 direction = Vector2Normalize(next->GetPosition() - node->GetPosition()) * g_gridUnit * 0.5f;
+            Vector2 midpoint = Vector2Scale(Vector2Add(node->GetPosition(), next->GetPosition()), 0.5f);
+            Vector2 direction = Vector2Scale(Vector2Normalize(Vector2Subtract(next->GetPosition(), node->GetPosition())), g_gridUnit * 0.5f);
             Vector2 angle = Vector2Rotate(direction, -135.0f);
-            DrawLineV(midpoint + direction, midpoint + direction + angle, color);
+            Vector2 offset = Vector2Add(midpoint, direction);
+            DrawLineV(offset, Vector2Add(offset, angle), color);
         }
     }
 }
@@ -401,7 +414,7 @@ Wire Graph::FindWireIntersectingPosition(Vector2 position, float radius) const
             if (end->GetHidden())
                 continue;
 
-            if (start->GetInComponent() && end->GetInComponent())
+            if (start->IsInComponent() && end->IsInComponent())
                 continue;
 
             float distance = Vector2DistanceToLine(start->GetPosition(), end->GetPosition(), position);
@@ -419,7 +432,7 @@ void Graph::FindSelectablesInRectangle(std::vector<Selectable>* output, Rectangl
     output->clear();
     for (Node* node : nodes)
     {
-        if (!node->GetInComponent() && CheckCollisionPointRec(node->GetPosition(), search))
+        if (!node->IsInComponent() && CheckCollisionPointRec(node->GetPosition(), search))
             output->push_back(Selectable(node));
     }
     for (Component* comp : components)
@@ -435,6 +448,7 @@ Component* Graph::FindComponentAtPosition(Vector2 position) const
         if (CheckCollisionPointRec(position, comp->GetCasingA()) || CheckCollisionPointRec(position, comp->GetCasingB()))
             return comp;
     }
+    return nullptr;
 }
 
 void Graph::Save(const char* filename)
@@ -616,7 +630,7 @@ void Graph::Load(const char* filename)
         file >> count;
 
         // Prep storage for the incoming number of nodes
-        graph->nodes.reserve(count);
+        nodes.reserve(count);
 
         // Read node data
         for (size_t i = 0; i < count; ++i)
@@ -624,7 +638,7 @@ void Graph::Load(const char* filename)
             Vector2 pos;
             char gate;
             file >> pos.x >> pos.y >> gate;
-            graph->AddNode(new Node(pos, (Gate)gate));
+            AddNode(new Node(pos, (Gate)gate));
         }
     }
 
@@ -641,7 +655,7 @@ void Graph::Load(const char* filename)
         {
             size_t a, b;
             file >> a >> b;
-            graph->ConnectNodes(graph->nodes[a], graph->nodes[b]);
+            ConnectNodes(nodes[a], nodes[b]);
         }
     }
 
@@ -651,7 +665,7 @@ void Graph::Load(const char* filename)
     {
         size_t count;
         file >> count;
-        graph->components.reserve(count);
+        components.reserve(count);
 
         for (size_t i = 0; i < count; ++i)
         {
@@ -661,7 +675,7 @@ void Graph::Load(const char* filename)
             file >> bpIndex >> position.x >> position.y >> nodeCount;
 
             Component* comp = new Component(blueprints[bpIndex]);
-            graph->components.push_back(comp);
+            components.push_back(comp);
             comp->SetPosition(position);
 
             // Save space for the nodes -- some can be reused, while the excess get dropped off.
@@ -672,8 +686,8 @@ void Graph::Load(const char* filename)
             {
                 size_t nodeIndex;
                 file >> nodeIndex;
-                comp->GetNodesVector().push_back(graph->nodes[nodeIndex]);
-                graph->nodes[nodeIndex]->SetInComponent(true);
+                comp->GetNodesVector().push_back(nodes[nodeIndex]);
+                nodes[nodeIndex]->SetComponentInternal();
             }
 
             // Hide internals
@@ -685,4 +699,9 @@ void Graph::Load(const char* filename)
     }
 
     file.close();
+}
+
+const std::vector<Node*>& Graph::GetNodes() const
+{
+    return nodes;
 }

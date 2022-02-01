@@ -1,5 +1,14 @@
 #pragma once
 
+struct ComponentBlueprint;
+class Component;
+enum class Gate : char;
+class Node;
+struct Wire;
+
+float Vector2DistanceToLine(Vector2 startPos, Vector2 endPos, Vector2 point);
+bool CheckCollisionLineCircle(Vector2 startPos, Vector2 endPos, Vector2 center, float radius);
+
 struct Selectable
 {
     Selectable(Node* node) :
@@ -86,4 +95,6 @@ public:
 
     void Save(const char* filename);
     void Load(const char* filename);
+
+    const std::vector<Node*>& GetNodes() const;
 };

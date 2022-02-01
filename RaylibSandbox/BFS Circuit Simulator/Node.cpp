@@ -6,8 +6,9 @@
 #include <algorithm>
 #include <unordered_map>
 
-#include "Component.h"
 #include "Node.h"
+
+Node::Node(Vector2 position, Gate type) : m_position(position), m_type(type), b_state(false), b_visited(false), b_hidden(false), m_componentFlags(0b00), m_container(nullptr), m_inputs{}, m_outputs{} {}
 
 Vector2 Node::GetPosition() const
 {
@@ -181,7 +182,7 @@ void Node::ClearReferencesToSelf()
     m_outputs.clear();
 }
 
-void DrawGateIcon(Gate type, Vector2 center, float radius, Color color, bool drawXORline = true)
+void DrawGateIcon(Gate type, Vector2 center, float radius, Color color, bool drawXORline)
 {
     switch (type)
     {
@@ -256,12 +257,12 @@ void DrawHighlightedGate(Vector2 position, Gate type)
 }
 
 
-bool IsNodeInVector(const std::vector<const Node*>& vector, const Node* node)
+bool IsNodeInVector(const std::vector<Node*>& vector, const Node* node)
 {
     return std::find(vector.begin(), vector.end(), node) != vector.end();
 }
 
-bool FindNodeIndexInVector(const std::vector<const Node*>& vector, const Node* node, size_t* index)
+bool FindNodeIndexInVector(const std::vector<Node*>& vector, const Node* node, size_t* index)
 {
     auto it = std::find(vector.begin(), vector.end(), node);
     *index = it - vector.begin();
@@ -273,9 +274,7 @@ size_t NodeIndexInVector(const std::vector<Node*>& vector, const Node* node)
     return std::find(vector.begin(), vector.end(), node) - vector.begin();
 }
 
-// Helper function for finding the relative indices of nodes in a vector
-// Destination map is expected to be empty
-void MapNodeRelativeIndices(const std::vector<const Node*>& source, std::unordered_map<const Node*, size_t>& dest)
+void MapNodeRelativeIndices(const std::vector<Node*>& source, std::unordered_map<const Node*, size_t>& dest)
 {
     dest.reserve(source.size());
     for (size_t i = 0; i < source.size(); ++i)
@@ -284,9 +283,7 @@ void MapNodeRelativeIndices(const std::vector<const Node*>& source, std::unorder
     }
 }
 
-// Helper function for finding the relative indices of nodes for all contained wires in a vector
-// Destination vector is expected to be empty
-void ListWireRelativeIndices(const std::vector<const Node*>& source, std::vector<WireRelative>& dest)
+void ListWireRelativeIndices(const std::vector<Node*>& source, std::vector<WireRelative>& dest)
 {
     std::unordered_map<const Node*, size_t> map;
     MapNodeRelativeIndices(source, map);

@@ -1,29 +1,30 @@
 #pragma once
 
+enum class Gate : char;
+class Node;
+
 struct NodeBlueprint
 {
     Gate gate;
     std::vector<size_t> outputs;
 };
 
+
 struct NodeBP_Helper
 {
-    Gate gate = Gate::OR;
-    Vector2 position = Vector2Zero();
-    bool noInputs = false;
+    Gate gate;
+    Vector2 position;
+    bool noInputs;
     std::vector<NodeBP_Helper*> outputs;
 
     bool operator<(const NodeBP_Helper& other) const;
 };
 
+
 struct ComponentBlueprint
 {
-    ComponentBlueprint() = default;
-
-    ComponentBlueprint(size_t inputs, size_t outputs) :
-        inputs(inputs),
-        outputs(outputs)
-    {}
+    ComponentBlueprint();
+    ComponentBlueprint(size_t inputs, size_t outputs);
 
     size_t inputs;
     size_t outputs;
@@ -31,7 +32,6 @@ struct ComponentBlueprint
 
     void GenerateBlueprintFromSelection(const std::vector<Node*>& source);
 };
-
 
 
 class Component
@@ -43,11 +43,7 @@ private:
     std::vector<Node*> m_nodes; // Sorted in blueprint
 
 public:
-    Component(ComponentBlueprint* blueprint) :
-        m_blueprint(blueprint),
-        m_casingLeft{ 0,0,0,0 },
-        m_casingRight{ 0,0,0,0 }
-    {}
+    Component(ComponentBlueprint* blueprint);
 
     ComponentBlueprint* const GetBlueprint() const;
     void SetBlueprint(ComponentBlueprint* blueprint);

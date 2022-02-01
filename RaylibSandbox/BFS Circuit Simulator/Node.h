@@ -1,5 +1,7 @@
 #pragma once
 
+class Component;
+
 constexpr float g_nodeRadius = 6.0f;
 constexpr float g_gridUnit = g_nodeRadius * 2.0f;
 
@@ -26,17 +28,7 @@ private:
     std::vector<Node*> m_outputs;
 
 public:
-    Node(Vector2 position, Gate type) :
-        m_position(position),
-        m_type(type),
-        b_state(false),
-        b_visited(false),
-        b_hidden(false),
-        m_componentFlags(0b00),
-        m_container(nullptr),
-        m_inputs{},
-        m_outputs{}
-    {}
+    Node(Vector2 position, Gate type);
 
     Vector2 GetPosition() const;
     void SetPosition(Vector2 position);
@@ -92,18 +84,6 @@ public:
 void DrawGateIcon(Gate type, Vector2 center, float radius, Color color, bool drawXORline = true);
 void DrawHighlightedGate(Vector2 position, Gate type);
 
-struct Wire
-{
-    Node* a;
-    Node* b;
-};
-
-struct WireRelative
-{
-    size_t a;
-    size_t b;
-};
-
 bool IsNodeInVector(const std::vector<Node*>& vector, const Node* node);
 // Use if you aren't sure whether the node is in the vector or not
 bool FindNodeIndexInVector(const std::vector<Node*>& vector, const Node* node, size_t* index);
@@ -113,6 +93,19 @@ size_t NodeIndexInVector(const std::vector<Node*>& vector, const Node* node);
 // Helper function for finding the relative indices of nodes in a vector
 // Destination map is expected to be empty
 void MapNodeRelativeIndices(const std::vector<Node*>& source, std::unordered_map<const Node*, size_t>& dest);
+
+struct Wire
+{
+    Node* a;
+    Node* b;
+};
+
+
+struct WireRelative
+{
+    size_t a;
+    size_t b;
+};
 
 // Helper function for finding the relative indices of nodes for all contained wires in a vector
 // Destination vector is expected to be empty

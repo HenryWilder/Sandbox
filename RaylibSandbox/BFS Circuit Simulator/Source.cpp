@@ -6,6 +6,10 @@
 #include <algorithm>
 #include <unordered_map>
 
+#include "Node.h"
+#include "Component.h"
+#include "Graph.h"
+
 #define sign(x) (((x) > (decltype(x))(0)) - ((x) < (decltype(x))(0)))
 
 using Vector1 = float;
@@ -50,21 +54,6 @@ inline Vector3& operator/=(Vector3& a, float div) { return (a = Vector3Scale(a, 
 
 #pragma endregion
 
-#include "Node.h"
-#include "Component.h"
-#include "Graph.h"
-
-float Vector2DistanceToLine(Vector2 startPos, Vector2 endPos, Vector2 point)
-{
-    Vector2 direction = Vector2Normalize(endPos - startPos);
-    Vector2 nearestPoint = startPos + direction * Clamp(Vector2DotProduct(direction, point - startPos), 0, Vector2Distance(startPos, endPos));
-    return Vector2Distance(point, nearestPoint);
-}
-bool CheckCollisionLineCircle(Vector2 startPos, Vector2 endPos, Vector2 center, float radius)
-{
-    return Vector2DistanceToLine(startPos, endPos, center) <= radius;
-}
-
 int Snap(int x, int gridsize)
 {
     x /= gridsize;
@@ -82,41 +71,6 @@ Vector2 Snap(Vector2 pt, float gridsize)
 float Signf(float value)
 {
     return (value > 0.01f ? 1.0f : (value < -0.01f ? -1.0f : 0.0f));
-}
-void CompressWire(Node* start, Node* end, float length)
-{
-    Vector2 pos = end->GetPosition();
-    pos.x = start->GetPosition().x + length * Signf(pos.x - start->GetPosition().x);
-    pos.y = start->GetPosition().y + length * Signf(pos.y - start->GetPosition().y);
-    end->SetPosition(pos);
-}
-void CompressNetwork(Node* start, float length)
-{
-    std::vector<Node*> wave;
-    start->SetVisited(true);
-
-
-    for (Node* output : start->GetOutputs())
-    {
-        if (!output->GetVisited())
-            wave.push_back(output);
-    }
-    for (Node* input : start->GetInputs())
-    {
-        if (!input->GetVisited())
-            wave.push_back(input);
-    }
-
-    for (Node* node : wave)
-    {
-        node->SetVisited(true);
-        CompressWire(start, node, length);
-    }
-    for (Node* node : wave)
-    {
-        CompressNetwork(node, length);
-    }
-    wave.clear();
 }
 
 struct GateSelection
@@ -784,7 +738,7 @@ int main()
     *   Unload and free memory                *
     ******************************************/
 
-    for (Node* node : graph.nodes)
+    for (Node* node : graph.GetNodes())
     {
         delete node;
     }
