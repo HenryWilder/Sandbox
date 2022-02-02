@@ -156,6 +156,7 @@ int main()
     Vector2 marqueeStart = Vector2Zero();
     Rectangle selectionRec;
     std::vector<Selectable> selection;
+    bool holdingTemporaryComponent = false; // If move is cancelled while this is true, we need to clean up the component
 
     while (!WindowShouldClose())
     {
@@ -211,7 +212,8 @@ int main()
             {
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
                 {
-                    marqueeStart = cursor;
+                    if (!holdingTemporaryComponent)
+                        marqueeStart = cursor;
                     marqueeDragging = true;
                 }
 
@@ -221,7 +223,7 @@ int main()
                     Vector2 offset = cursor - marqueeStart;
 
                     // Copy
-                    if (IsModifierDown(KEY_ALT))
+                    if (IsModifierDown(KEY_ALT) && !holdingTemporaryComponent)
                     {
                         std::vector<Selectable> copies;
 
@@ -276,6 +278,10 @@ int main()
                             case Selectable::Type::COMP:
                                 element.comp->SetPosition(element.comp->GetPosition() + offset);
                             }
+                        }
+                        if (holdingTemporaryComponent)
+                        {
+                            holdingTemporaryComponent = false;
                         }
                     }
                 }
@@ -470,40 +476,11 @@ int main()
 
             ComponentBlueprint* blueprint = new ComponentBlueprint();
             blueprint->GenerateBlueprintFromSelection(breakdown);
-
-            Vector2 minPoint = { INFINITY, INFINITY };
-            for (Selectable element : selection)
-            {
-                Vector2 pos;
-
-                if (element.type == Selectable::Type::COMP)
-                    pos = element.comp->GetPosition();
-                else
-                    pos = element.node->GetPosition();
-
-                if (pos.x < minPoint.x)
-                    minPoint.x = pos.x;
-
-                if (pos.y < minPoint.y)
-                    minPoint.y = pos.y;
-            }
-            graph.CloneComponentAtPosition(blueprint, minPoint);
-
-            for (Selectable element : selection)
-            {
-                if (element.type == Selectable::Type::COMP)
-                {
-                    graph.RemoveComponent(element.comp);
-                    delete element.comp;
-                }
-                else
-                {
-                    graph.RemoveNode(element.node);
-                    delete element.node;
-                }
-            }
             selection.clear();
-
+            marqueeStart = { g_gridUnit * -6, 0 };
+            Component* clone = graph.CloneComponentAtPosition(blueprint, marqueeStart); // Place the component offscreen
+            selection.push_back(Selectable(clone));
+            holdingTemporaryComponent = true;
             graphDirty = true;
         }
 
@@ -633,7 +610,7 @@ int main()
             graph.DrawWires();
 
             // Moving points
-            if (marqueeDragging)
+            if (marqueeDragging || holdingTemporaryComponent)
             {
                 Vector2 offset = cursor - marqueeStart;
                 for (Selectable element : selection)

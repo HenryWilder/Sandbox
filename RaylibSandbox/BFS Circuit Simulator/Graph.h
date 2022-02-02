@@ -62,7 +62,8 @@ public:
     void RegenerateComponents(std::vector<Component*>& components);
     void RegenerateAllComponents();
 
-    void CloneComponentAtPosition(ComponentBlueprint* blueprint, Vector2 position);
+    // Returns the pointer to the clone
+    Component* CloneComponentAtPosition(ComponentBlueprint* blueprint, Vector2 position);
 
     void MarkRouteDirty();
     void MarkGateDirty();
@@ -91,10 +92,8 @@ public:
     void RemoveNode(Node* node);
     void RemoveComponent(Component* comp);
 
-    [[deprecated("Prefer FindNodeAtGridPoint().")]]
     Node* FindNodeAtPosition(Vector2 position, float radius) const;
     Node* FindNodeAtGridPoint(Vector2 point) const; // Returns the first encountered node that meets the criteria
-    [[deprecated("Prefer FindWireIntersectingGridPoint().")]]
     Wire FindWireIntersectingPosition(Vector2 position, float radius) const;
     Wire FindWireIntersectingGridPoint(Vector2 point) const; // Returns the first encountered wire that meets the criteria
     void FindSelectablesInRectangle(std::vector<Selectable>* output, Rectangle search) const;

@@ -111,12 +111,13 @@ void Graph::RegenerateAllComponents()
     RegenerateComponents(components);
 }
 
-void Graph::CloneComponentAtPosition(ComponentBlueprint* blueprint, Vector2 position)
+Component* Graph::CloneComponentAtPosition(ComponentBlueprint* blueprint, Vector2 position)
 {
     Component* comp = new Component(blueprint);
     components.push_back(comp);
     RegenerateSingleComponent(comp);
     comp->SetPosition(position);
+    return comp;
 }
 
 void Graph::MarkRouteDirty()
@@ -384,6 +385,7 @@ void Graph::RemoveComponent(Component* comp)
     }
 }
 
+[[deprecated("Prefer FindNodeAtGridPoint().")]]
 Node* Graph::FindNodeAtPosition(Vector2 position, float radius) const
 {
     float shortestDistance = radius;
@@ -414,6 +416,7 @@ Node* Graph::FindNodeAtGridPoint(Vector2 point) const
     }
     return nullptr;
 }
+[[deprecated("Prefer FindWireIntersectingGridPoint().")]]
 Wire Graph::FindWireIntersectingPosition(Vector2 position, float radius) const
 {
     float shortestDistance = radius;
