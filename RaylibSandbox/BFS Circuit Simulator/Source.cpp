@@ -410,6 +410,25 @@ int main()
         {
             if (hoveredNode)
             {
+                if (IsModifierDown(KEY_SHIFT)) // Transfer inputs to outputs
+                {
+                    if (hoveredNode->InputCount() == 1)
+                    {
+                        Node* handoff = hoveredNode->GetInput(0);
+                        for (Node* output : hoveredNode->GetOutputs())
+                        {
+                            graph.ConnectNodes(handoff, output);
+                        }
+                    }
+                    else if (hoveredNode->OutputCount() == 1)
+                    {
+                        Node* handoff = hoveredNode->GetOutput(0);
+                        for (Node* input : hoveredNode->GetInputs())
+                        {
+                            graph.ConnectNodes(input, handoff);
+                        }
+                    }
+                }
                 graph.RemoveNode(hoveredNode);
                 delete hoveredNode;
                 hoveredNode = nullptr;
@@ -417,7 +436,16 @@ int main()
             }
             else if (hoveredWire.a)
             {
-                graph.DisconnectNodes(hoveredWire.a, hoveredWire.b);
+                if (IsModifierDown(KEY_SHIFT)) // Also delete the related nodes
+                {
+                    graph.RemoveNode(hoveredWire.a);
+                    graph.RemoveNode(hoveredWire.b);
+                    delete hoveredWire.a;
+                    delete hoveredWire.b;
+                }
+                else
+                    graph.DisconnectNodes(hoveredWire.a, hoveredWire.b);
+
                 hoveredWire = { nullptr, nullptr };
                 graphDirty = true;
             }
