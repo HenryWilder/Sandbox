@@ -132,6 +132,29 @@ bool IsModifierDown(int id)
     }
 }
 
+Vector2 ConstrainOffset(Vector2 constraint, Vector2 point)
+{
+    Vector2 difference = Vector2Subtract(point, constraint);
+    float xSize = abs(difference.x);
+    float ySize = abs(difference.y);
+    auto [shortLength, longLength] = std::minmax(xSize, ySize);
+
+    if (shortLength > longLength * 0.5) // Diagonal
+    {
+        return {
+            constraint.x + copysignf(shortLength, difference.x),
+            constraint.y + copysignf(shortLength, difference.y)
+        };
+    }
+    else // Cardinal
+    {
+        if (xSize < ySize)
+            return { constraint.x, point.y };
+        else
+            return { point.x, constraint.y };
+    }
+}
+
 int main()
 {
     int windowWidth = 1280;
@@ -179,32 +202,11 @@ int main()
 
         // Lock wire directions
         if (selectionStart)
-        {
-            Vector2 start = selectionStart->GetPosition();
-            Vector2 difference = Vector2Subtract(cursor, start);
-            float xSize = abs(difference.x);
-            float ySize = abs(difference.y);
-            auto[shortLength, longLength] = std::minmax(xSize, ySize);
-
-            if (shortLength > longLength * 0.5) // Diagonal
-            {
-                cursor = {
-                    start.x + copysignf(shortLength, difference.x),
-                    start.y + copysignf(shortLength, difference.y)
-                };
-            }
-            else // Cardinal
-            {
-                if (xSize < ySize)
-                    cursor.x = start.x;
-                else
-                    cursor.y = start.y;
-            }
-        }
+            cursor = ConstrainOffset(selectionStart->GetPosition(), cursor);
 
         // Hover
         Node* hoveredNode = graph.FindNodeAtGridPoint(cursor);
-        Wire hoveredWire = (hoveredNode ? Wire{ nullptr, nullptr }  : graph.FindWireIntersectingGridPoint(cursor));
+        Wire hoveredWire = (hoveredNode ? WireNull()  : graph.FindWireIntersectingGridPoint(cursor));
 
         if (!marqueeSelecting)
         {
@@ -224,65 +226,15 @@ int main()
 
                     // Copy
                     if (IsModifierDown(KEY_ALT) && !holdingTemporaryComponent)
-                    {
-                        std::vector<Selectable> copies;
-
-                        copies.reserve(selection.size());
-                        for (Selectable src : selection)
-                        {
-                            if (src.type == Selectable::Type::COMP)
-                            {
-                                graph.CloneComponentAtPosition(src.comp->GetBlueprint(), src.comp->GetPosition() + offset);
-                            }
-                            else
-                            {
-                                Selectable copy = Selectable(new Node(src.node->GetPosition() + offset, src.node->GetGate()));
-                                copies.push_back(copy);
-                                graph.AddNode(copies.back().node);
-                            }
-                        }
-
-                        graph.ResetVisited();
-                        for (Selectable start : selection)
-                        {
-                            if (start.node->GetVisited())
-                                continue;
-
-                            size_t a = std::find(selection.begin(), selection.end(), start) - selection.begin();
-
-                            for (Node* end : start.node->GetOutputs())
-                            {
-                                if (end->GetVisited())
-                                    break;
-
-                                auto it = std::find(selection.begin(), selection.end(), end);
-
-                                if (it != selection.end())
-                                {
-                                    size_t b = it - selection.begin();
-                                    graph.ConnectNodes(copies[a].node, copies[b].node);
-                                }
-                            }
-                        }
-                    }
+                        graph.CloneNodesWithOffset(selection, offset);
                     // Move
                     else
                     {
-                        for (Selectable element : selection)
-                        {
-                            switch (element.type)
-                            {
-                            case Selectable::Type::NODE:
-                                element.node->SetPosition(element.node->GetPosition() + offset);
-                                break;
-                            case Selectable::Type::COMP:
-                                element.comp->SetPosition(element.comp->GetPosition() + offset);
-                            }
-                        }
+                        graph.OffsetNodes(selection, offset);
+
+                        // todo: ????
                         if (holdingTemporaryComponent)
-                        {
                             holdingTemporaryComponent = false;
-                        }
                     }
                 }
             }
@@ -293,25 +245,22 @@ int main()
                 {
                     selectionEnd = hoveredNode;
 
-                    // Finalize
+                    // Finish making connection
                     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                     {
                         if (selectionEnd != selectionStart)
                         {
                             if (!selectionEnd)
-                            {
-                                selectionEnd = new Node(cursor, Gate::OR);
-                                graph.AddNode(selectionEnd);
-                            }
+                                selectionEnd = graph.AddNewNode(cursor);
+
                             graph.ConnectNodes(selectionStart, selectionEnd);
                             graphDirty = true;
 
                             // Divide wire
-                            if (hoveredWire.a)
+                            if (hoveredWire)
                             {
-                                graph.DisconnectNodes(hoveredWire.a, hoveredWire.b);
-                                graph.ConnectNodes(hoveredWire.a, selectionEnd);
-                                graph.ConnectNodes(selectionEnd, hoveredWire.b);
+                                graph.DivideWire(hoveredWire, selectionEnd);
+                                hoveredWire = WireNull();
                             }
                         }
                         selectionStart = selectionEnd = nullptr;
@@ -324,17 +273,14 @@ int main()
 
                     if (!selectionStart)
                     {
-                        selectionStart = new Node(cursor, Gate::OR);
-                        hoveredNode = selectionStart;
-                        graph.AddNode(selectionStart);
+                        selectionStart = graph.AddNewNode(cursor);
                         graphDirty = true;
 
                         // Divide wire
-                        if (hoveredWire.a)
+                        if (hoveredWire)
                         {
-                            graph.DisconnectNodes(hoveredWire.a, hoveredWire.b);
-                            graph.ConnectNodes(hoveredWire.a, selectionStart);
-                            graph.ConnectNodes(selectionStart, hoveredWire.b);
+                            graph.DivideWire(hoveredWire, selectionStart);
+                            hoveredWire = WireNull();
                         }
                     }
                 }
@@ -343,14 +289,10 @@ int main()
                 if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON) && !selectionStart)
                 {
                     if (hoveredNode)
-                    {
                         selectionStart = hoveredNode;
-                    }
-                    else if (hoveredWire.a)
+                    else if (hoveredWire)
                     {
-                        graph.DisconnectNodes(hoveredWire.a, hoveredWire.b);
-                        graph.ConnectNodes(hoveredWire.b, hoveredWire.a);
-                        hoveredWire = { hoveredWire.b, hoveredWire.a };
+                        hoveredWire = graph.ReverseWire(hoveredWire);
                         graphDirty = true;
                     }
                 }
@@ -358,13 +300,9 @@ int main()
                 {
 
                     // Middle click
-                    if (cursor.x == selectionStart->GetPosition().x &&
-                        cursor.y == selectionStart->GetPosition().y)
+                    if (Vector2Equals(cursor, selectionStart->GetPosition()))
                     {
-                        if (selectionStart->GetGate() != Gate::NOR)
-                            selectionStart->SetGate(Gate::NOR);
-                        else
-                            selectionStart->SetGate(Gate::OR);
+                        selectionStart->SetGate(selectionStart->GetGate() != Gate::NOR ? Gate::NOR : Gate::OR);
                     }
                     // Middle drag
                     else
@@ -380,8 +318,7 @@ int main()
                     else
                         selectionStart->SetState(selectionStart->GetGate() == Gate::NOR);
 
-                    selectionStart = nullptr;
-                    selectionEnd = nullptr;
+                    selectionStart = selectionEnd = nullptr;
                 }
             }
         }
@@ -392,15 +329,9 @@ int main()
             for (Selectable element : selection)
             {
                 if (element.type == Selectable::Type::COMP)
-                {
-                    graph.RemoveComponent(element.comp);
-                    delete element.comp;
-                }
+                    graph.RemoveComponentEntirely(element.comp);
                 else
-                {
-                    graph.RemoveNode(element.node);
-                    delete element.node;
-                }
+                    graph.RemoveNodeEntirely(element.node);
             }
             selection.clear();
         }
@@ -410,43 +341,37 @@ int main()
         {
             if (hoveredNode)
             {
-                if (IsModifierDown(KEY_SHIFT)) // Transfer inputs to outputs
+                bool removed;
+
+                // Transfer inputs to outputs
+                if (IsModifierDown(KEY_SHIFT) &&
+                    !(hoveredNode->InputCount () == 1 &&
+                      hoveredNode->OutputCount() == 1))
                 {
-                    if (hoveredNode->InputCount() == 1)
-                    {
-                        Node* handoff = hoveredNode->GetInput(0);
-                        for (Node* output : hoveredNode->GetOutputs())
-                        {
-                            graph.ConnectNodes(handoff, output);
-                        }
-                    }
-                    else if (hoveredNode->OutputCount() == 1)
-                    {
-                        Node* handoff = hoveredNode->GetOutput(0);
-                        for (Node* input : hoveredNode->GetInputs())
-                        {
-                            graph.ConnectNodes(input, handoff);
-                        }
-                    }
+                    hoveredNode->SetGate(Gate::OR);
                 }
-                graph.RemoveNode(hoveredNode);
-                delete hoveredNode;
-                hoveredNode = nullptr;
+                else
+                {
+                    if (IsModifierDown(KEY_SHIFT))
+                        graph.ConnectNodes(hoveredNode->GetInput(0), hoveredNode->GetOutput(0));
+
+                    graph.RemoveNodeEntirely(hoveredNode);
+                    hoveredNode = nullptr;
+                }
+
                 graphDirty = true;
             }
-            else if (hoveredWire.a)
+            else if (hoveredWire)
             {
                 if (IsModifierDown(KEY_SHIFT)) // Also delete the related nodes
                 {
-                    graph.RemoveNode(hoveredWire.a);
-                    graph.RemoveNode(hoveredWire.b);
-                    delete hoveredWire.a;
-                    delete hoveredWire.b;
+                    graph.RemoveNodeEntirely(hoveredWire.a);
+                    graph.RemoveNodeEntirely(hoveredWire.b);
                 }
                 else
                     graph.DisconnectNodes(hoveredWire.a, hoveredWire.b);
 
-                hoveredWire = { nullptr, nullptr };
+                hoveredWire = WireNull();
                 graphDirty = true;
             }
             else

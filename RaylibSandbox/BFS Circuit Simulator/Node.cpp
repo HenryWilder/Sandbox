@@ -119,7 +119,7 @@ void Node::AddInput(Node* input)
     if (!input)
         return;
 
-    if (std::find(m_inputs.begin(), m_inputs.end(), input) == m_inputs.end()) // Prevent duplicates
+    if (HasNodeAsInput(input)) // Prevent duplicates
         m_inputs.push_back(input);
 }
 void Node::RemoveInput(const Node* input)
@@ -130,6 +130,11 @@ void Node::RemoveInput(const Node* input)
     auto it = std::find(m_inputs.begin(), m_inputs.end(), input);
     if (it != m_inputs.end())
         m_inputs.erase(it);
+}
+
+bool Node::HasNodeAsInput(const Node* input) const
+{
+    return IsNodeInVector(m_inputs, input);
 }
 
 bool Node::HasNoOutputs() const
@@ -154,7 +159,7 @@ void Node::AddOutput(Node* output)
     if (!output)
         return;
 
-    if (std::find(m_outputs.begin(), m_outputs.end(), output) == m_outputs.end()) // Prevent duplicates
+    if (HasNodeAsOutput(output)) // Prevent duplicates
         m_outputs.push_back(output);
 }
 void Node::RemoveOutput(const Node* output)
@@ -165,6 +170,11 @@ void Node::RemoveOutput(const Node* output)
     auto it = std::find(m_outputs.begin(), m_outputs.end(), output);
     if (it != m_outputs.end())
         m_outputs.erase(it);
+}
+
+bool Node::HasNodeAsOutput(const Node* output) const
+{
+    return IsNodeInVector(m_outputs, output);
 }
 
 void Node::ClearReferencesToSelf()

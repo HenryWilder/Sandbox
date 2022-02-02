@@ -64,6 +64,7 @@ public:
 
     void AddInput(Node* input);
     void RemoveInput(const Node* input);
+    bool HasNodeAsInput(const Node* input) const;
 
     bool HasNoOutputs() const;
     bool OutputCount() const;
@@ -72,6 +73,7 @@ public:
 
     void AddOutput(Node* output);
     void RemoveOutput(const Node* output);
+    bool HasNodeAsOutput(const Node* output) const;
 
     // Warning: Affects input/output nodes
     // Always use this before deleting the node
@@ -98,8 +100,24 @@ struct Wire
 {
     Node* a;
     Node* b;
-};
 
+    inline operator bool()
+    {
+        return a && b;
+    }
+};
+// Test if a wire might not be valid anymore
+bool CheckWireIntegrity(Wire wire)
+{
+    return
+        (bool)wire &&
+        wire.a->HasNodeAsOutput(wire.b) &&
+        wire.b->HasNodeAsInput(wire.a);
+}
+inline constexpr Wire WireNull()
+{
+    return Wire{ nullptr, nullptr };
+}
 
 struct WireRelative
 {

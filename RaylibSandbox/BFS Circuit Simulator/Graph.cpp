@@ -337,6 +337,13 @@ void Graph::AddNode(Node* newNode)
         nodes.push_back(newNode);
 }
 
+Node* Graph::AddNewNode(Vector2 position)
+{
+    Node* node = new Node(position, Gate::OR);
+    AddNode(node);
+    return node;
+}
+
 void Graph::ConnectNodes(Node* start, Node* end)
 {
     auto endIt = std::find(start->GetInputs().begin(), start->GetInputs().end(), end);
@@ -368,6 +375,27 @@ void Graph::RemoveNode(Node* node)
         nodes.erase(it);
     }
 }
+bool Graph::RemoveNodeAndTransferConnections(Node* node)
+{
+    bool safe =
+        node->InputCount () == 1 &&
+        node->OutputCount() == 1;
+
+    if (safe)
+    {
+        ConnectNodes(node->GetInput(0), node->GetOutput(0));
+        RemoveNode(node);
+    }
+    else
+        node->SetGate(Gate::OR);
+
+    return safe;
+}
+void Graph::RemoveNodeEntirely(Node* node)
+{
+    RemoveNode(node);
+    delete node;
+}
 void Graph::RemoveComponent(Component* comp)
 {
     if (!comp)
@@ -383,6 +411,11 @@ void Graph::RemoveComponent(Component* comp)
         }
         components.erase(it);
     }
+}
+void Graph::RemoveComponentEntirely(Component* comp)
+{
+    RemoveComponent(comp);
+    delete comp;
 }
 
 [[deprecated("Prefer FindNodeAtGridPoint().")]]
@@ -762,4 +795,76 @@ void Graph::Load(const char* filename)
 const std::vector<Node*>& Graph::GetNodes() const
 {
     return nodes;
+}
+
+void Graph::OffsetNodes(const std::vector<Selectable>& source, Vector2 offset)
+{
+    for (Selectable element : source)
+    {
+        switch (element.type)
+        {
+        case Selectable::Type::NODE:
+            element.node->SetPosition(Vector2Add(element.node->GetPosition(), offset));
+            break;
+        case Selectable::Type::COMP:
+            element.comp->SetPosition(Vector2Add(element.comp->GetPosition(), offset));
+        }
+    }
+}
+
+void Graph::CloneNodesWithOffset(const std::vector<Selectable>& source, Vector2 offset)
+{
+    std::vector<Selectable> copies;
+
+    copies.reserve(source.size());
+    for (Selectable src : source)
+    {
+        if (src.type == Selectable::Type::COMP)
+        {
+            CloneComponentAtPosition(src.comp->GetBlueprint(), Vector2Add(src.comp->GetPosition(), offset));
+        }
+        else
+        {
+            Selectable copy = Selectable(new Node(Vector2Add(src.node->GetPosition(), offset), src.node->GetGate()));
+            copies.push_back(copy);
+            AddNode(copies.back().node);
+        }
+    }
+
+    ResetVisited();
+    for (Selectable start : source)
+    {
+        if (start.node->GetVisited())
+            continue;
+
+        size_t a = std::find(source.begin(), source.end(), start) - source.begin();
+
+        for (Node* end : start.node->GetOutputs())
+        {
+            if (end->GetVisited())
+                break;
+
+            auto it = std::find(source.begin(), source.end(), end);
+
+            if (it != source.end())
+            {
+                size_t b = it - source.begin();
+                ConnectNodes(copies[a].node, copies[b].node);
+            }
+        }
+    }
+}
+
+void Graph::DivideWire(Wire wire, Node* interloper)
+{
+    DisconnectNodes(wire.a, wire.b);
+    ConnectNodes(wire.a, interloper);
+    ConnectNodes(interloper, wire.b);
+}
+
+Wire Graph::ReverseWire(Wire wire)
+{
+    DisconnectNodes(wire.a, wire.b);
+    ConnectNodes(wire.b, wire.a);
+    return { wire.b, wire.a };
 }
