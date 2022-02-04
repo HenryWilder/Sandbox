@@ -1,4 +1,5 @@
 #pragma once
+#include <vector>
 
 struct ComponentBlueprint;
 class Component;
@@ -11,31 +12,24 @@ bool Vector2Equals(Vector2 a, Vector2 b);
 float Vector2DistanceToLine(Vector2 startPos, Vector2 endPos, Vector2 point);
 bool CheckCollisionLineCircle(Vector2 startPos, Vector2 endPos, Vector2 center, float radius);
 
-struct Selectable
+struct Selection
 {
-    Selectable(Node* node) :
-        type(Type::NODE),
-        node(node)
-    {}
+    bool dirty = true; // Track at your own leisure
+    std::vector<Node*> nodes;
+    std::vector<Component*> comps;
 
-    Selectable(Component* comp) :
-        type(Type::COMP),
-        comp(comp)
-    {}
+    void AccountForComponentNodes();
 
-    enum class Type
+    inline void Dirty()
     {
-        NODE,
-        COMP,
-    } type;
-
-    union
+        dirty = true;
+    }
+    inline void Clean()
     {
-        Node* node;
-        Component* comp;
-    };
-
-    bool operator==(const Selectable& other) const;
+        if (dirty)
+            AccountForComponentNodes();
+        dirty = false;
+    }
 };
 
 class Graph
@@ -89,6 +83,7 @@ public:
 
     // Erases a node from existence
     void RemoveNode(Node* node);
+    void RemoveMultipleNodes(const std::vector<Node*>& remove);
     // Note: If the connections cannot be transfered cleanly the node will not be deleted and instead be made an OR gate.
     // Returns true if the node was removed and is safe to delete. False means the node is still in use and should not be deleted.
     bool RemoveNodeAndTransferConnections(Node* node);
@@ -98,7 +93,7 @@ public:
 
     void DrawNodes() const;
 
-    void OffsetNodes(const std::vector<Selectable>& source, Vector2 offset);
+    void OffsetNodes(const Selection& source, Vector2 offset);
     bool FindNodeIndexInGraph(const Node* node, size_t* index) const;
     size_t NodeIndexInGraph(const Node* node) const;
     void ResetVisited() const;
@@ -133,6 +128,7 @@ public:
     void RegenerateAllComponents();
 
     void RemoveComponent(Component* comp);
+    void RemoveMultipleComponents(const std::vector<Component*>& remove);
     void RemoveComponentEntirely(Component* comp); // Warning! Calls delete
     Component* FindComponentAtPosition(Vector2 position) const;
 
@@ -142,9 +138,10 @@ public:
     void DrawComponents() const;
 
 #pragma endregion
-#pragma region Selectables
+#pragma region Selection
 
-    void FindSelectablesInRectangle(std::vector<Selectable>* output, Rectangle search) const;
+    void FindObjectsInRectangle(Selection* output, Rectangle search) const;
+    void RemoveObjects(const Selection& remove);
 
 #pragma endregion
 #pragma region Other

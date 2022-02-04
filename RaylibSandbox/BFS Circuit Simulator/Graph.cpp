@@ -5,6 +5,7 @@
 #include <stack>
 #include <algorithm>
 #include <unordered_map>
+#include <unordered_set>
 
 #include "Node.h"
 #include "Component.h"
@@ -12,7 +13,9 @@
 
 bool Vector2Equals(Vector2 a, Vector2 b)
 {
-    return a.x == b.x && a.y == b.y;
+    return
+        a.x == b.x &&
+        a.y == b.y;
 }
 
 float Vector2DistanceToLine(Vector2 startPos, Vector2 endPos, Vector2 point)
@@ -27,16 +30,6 @@ bool CheckCollisionLineCircle(Vector2 startPos, Vector2 endPos, Vector2 center, 
     return Vector2DistanceToLine(startPos, endPos, center) <= radius;
 }
 
-bool Selectable::operator==(const Selectable& other) const
-{
-    if (other.type != type)
-        return false;
-
-    if (type == Type::COMP)
-        return other.comp == comp;
-    else
-        return other.node == node;
-}
 
 bool Graph::IsNodeInGraph(const Node* node) const
 {
@@ -336,7 +329,13 @@ void Graph::AddNode(Node* newNode)
     if (std::find(nodes.begin(), nodes.end(), newNode) == nodes.end())
         nodes.push_back(newNode);
 }
-
+void Graph::AddNodes(const std::vector<Node*>& source)
+{
+    for (Node* node : source)
+    {
+        AddNode(node);
+    }
+}
 Node* Graph::AddNewNode(Vector2 position)
 {
     Node* node = new Node(position, Gate::OR);
@@ -375,6 +374,19 @@ void Graph::RemoveNode(Node* node)
         nodes.erase(it);
     }
 }
+void Graph::RemoveMultipleNodes(const std::vector<Node*>& remove)
+{
+    std::unordered_set<Node*> removeSet(remove.begin(), remove.end());
+    size_t newSize = nodes.size();
+    std::stable_partition(nodes.begin(), nodes.end(), [&removeSet, &newSize](Node* node)
+        {
+            if (removeSet.find(node) == removeSet.end())
+                return true;
+            newSize--;
+            return false;
+        });
+    nodes.resize(newSize);
+}
 bool Graph::RemoveNodeAndTransferConnections(Node* node)
 {
     bool safe =
@@ -391,7 +403,7 @@ bool Graph::RemoveNodeAndTransferConnections(Node* node)
 
     return safe;
 }
-void Graph::RemoveNodeEntirely(Node* node)
+void Graph::RemoveNodeAndDelete(Node* node)
 {
     RemoveNode(node);
     delete node;
@@ -412,31 +424,25 @@ void Graph::RemoveComponent(Component* comp)
         components.erase(it);
     }
 }
+void Graph::RemoveMultipleComponents(const std::vector<Component*>& remove)
+{
+    std::unordered_set<Component*> removeSet(remove.begin(), remove.end());
+    size_t newSize = components.size();
+    std::stable_partition(components.begin(), components.end(), [&removeSet, &newSize](Component* comp)
+        {
+            if (removeSet.find(comp) == removeSet.end())
+                return true;
+            newSize--;
+            return false;
+        });
+    components.resize(newSize);
+}
 void Graph::RemoveComponentEntirely(Component* comp)
 {
     RemoveComponent(comp);
     delete comp;
 }
 
-[[deprecated("Prefer FindNodeAtGridPoint().")]]
-Node* Graph::FindNodeAtPosition(Vector2 position, float radius) const
-{
-    float shortestDistance = radius;
-    Node* closest = nullptr;
-    for (Node* node : nodes)
-    {
-        if (node->GetHidden())
-            continue;
-
-        float distance = Vector2Distance(position, node->GetPosition());
-        if (distance < shortestDistance)
-        {
-            shortestDistance = distance;
-            closest = node;
-        }
-    }
-    return closest;
-}
 Node* Graph::FindNodeAtGridPoint(Vector2 point) const
 {
     for (Node* node : nodes)
@@ -448,41 +454,6 @@ Node* Graph::FindNodeAtGridPoint(Vector2 point) const
             return node;
     }
     return nullptr;
-}
-[[deprecated("Prefer FindWireIntersectingGridPoint().")]]
-Wire Graph::FindWireIntersectingPosition(Vector2 position, float radius) const
-{
-    float shortestDistance = radius;
-    Wire closest = { nullptr, nullptr };
-    ResetVisited();
-    for (Node* start : nodes)
-    {
-        if (start->GetVisited())
-            continue;
-
-        if (start->GetHidden())
-            continue;
-
-        for (Node* end : start->GetOutputs())
-        {
-            if (end->GetVisited())
-                break;
-
-            if (end->GetHidden())
-                continue;
-
-            if (start->IsInComponent() && end->IsInComponent())
-                continue;
-
-            float distance = Vector2DistanceToLine(start->GetPosition(), end->GetPosition(), position);
-            if (distance < shortestDistance)
-            {
-                shortestDistance = distance;
-                closest = { start, end };
-            }
-        }
-    }
-    return closest;
 }
 Wire Graph::FindWireIntersectingGridPoint(Vector2 point) const
 {
@@ -539,19 +510,90 @@ Wire Graph::FindWireIntersectingGridPoint(Vector2 point) const
     }
     return Wire{ nullptr, nullptr };
 }
-void Graph::FindSelectablesInRectangle(std::vector<Selectable>* output, Rectangle search) const
+void Graph::FindObjectsInRectangle(Selection* output, Rectangle search) const
 {
-    output->clear();
+    output->nodes.clear();
     for (Node* node : nodes)
     {
-        if (!node->IsInComponent() && CheckCollisionPointRec(node->GetPosition(), search))
-            output->push_back(Selectable(node));
+        if (CheckCollisionPointRec(node->GetPosition(), search))
+            output->nodes.push_back(node);
     }
+    output->comps.clear();
     for (Component* comp : components)
     {
         if (CheckCollisionRecs(search, comp->GetCasingA()) ||
             CheckCollisionRecs(search, comp->GetCasingB()))
-            output->push_back(Selectable(comp));
+            output->comps.push_back(comp);
+    }
+    output->Dirty();
+    output->Clean();
+}
+void Graph::RemoveObjects(const Selection& remove)
+{
+    // Nodes
+    {
+        std::unordered_set<Node*> nodesToRemove(remove.nodes.begin(), remove.nodes.end());
+
+        // Reduce redundant
+        size_t count = remove.nodes.size();
+        for (Component* comp : remove.comps)
+        {
+            count += comp->GetNodeCount();
+        }
+        nodesToRemove.reserve(count);
+
+        // Include component nodes
+        for (Component* comp : remove.comps)
+        {
+            nodesToRemove.insert(comp->GetNodes().begin(), comp->GetNodes().end());
+        }
+
+        // Remove
+        {
+            size_t popCount = 0;
+
+            auto pred = [&nodesToRemove, &popCount](Node* node)
+            {
+                if (nodesToRemove.find(node) == nodesToRemove.end())
+                    return true;
+                popCount++;
+                return false;
+            };
+            std::stable_partition(nodes.begin(), nodes.end(), pred);
+
+            for (size_t i = 0; i < popCount; ++i)
+            {
+                for (Node* input : nodes.back()->GetInputs())
+                {
+                    if (nodesToRemove.find(input) == nodesToRemove.end())
+                        input->RemoveOutput(nodes.back());
+                }
+                for (Node* output : nodes.back()->GetOutputs())
+                {
+                    if (nodesToRemove.find(output) == nodesToRemove.end())
+                        output->RemoveOutput(nodes.back());
+                }
+                nodes.pop_back();
+            }
+        }
+    }
+
+    // Components
+    {
+        std::unordered_set<Component*> componentsToRemove(remove.comps.begin(), remove.comps.end());
+
+        size_t popCount = 0;
+        std::stable_partition(components.begin(), components.end(), [&componentsToRemove, &popCount](Component* comp)
+            {
+                if (componentsToRemove.find(comp) == componentsToRemove.end())
+                    return true;
+                popCount++;
+                return false;
+            });
+        for (size_t i = 0; i < popCount; ++i)
+        {
+            components.pop_back();
+        }
     }
 }
 Component* Graph::FindComponentAtPosition(Vector2 position) const
@@ -797,18 +839,16 @@ const std::vector<Node*>& Graph::GetNodes() const
     return nodes;
 }
 
-void Graph::OffsetNodes(const std::vector<Selectable>& source, Vector2 offset)
+void Graph::OffsetNodes(const Selection& source, Vector2 offset)
 {
-    for (Selectable element : source)
+    for (Component* comp : source.comps)
     {
-        switch (element.type)
-        {
-        case Selectable::Type::NODE:
-            element.node->SetPosition(Vector2Add(element.node->GetPosition(), offset));
-            break;
-        case Selectable::Type::COMP:
-            element.comp->SetPosition(Vector2Add(element.comp->GetPosition(), offset));
-        }
+        comp->SetPosition(Vector2Add(comp->GetPosition(), offset));
+    }
+    for (Node* node : source.nodes)
+    {
+        if (!node->IsInComponent())
+            node->SetPosition(Vector2Add(node->GetPosition(), offset));
     }
 }
 
@@ -867,4 +907,20 @@ Wire Graph::ReverseWire(Wire wire)
     DisconnectNodes(wire.a, wire.b);
     ConnectNodes(wire.b, wire.a);
     return { wire.b, wire.a };
+}
+
+void Selection::AccountForComponentNodes()
+{
+    std::unordered_set<Node*> existing(nodes.begin(), nodes.end());
+    size_t size = existing.size();
+    for (Component* comp : comps)
+    {
+        size += comp->GetNodeCount();
+    }
+    existing.reserve(size);
+    for (Component* comp : comps)
+    {
+        existing.insert(comp->GetNodes().begin(), comp->GetNodes().end());
+    }
+    nodes = std::vector<Node*>(existing.begin(), existing.end());
 }
