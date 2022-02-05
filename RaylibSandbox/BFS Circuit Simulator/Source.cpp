@@ -118,6 +118,70 @@ Vector2 ConstrainOffset(Vector2 constraint, Vector2 point)
     }
 }
 
+enum class ToolType : char
+{
+    // (V) Selects nodes and components if the start point overlaps none.
+    //     Replaces the selection with the clicked object if it is not in the current selection.
+    //     Moves the currently selected elements if the element clicked is in the current selection.
+    //     Sets all selected elements to match the gate/blueprint picker if the picker changes.
+    //     Displays the inputs and outputs of the hovered node, wire, or component
+    Select,
+
+    // (P) Draws nodes of the active gate connected by wires where the mouse is pressed.
+    //     Connects nodes when a wire is drawn between one another.
+    //     Cancels the current wire when right clicking
+    Pen,
+
+    // (A) Manually orders the input/output nodes on the hovered component.
+    //     Reverses the direction of clicked wires.
+    //     Moves dragged nodes.
+    Direct,
+
+    // (K) Sets the gate of the clicked node to match the active gate.
+    //     Sets the blueprint of clicked components to match the active blueprint.
+    Edit,
+
+    // (Z) Moves the camera when dragging.
+    //     Zooms when scrolling.
+    Camera,
+};
+class Tool
+{
+public:
+    // Left mouse
+    virtual void Primary_Press() = 0;
+    virtual void Primary_Tick() = 0;
+    virtual void Primary_Release() = 0;
+    // Right mouse
+    virtual void Secondary_Press() = 0;
+    virtual void Secondary_Tick() = 0;
+    virtual void Secondary_Release() = 0;
+    // Middle mouse
+    virtual void Tertiary_Press() = 0;
+    virtual void Tertiary_Drag() = 0;
+    virtual void Tertiary_Release() = 0;
+};
+class Tool_Select : public Tool
+{
+
+};
+class ToolHandler
+{
+private:
+    ToolType m_toolType = ToolType::Select;
+    Tool* m_toolControl = nullptr;
+
+public:
+    void SetTool(ToolType type)
+    {
+        m_toolType = type;
+    }
+    ToolType GetTool() const
+    {
+        return m_toolType;
+    }
+};
+
 int main()
 {
     int windowWidth = 1280;
@@ -128,29 +192,6 @@ int main()
     /******************************************
     *   Load textures, shaders, and meshes    *
     ******************************************/
-
-    enum class Tool
-    {
-        Select, // (V) Selects nodes and components if the start point overlaps none.
-                //     Replaces the selection with the clicked object if it is not in the current selection.
-                //     Moves the currently selected elements if the element clicked is in the current selection.
-                //     Sets all selected elements to match the gate/blueprint picker if the picker changes.
-                //     Displays the inputs and outputs of the hovered node, wire, or component
-
-        Pen,    // (P) Draws nodes of the active gate connected by wires where the mouse is pressed.
-                //     Connects nodes when a wire is drawn between one another.
-                //     Cancels the current wire when right clicking
-
-        Direct, // (A) Manually orders the input/output nodes on the hovered component.
-                //     Reverses the direction of clicked wires.
-                //     Moves dragged nodes.
-
-        Edit,   // (K) Sets the gate of the clicked node to match the active gate.
-                //     Sets the blueprint of clicked components to match the active blueprint.
-
-        Camera, // (Z) Moves the camera when dragging.
-                //     Zooms when scrolling.
-    };
 
     Graph graph;
     bool graphDirty = false;
