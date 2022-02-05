@@ -129,6 +129,27 @@ int main()
     *   Load textures, shaders, and meshes    *
     ******************************************/
 
+    enum class Tool
+    {
+        Pen,    // Draws wires (and nodes if necessary) where the mouse is pressed
+        Select, // Selects nodes and components
+        /*
+        * Note: Selection persists when tool is changed.
+        * 
+        * Selection is cleared when one of the following occurs:
+        *   A) A new selection is made
+        *   B) The tool being switched to is the Pen
+        * 
+        * Selection is hidden, but not cleared when the following occurs:
+        *   A) The tool being switched to is the Edit or Route tool
+        */
+        Move,   // Moves selected nodes/components from the mouse press location to the mouse release location
+        Route,  // Displays the output paths & ordering from the hovered node
+        Edit,   // Allows the user to manually order the input/output nodes on the hovered component
+        Gate,   // Sets the gate of the selected nodes to be the chosen gate (similar to a color pallet)
+        Camera, // Moves the camera when dragging, zooms when scrolling
+    };
+
     Graph graph;
     bool graphDirty = false;
     bool gateDirty = false;
