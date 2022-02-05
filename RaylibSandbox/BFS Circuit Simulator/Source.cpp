@@ -131,23 +131,25 @@ int main()
 
     enum class Tool
     {
-        Pen,    // Draws wires (and nodes if necessary) where the mouse is pressed
-        Select, // Selects nodes and components
-        /*
-        * Note: Selection persists when tool is changed.
-        * 
-        * Selection is cleared when one of the following occurs:
-        *   A) A new selection is made
-        *   B) The tool being switched to is the Pen
-        * 
-        * Selection is hidden, but not cleared when the following occurs:
-        *   A) The tool being switched to is the Edit or Route tool
-        */
-        Move,   // Moves selected nodes/components from the mouse press location to the mouse release location
-        Route,  // Displays the output paths & ordering from the hovered node
-        Edit,   // Allows the user to manually order the input/output nodes on the hovered component
-        Gate,   // Sets the gate of the selected nodes to be the chosen gate (similar to a color pallet)
-        Camera, // Moves the camera when dragging, zooms when scrolling
+        Select, // (V) Selects nodes and components if the start point overlaps none.
+                //     Replaces the selection with the clicked object if it is not in the current selection.
+                //     Moves the currently selected elements if the element clicked is in the current selection.
+                //     Sets all selected elements to match the gate/blueprint picker if the picker changes.
+                //     Displays the inputs and outputs of the hovered node, wire, or component
+
+        Pen,    // (P) Draws nodes of the active gate connected by wires where the mouse is pressed.
+                //     Connects nodes when a wire is drawn between one another.
+                //     Cancels the current wire when right clicking
+
+        Direct, // (A) Manually orders the input/output nodes on the hovered component.
+                //     Reverses the direction of clicked wires.
+                //     Moves dragged nodes.
+
+        Edit,   // (K) Sets the gate of the clicked node to match the active gate.
+                //     Sets the blueprint of clicked components to match the active blueprint.
+
+        Camera, // (Z) Moves the camera when dragging.
+                //     Zooms when scrolling.
     };
 
     Graph graph;
