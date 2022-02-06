@@ -59,6 +59,11 @@ void Graph::ResetStates()
     }
 }
 
+const std::vector<Component*>& Graph::GetComponents() const
+{
+    return components;
+}
+
 // For components
 void Graph::RegenerateSingleComponent(Component* component)
 {

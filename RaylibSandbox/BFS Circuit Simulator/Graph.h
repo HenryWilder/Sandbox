@@ -34,7 +34,17 @@ struct Selection
 
 class Graph
 {
+public:
+    // Use this to access the (only) graph
+    static Graph& Global()
+    {
+        static Graph singleton; // Instantiated on first use
+        return singleton;
+    }
+
 private:
+    Graph() {}
+
     size_t seedCount = 0;
     bool routeDirty = false;
     bool gateDirty = false;
@@ -42,6 +52,8 @@ private:
     std::vector<Component*> components;
 
 public:
+    Graph(Graph const&) = delete;
+    void operator=(Graph const&) = delete;
 
     /******************************************
     * 
@@ -123,6 +135,7 @@ public:
 #pragma endregion
 #pragma region Components
 
+    const std::vector<Component*>& GetComponents() const;
     void RegenerateSingleComponent(Component* component);
     void RegenerateComponents(std::vector<Component*>& components);
     void RegenerateAllComponents();

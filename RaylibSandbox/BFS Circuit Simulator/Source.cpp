@@ -11,6 +11,8 @@
 #include "Component.h"
 #include "Graph.h"
 
+#define VECTOR_CONTAINS_ELEMENT(vector,element) (std::find((vector).begin(), (vector).end(), (element)) != (vector).end())
+
 struct Action
 {
     // todo
@@ -147,38 +149,280 @@ enum class ToolType : char
 };
 class Tool
 {
+protected:
+    static Component* hoveredComp;
+    static Node* hoveredNode;
+    static Wire hoveredWire;
+
 public:
+    inline static bool IsHoveringObject() { return hoveredNode || hoveredComp || hoveredWire; }
+
+    // No event
+    virtual void Tick()
+    {
+        if (hoveredComp = Graph::Global().FindComponentAtPosition(GetMousePosition()))
+        {
+            hoveredNode = nullptr;
+            hoveredWire = WireNull();
+        }
+        else
+        {
+            if (hoveredNode = Graph::Global().FindNodeAtGridPoint(GetMousePosition()))
+                hoveredWire = WireNull();
+            else
+                hoveredWire = Graph::Global().FindWireIntersectingGridPoint(GetMousePosition());
+        }
+    }
+
     // Left mouse
-    virtual void Primary_Press() = 0;
-    virtual void Primary_Tick() = 0;
-    virtual void Primary_Release() = 0;
+    virtual void Primary_Press() {}
+    virtual void Primary_Release() {}
     // Right mouse
-    virtual void Secondary_Press() = 0;
-    virtual void Secondary_Tick() = 0;
-    virtual void Secondary_Release() = 0;
+    virtual void Secondary_Press() {}
+    virtual void Secondary_Release() {}
     // Middle mouse
-    virtual void Tertiary_Press() = 0;
-    virtual void Tertiary_Drag() = 0;
-    virtual void Tertiary_Release() = 0;
+    virtual void Tertiary_Press() {}
+    virtual void Tertiary_Release() {}
+
+    // Keyboard
+    virtual void TickKeyboardPressCheck() {} // Check if any keys being listened for are pressed or released
+    virtual void TickKeyboardReleaseCheck() {} // Check if any keys being listened for are pressed or released
+    virtual void Key_Press(KeyboardKey key) {}
+    virtual void Key_Release(KeyboardKey key) {}
+
+    // Inputs
+    virtual void SimulateTick()
+    {
+        // Pre-tick
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)  ) Primary_Press  ();
+        if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON) ) Secondary_Press();
+        if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON)) Tertiary_Press ();
+        TickKeyboardPressCheck();
+
+        // Tick
+        Tick();
+
+        // Post-tick
+        if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)  ) Primary_Release  ();
+        if (IsMouseButtonReleased(MOUSE_RIGHT_BUTTON) ) Secondary_Release();
+        if (IsMouseButtonReleased(MOUSE_MIDDLE_BUTTON)) Tertiary_Release ();
+        TickKeyboardReleaseCheck();
+    }
+    virtual void DrawTick() {}
 };
+Component* Tool::hoveredComp = nullptr;
+Node* Tool::hoveredNode = nullptr;
+Wire Tool::hoveredWire = WireNull();
+
+Rectangle TwoPointRec(Vector2 a, Vector2 b)
+{
+    auto [x1, x2] = std::minmax(a.x, b.x);
+    auto [y1, y2] = std::minmax(a.y, b.y);
+    return { x1, y1, x2 - x1, y2 - y1 };
+}
+
 class Tool_Select : public Tool
+{
+private:
+    union
+    {
+        Vector2 selectionStart;
+        Vector2 draggingStart;
+    };
+    bool selecting = false;
+    bool dragging = false;
+    std::vector<Node*> selectedNodes;
+    std::vector<Component*> selectedComps;
+
+public:
+    Rectangle GetSelectionRec() const { return TwoPointRec(selectionStart, GetMousePosition()); }
+    Vector2 GetDraggingOffset() const { return Vector2Subtract(GetMousePosition(), selectionStart); }
+
+    // No event
+    void Tick() override
+    {
+        // Don't look for a hovered node/component while selecting or dragging
+        if (selecting)
+            TickSelecting();
+        else if (dragging)
+            TickDragging();
+        else
+            Tool::Tick();
+    }
+
+    void StartSelecting()
+    {
+        // Hovered objects won't be getting updated until the selection is no longer active, so make sure they aren't needlessly and confusingly drawn
+        hoveredComp = nullptr;
+        hoveredNode = nullptr;
+        selectionStart = GetMousePosition();
+        selecting = true;
+    }
+    void TickSelecting()
+    {
+        Rectangle selectionRec = GetSelectionRec();
+
+        // Select nodes
+        {
+            auto NodeIsInRec = [selectionRec](Node* node) {
+                return CheckCollisionPointRec(node->GetPosition(), selectionRec);
+            };
+
+            const std::vector<Node*>& nodes = Graph::Global().GetNodes();
+
+            selectedNodes.clear(); // We don't need to bother copying over the data to the new reservation
+            selectedNodes.reserve(std::count_if(nodes.begin(), nodes.end(), NodeIsInRec));
+
+            for (Node* node : Graph::Global().GetNodes())
+            {
+                if (NodeIsInRec(node)) selectedNodes.push_back(node);
+            }
+        }
+
+        // Select components
+        {
+            auto CompIsInRec = [selectionRec](Component* comp) {
+                return CheckCollisionRecs(selectionRec, comp->GetCasingA()) ||
+                       CheckCollisionRecs(selectionRec, comp->GetCasingB());
+            };
+
+            const std::vector<Component*>& comps = Graph::Global().GetComponents();
+
+            selectedComps.clear(); // We don't need to bother copying over the data to the new reservation
+            selectedComps.reserve(std::count_if(comps.begin(), comps.end(), CompIsInRec));
+
+            for (Component* comp : Graph::Global().GetComponents())
+            {
+                if (CompIsInRec(comp)) selectedComps.push_back(comp);
+            }
+        }
+    }
+    void FinishSelecting()
+    {
+        selecting = false;
+    }
+
+    void StartDragging()
+    {
+        draggingStart = GetMousePosition();
+        dragging = true;
+    }
+    void TickDragging()
+    {
+        // Only important when drawing - which is not handled in here
+    }
+    void FinishDragging()
+    {
+        Vector2 offset = GetDraggingOffset();
+
+        for (Component* comp : selectedComps)
+        {
+            comp->SetPosition(Vector2Add(comp->GetPosition(), offset));
+        }
+        for (Node* node : selectedNodes)
+        {
+            node->SetPosition(Vector2Add(node->GetPosition(), offset));
+        }
+        dragging = false;
+    }
+
+    // Left mouse
+    void Primary_Press() override
+    {
+        if (hoveredNode || hoveredComp) // Drag if hovering a component in the selection
+        {
+            // Replace selection with hover
+            {
+                if (hoveredComp && !VECTOR_CONTAINS_ELEMENT(selectedComps, hoveredComp))
+                {
+                    selectedNodes.clear();
+                    selectedComps.resize(1);
+                    selectedComps.back() = hoveredComp;
+                }
+                else if (hoveredNode && !VECTOR_CONTAINS_ELEMENT(selectedNodes, hoveredNode))
+                {
+                    selectedComps.clear();
+                    selectedNodes.resize(1);
+                    selectedNodes.back() = hoveredNode;
+                }
+            }
+            StartDragging();
+        }
+        else // Select
+            StartSelecting();
+    }
+    void Primary_Release() override
+    {
+        if (selecting)
+            FinishSelecting();
+        else if (dragging)
+            FinishDragging();
+    }
+};
+
+class Tool_Pen : public Tool
 {
 
 };
+
+class Tool_Direct : public Tool
+{
+};
+
+class Tool_Edit : public Tool
+{
+};
+
+class Tool_Camera : public Tool
+{
+};
+
 class ToolHandler
 {
 private:
-    ToolType m_toolType = ToolType::Select;
-    Tool* m_toolControl = nullptr;
+    ToolHandler()
+    {
+        m_toolType = ToolType::Select;
+        m_toolControl = new Tool_Select;
+    }
+    ToolType m_toolType;
+    Tool* m_toolControl;
 
 public:
-    void SetTool(ToolType type)
+    ~ToolHandler()
     {
-        m_toolType = type;
+        delete m_toolControl;
     }
-    ToolType GetTool() const
+    static ToolHandler& Global()
+    {
+        static ToolHandler singleton;
+        return singleton;
+    }
+
+    void SetToolType(ToolType type)
+    {
+        if (m_toolType != type)
+        {
+            m_toolType = type;
+            delete m_toolControl; // There should ALWAYS be a valid pointer here until the program closes
+            switch (type)
+            {
+            default: // Select is default
+            case ToolType::Select:  m_toolControl = new Tool_Select;    break;
+            case ToolType::Pen:     m_toolControl = new Tool_Pen;       break;
+            case ToolType::Direct:  m_toolControl = new Tool_Direct;    break;
+            case ToolType::Edit:    m_toolControl = new Tool_Edit;      break;
+            case ToolType::Camera:  m_toolControl = new Tool_Camera;    break;
+            }
+        }
+    }
+    ToolType GetToolType() const
     {
         return m_toolType;
+    }
+    const Tool* GetTool() const
+    {
+        return m_toolControl;
     }
 };
 
@@ -193,7 +437,6 @@ int main()
     *   Load textures, shaders, and meshes    *
     ******************************************/
 
-    Graph graph;
     bool graphDirty = false;
     bool gateDirty = false;
     bool drawGateOptions = false;
@@ -218,9 +461,9 @@ int main()
         if (IsKeyPressed(KEY_S) && IsModifierDown(KEY_CONTROL))
         {
             if (IsModifierDown(KEY_SHIFT)) // Load
-                graph.Load("save.graph");
+                Graph::Global().Load("save.graph");
             else // Save
-                graph.Save("save.graph");
+                Graph::Global().Save("save.graph");
         }
 
 
@@ -232,8 +475,8 @@ int main()
             cursor = ConstrainOffset(selectionStart->GetPosition(), cursor);
 
         // Hover
-        Node* hoveredNode = graph.FindNodeAtGridPoint(cursor);
-        Wire hoveredWire = (hoveredNode ? WireNull()  : graph.FindWireIntersectingGridPoint(cursor));
+        Node* hoveredNode = Graph::Global().FindNodeAtGridPoint(cursor);
+        Wire hoveredWire = (hoveredNode ? WireNull()  : Graph::Global().FindWireIntersectingGridPoint(cursor));
 
         if (!marqueeSelecting)
         {
@@ -249,15 +492,15 @@ int main()
                 if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                 {
                     marqueeDragging = false;
-                    Vector2 offset = cursor - marqueeStart;
+                    Vector2 offset = Vector2Subtract(cursor, marqueeStart);
 
                     // Copy
                     if (IsModifierDown(KEY_ALT) && !holdingTemporaryComponent)
-                        graph.CloneNodesWithOffset(selection, offset);
+                        Graph::Global().CloneNodesWithOffset(selection, offset);
                     // Move
                     else
                     {
-                        graph.OffsetNodes(selection, offset);
+                        Graph::Global().OffsetNodes(selection, offset);
 
                         // todo: ????
                         if (holdingTemporaryComponent)
@@ -278,15 +521,15 @@ int main()
                         if (selectionEnd != selectionStart)
                         {
                             if (!selectionEnd)
-                                selectionEnd = graph.AddNewNode(cursor);
+                                selectionEnd = Graph::Global().AddNewNode(cursor);
 
-                            graph.ConnectNodes(selectionStart, selectionEnd);
+                            Graph::Global().ConnectNodes(selectionStart, selectionEnd);
                             graphDirty = true;
 
                             // Divide wire
                             if (hoveredWire)
                             {
-                                graph.DivideWire(hoveredWire, selectionEnd);
+                                Graph::Global().DivideWire(hoveredWire, selectionEnd);
                                 hoveredWire = WireNull();
                             }
                         }
@@ -300,7 +543,7 @@ int main()
 
                     if (!selectionStart)
                     {
-                        selectionStart = graph.AddNewNode(cursor);
+                        selectionStart = Graph::Global().AddNewNode(cursor);
                         graphDirty = true;
 
                         // Divide wire
@@ -319,7 +562,7 @@ int main()
                         selectionStart = hoveredNode;
                     else if (hoveredWire)
                     {
-                        hoveredWire = graph.ReverseWire(hoveredWire);
+                        hoveredWire = Graph::Global().ReverseWire(hoveredWire);
                         graphDirty = true;
                     }
                 }
@@ -356,9 +599,9 @@ int main()
             for (Selectable element : selection)
             {
                 if (element.type == Selectable::Type::COMP)
-                    graph.RemoveComponentEntirely(element.comp);
+                    Graph::Global().RemoveComponentEntirely(element.comp);
                 else
-                    graph.RemoveNodeEntirely(element.node);
+                    Graph::Global().RemoveNodeEntirely(element.node);
             }
             selection.clear();
         }
@@ -380,9 +623,9 @@ int main()
                 else
                 {
                     if (IsModifierDown(KEY_SHIFT))
-                        graph.ConnectNodes(hoveredNode->GetInput(0), hoveredNode->GetOutput(0));
+                        Graph::Global().ConnectNodes(hoveredNode->GetInput(0), hoveredNode->GetOutput(0));
 
-                    graph.RemoveNodeEntirely(hoveredNode);
+                    Graph::Global().RemoveNodeEntirely(hoveredNode);
                     hoveredNode = nullptr;
                 }
 
@@ -392,11 +635,11 @@ int main()
             {
                 if (IsModifierDown(KEY_SHIFT)) // Also delete the related nodes
                 {
-                    graph.RemoveNodeEntirely(hoveredWire.a);
-                    graph.RemoveNodeEntirely(hoveredWire.b);
+                    Graph::Global().RemoveNodeEntirely(hoveredWire.a);
+                    Graph::Global().RemoveNodeEntirely(hoveredWire.b);
                 }
                 else
-                    graph.DisconnectNodes(hoveredWire.a, hoveredWire.b);
+                    Graph::Global().DisconnectNodes(hoveredWire.a, hoveredWire.b);
 
                 hoveredWire = WireNull();
                 graphDirty = true;
@@ -419,7 +662,7 @@ int main()
                     std::max(marqueeStart.x, cursor.x) - a.x,
                     std::max(marqueeStart.y, cursor.y) - a.y,
             };
-            graph.FindSelectablesInRectangle(&selection, selectionRec);
+            Graph::Global().FindSelectablesInRectangle(&selection, selectionRec);
 
             // Finalize
             if (IsMouseButtonReleased(MOUSE_RIGHT_BUTTON))
@@ -458,14 +701,14 @@ int main()
             blueprint->GenerateBlueprintFromSelection(breakdown);
             selection.clear();
             marqueeStart = { g_gridUnit * -6, 0 };
-            Component* clone = graph.CloneComponentAtPosition(blueprint, marqueeStart); // Place the component offscreen
+            Component* clone = Graph::Global().CloneComponentAtPosition(blueprint, marqueeStart); // Place the component offscreen
             selection.push_back(Selectable(clone));
             holdingTemporaryComponent = true;
             graphDirty = true;
         }
 
-        graph.UnDirty();
-        graph.Step();
+        Graph::Global().UnDirty();
+        Graph::Global().Step();
 
         /******************************************
         *   Draw the frame                        *
@@ -587,7 +830,7 @@ int main()
 
 
             // Wires
-            graph.DrawWires();
+            Graph::Global().DrawWires();
 
             // Moving points
             if (marqueeDragging || holdingTemporaryComponent)
@@ -650,14 +893,14 @@ int main()
             }
 
             // Components
-            graph.DrawComponents();
+            Graph::Global().DrawComponents();
 
             // Hovered wire
             if (hoveredWire.a && !drawGateOptions)
                 DrawLineV(hoveredWire.a->GetPosition(), hoveredWire.b->GetPosition(), LIGHTGRAY);
 
             // Nodes
-            graph.DrawNodes();
+            Graph::Global().DrawNodes();
 
             // Cursor
             if (hoveredNode)
@@ -695,7 +938,7 @@ int main()
     *   Unload and free memory                *
     ******************************************/
 
-    for (Node* node : graph.GetNodes())
+    for (Node* node : Graph::Global().GetNodes())
     {
         delete node;
     }
