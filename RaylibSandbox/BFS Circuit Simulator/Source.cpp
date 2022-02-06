@@ -110,20 +110,6 @@ int main()
     *   Load textures, shaders, and meshes    *
     ******************************************/
 
-    bool graphDirty = false;
-    bool gateDirty = false;
-    bool drawGateOptions = false;
-
-    Node* selectionStart = nullptr;
-    Node* selectionEnd = nullptr;
-
-    bool marqueeSelecting = false;
-    bool marqueeDragging = false;
-    Vector2 marqueeStart = Vector2Zero();
-    Rectangle selectionRec;
-    std::vector<Selectable> selection;
-    bool holdingTemporaryComponent = false; // If move is cancelled while this is true, we need to clean up the component
-
     while (!WindowShouldClose())
     {
         /******************************************
@@ -144,8 +130,11 @@ int main()
         Vector2 cursor = Snap(GetMousePosition(), g_nodeRadius * 2.0f);
 
         // Lock wire directions
-        if (selectionStart)
-            cursor = ConstrainOffset(selectionStart->GetPosition(), cursor);
+        {
+            const Tool_Pen* pen = dynamic_cast<const Tool_Pen*>(ToolHandler::Global().GetTool());
+            if (pen && pen->GetStartNode())
+                cursor = ConstrainOffset(pen->GetStartNode()->GetPosition(), cursor);
+        }
 
         // Hover
         Node* hoveredNode = Graph::Global().FindNodeAtGridPoint(cursor);

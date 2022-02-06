@@ -42,14 +42,16 @@ class Tool
 {
 protected: // Persistent members
 
-    // Hovering
-    static Component* s_hoveredComp;
-    static Node* s_hoveredNode;
-    static Wire s_hoveredWire;
-
     // Pallet
     static ComponentBlueprint* s_activeBlueprint;
     static Gate s_activeGate;
+
+protected: // Global members
+
+    // Hovering
+    Component* s_hoveredComp;
+    Node* s_hoveredNode;
+    Wire s_hoveredWire;
 
 public: // Virtuals
 
@@ -62,7 +64,7 @@ public: // Virtuals
     // Right mouse
     virtual void Secondary_Press();
     virtual void Secondary_Release();
-    // Middle mouse
+    // Middle mouse 
     virtual void Tertiary_Press();
     virtual void Tertiary_Release();
 
@@ -120,6 +122,10 @@ class Tool_Pen : public Tool
 private: // Members
 
     Node* m_wireStart = nullptr; // The previous node in the wire
+
+public: // Getters
+
+    Node* GetStartNode() const;
 
 public: // Overrides
 

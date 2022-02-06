@@ -109,10 +109,6 @@ void Tool::DrawTick()
     
 }
 
-Component* Tool::s_hoveredComp = nullptr;
-Node* Tool::s_hoveredNode = nullptr;
-Wire Tool::s_hoveredWire = WireNull();
-
 ComponentBlueprint* Tool::s_activeBlueprint = nullptr;
 Gate Tool::s_activeGate = Gate::OR;
 
@@ -139,10 +135,17 @@ void Tool_Select::StartSelecting()
     s_hoveredNode = nullptr;
     m_selectionStart = GetMousePosition();
     m_selecting = true;
+    if (!IsModifierDown(KEY_SHIFT))
+    {
+        m_selectedComps.clear();
+        m_selectedNodes.clear();
+    }
 }
 
 void Tool_Select::TickSelecting()
 {
+    // TODO: Add to selection instead of just creating the selection each tick
+
     Rectangle selectionRec = GetSelectionRec();
 
     // Select nodes
@@ -260,6 +263,11 @@ void Tool_Select::TickKeyboardPressCheck()
         DeleteSelected();
 }
 
+
+Node* Tool_Pen::GetStartNode() const
+{
+    return m_wireStart;
+}
 
 void Tool_Pen::Primary_Press()
 {
