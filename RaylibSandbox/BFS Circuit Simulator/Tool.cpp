@@ -260,13 +260,31 @@ void Tool_Select::TickKeyboardPressCheck()
         DeleteSelected();
 }
 
+
 void Tool_Pen::Primary_Press()
 {
+    // The node that the current wire should end at
+    Node* endNode;
+
+    if (!!s_hoveredNode) // There is a node being hovered (make that the end node)
+        endNode = s_hoveredNode;
+    else // No node at the clicked position (create one)
+        endNode = Graph::Global().AddNewNode(GetMousePosition());
+
+    // We are continuing an existing wire
+    if (!!m_wireStart)
+        Graph::Global().ConnectNodes(m_wireStart, endNode);
+
+    // Transfer this node to be the start of the next wire
+    m_wireStart = endNode;
 }
 
-void Tool_Pen::Primary_Release()
+void Tool_Pen::Secondary_Press()
 {
+    // Stop wire
+    m_wireStart = nullptr;
 }
+
 
 ToolHandler::ToolHandler()
 {

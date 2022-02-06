@@ -117,21 +117,38 @@ public: // Overrides
 
 class Tool_Pen : public Tool
 {
+private: // Members
+
+    Node* m_wireStart = nullptr; // The previous node in the wire
+
+public: // Overrides
+
+    // Left mouse
+    void Primary_Press() override;
+
+    // Right mouse
+    void Secondary_Press() override;
+};
+
+class Tool_Direct : public Tool
+{
+public: // Overrides
+
     // Left mouse
     void Primary_Press() override;
     void Primary_Release() override;
 };
 
-class Tool_Direct : public Tool
-{
-};
-
 class Tool_Edit : public Tool
 {
+public: // Overrides
+
 };
 
 class Tool_Camera : public Tool
 {
+public: // Overrides
+
 };
 
 class ToolHandler
