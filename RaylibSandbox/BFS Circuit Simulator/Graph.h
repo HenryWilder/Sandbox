@@ -49,6 +49,7 @@ private:
     bool routeDirty = false;
     bool gateDirty = false;
     std::vector<Node*> nodes;
+    std::vector<ComponentBlueprint*> blueprints;
     std::vector<Component*> components;
 
 public:

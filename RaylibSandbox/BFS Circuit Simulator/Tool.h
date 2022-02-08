@@ -47,11 +47,15 @@ protected: // Persistent members
     static Gate s_activeGate;
 
 protected: // Global members
+    
+    Vector2 m_cursorPosition;
 
     // Hovering
-    Component* s_hoveredComp;
-    Node* s_hoveredNode;
-    Wire s_hoveredWire;
+    Component* m_hoveredComp;
+    Node* m_hoveredNode;
+    Wire m_hoveredWire;
+
+    virtual void UpdateCursorPos();
 
 public: // Virtuals
 
@@ -123,11 +127,16 @@ private: // Members
 
     Node* m_wireStart = nullptr; // The previous node in the wire
 
+    void UpdateCursorPos() override;
+
 public: // Getters
 
     Node* GetStartNode() const;
 
 public: // Overrides
+
+    // No event
+    void Tick() override;
 
     // Left mouse
     void Primary_Press() override;

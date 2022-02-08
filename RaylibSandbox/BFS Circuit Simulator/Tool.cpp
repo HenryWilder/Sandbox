@@ -34,20 +34,28 @@ Rectangle TwoPointRec(Vector2 a, Vector2 b)
 }
 
 
+void Tool::UpdateCursorPos()
+{
+    m_cursorPosition.x = roundf((float)GetMouseX() / g_gridUnit) * g_gridUnit;
+    m_cursorPosition.y = roundf((float)GetMouseY() / g_gridUnit) * g_gridUnit;
+}
+
 // No event
 void Tool::Tick()
 {
-    if (s_hoveredComp = Graph::Global().FindComponentAtPosition(GetMousePosition()))
+    m_hoveredComp = Graph::Global().FindComponentAtPosition(m_cursorPosition);
+    if (!!m_hoveredComp)
     {
-        s_hoveredNode = nullptr;
-        s_hoveredWire = WireNull();
+        m_hoveredNode = nullptr;
+        m_hoveredWire = WireNull();
     }
     else
     {
-        if (s_hoveredNode = Graph::Global().FindNodeAtGridPoint(GetMousePosition()))
-            s_hoveredWire = WireNull();
+        m_hoveredNode = Graph::Global().FindNodeAtGridPoint(m_cursorPosition);
+        if (!!m_hoveredNode)
+            m_hoveredWire = WireNull();
         else
-            s_hoveredWire = Graph::Global().FindWireIntersectingGridPoint(GetMousePosition());
+            m_hoveredWire = Graph::Global().FindWireIntersectingGridPoint(m_cursorPosition);
     }
 }
 
@@ -87,20 +95,6 @@ void Tool::TickKeyboardReleaseCheck()
 
 void Tool::SimulateTick()
 {
-    // Pre-tick
-    if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON)) Primary_Press();
-    if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON)) Secondary_Press();
-    if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON)) Tertiary_Press();
-    TickKeyboardPressCheck();
-
-    // Tick
-    Tick();
-
-    // Post-tick
-    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) Primary_Release();
-    if (IsMouseButtonReleased(MOUSE_RIGHT_BUTTON)) Secondary_Release();
-    if (IsMouseButtonReleased(MOUSE_MIDDLE_BUTTON)) Tertiary_Release();
-    TickKeyboardReleaseCheck();
 }
 
 // Basic draw
@@ -131,8 +125,8 @@ void Tool_Select::Tick()
 void Tool_Select::StartSelecting()
 {
     // Hovered objects won't be getting updated until the selection is no longer active, so make sure they aren't needlessly and confusingly drawn
-    s_hoveredComp = nullptr;
-    s_hoveredNode = nullptr;
+    m_hoveredComp = nullptr;
+    m_hoveredNode = nullptr;
     m_selectionStart = GetMousePosition();
     m_selecting = true;
     if (!IsModifierDown(KEY_SHIFT))
@@ -224,21 +218,21 @@ void Tool_Select::DeleteSelected()
 
 void Tool_Select::Primary_Press()
 {
-    if (s_hoveredNode || s_hoveredComp) // Drag if hovering a component in the selection
+    if (m_hoveredNode || m_hoveredComp) // Drag if hovering a component in the selection
     {
         // Replace selection with hover
         {
-            if (s_hoveredComp && !VECTOR_CONTAINS_ELEMENT(m_selectedComps, s_hoveredComp))
+            if (m_hoveredComp && !VECTOR_CONTAINS_ELEMENT(m_selectedComps, m_hoveredComp))
             {
                 m_selectedNodes.clear();
                 m_selectedComps.resize(1);
-                m_selectedComps.back() = s_hoveredComp;
+                m_selectedComps.back() = m_hoveredComp;
             }
-            else if (s_hoveredNode && !VECTOR_CONTAINS_ELEMENT(m_selectedNodes, s_hoveredNode))
+            else if (m_hoveredNode && !VECTOR_CONTAINS_ELEMENT(m_selectedNodes, m_hoveredNode))
             {
                 m_selectedComps.clear();
                 m_selectedNodes.resize(1);
-                m_selectedNodes.back() = s_hoveredNode;
+                m_selectedNodes.back() = m_hoveredNode;
             }
         }
         StartDragging();
@@ -269,13 +263,19 @@ Node* Tool_Pen::GetStartNode() const
     return m_wireStart;
 }
 
+void Tool_Pen::Tick()
+{
+
+    Tool::Tick();
+}
+
 void Tool_Pen::Primary_Press()
 {
     // The node that the current wire should end at
     Node* endNode;
 
-    if (!!s_hoveredNode) // There is a node being hovered (make that the end node)
-        endNode = s_hoveredNode;
+    if (!!m_hoveredNode) // There is a node being hovered (make that the end node)
+        endNode = m_hoveredNode;
     else // No node at the clicked position (create one)
         endNode = Graph::Global().AddNewNode(GetMousePosition());
 
