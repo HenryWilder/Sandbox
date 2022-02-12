@@ -63,30 +63,35 @@ int main()
     ClearBackground(WHITE);
     EndTextureMode();
 
+    int resLoc = GetShaderLocation(shader, "resolution");
+    Vector2 res = { (float)windowWidth, (float)windowHeight };
+    SetShaderValue(shader, resLoc, &res, UNIFORM_VEC2);
+    int zoomLoc = GetShaderLocation(shader, "zoom");
+    int offsetLoc = GetShaderLocation(shader, "offset");
+
+    float zoom = 1.0f;
+    Vector2 offset = Vector2Zero();
+
     while (!WindowShouldClose())
     {
         /******************************************
         *   Simulate frame and update variables   *
         ******************************************/
 
-        //if (dirty)
-        //{
-        //    dirty = false;
-        //
-        //    BeginTextureMode(screen); {
-        //
-        //        ClearBackground(BLACK);
-        //
-        //        BeginShaderMode(shader); {
-        //
-        //            DrawTexture(screen.texture, 0, 0, WHITE);
-        //
-        //        } EndShaderMode();
-        //
-        //        DrawTexture(screen.texture, 0, 0, WHITE);
-        //
-        //    } EndTextureMode();
-        //}
+        if (GetMouseWheelMove() > 0.0)
+            zoom /= 2;
+        else if (GetMouseWheelMove() < 0.0)
+            zoom *= 2;
+
+        if (!!GetMouseWheelMove())
+            offset = (GetMousePosition() / 2) / zoom;
+
+        offset.x += (IsKeyDown(KEY_D) - IsKeyDown(KEY_A)) * 10 / zoom;
+        offset.y += (IsKeyDown(KEY_S) - IsKeyDown(KEY_W)) * 10 / zoom;
+
+
+        SetShaderValue(shader, zoomLoc, &zoom, UNIFORM_FLOAT);
+        SetShaderValue(shader, offsetLoc, &offset, UNIFORM_VEC2);
 
         /******************************************
         *   Draw the frame                        *

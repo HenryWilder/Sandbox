@@ -14,8 +14,8 @@ out vec4 finalColor;
 // NOTE: Add here your custom variables
 uniform vec2 resolution = vec2(720, 720);
 uniform float maxCount = 200.0;
-uniform float zoom = 1.0;
-uniform vec2 offset = vec2(0.0, 0.0);
+uniform float zoom = 2.0;
+uniform vec2 offset = vec2(20.0, 30.0);
 
 vec2 ComplexAdd(vec2 a, float b)
 {
@@ -23,9 +23,11 @@ vec2 ComplexAdd(vec2 a, float b)
 }
 vec2 ComplexMultiply(vec2 a, vec2 b)
 {
-	return vec2(
+	vec2 c;
+	c = vec2(
 		a.x * b.x - a.y * b.y,
-		a.x * b.y - b.x * a.y);
+		a.x * b.y + a.y * b.x);
+	return c;
 }
 vec2 ComplexScale(vec2 a, float scale)
 {
@@ -46,7 +48,7 @@ vec2 ComplexAbsolute(vec2 c)
 vec2 ComplexSqrt(vec2 c)
 {
 	float z_abs = length(c); // Absolute value of complex number
-	return vec2(sqrt((z_abs + c.x) / 2.0), (c.y / abs(c.y)) * sqrt((z_abs - c.x) / 2.0));
+	return vec2(sqrt((z_abs + c.x) / 2.0), (c.y > 0 ? -1 : 1) * sqrt((z_abs - c.x) / 2.0));
 }
 
 void main()
@@ -58,13 +60,17 @@ void main()
 
 	// Code here
 	vec2 z = vec2(0.0);
-	vec2 c = ((fragTexCoord / zoom) - vec2(0.5)) * 2.0 + offset;
+	vec2 c = (((fragTexCoord * resolution) + offset) * zoom) / resolution;
 	float i = 0;
 	for (; ((z.x * z.x + z.y * z.y) < 4) && (i < maxCount); ++i)
 	{
-		vec2 z1 = ComplexSqrt(
-						(ComplexMultiply(z, z) + ComplexAdd(c, -1)) /
-					    (ComplexScale   (z, 2) + ComplexAdd(c, -2)));
+		vec2 z1;
+		//z1 = ComplexSqrt(
+		//				(ComplexMultiply(z, z) + ComplexAdd(c, -1)) /
+		//			    (ComplexScale   (z, 2) + ComplexAdd(c, -2)));
+		//z1 = ComplexMultiply(z, vec2(sin(z.x), sin(z.y)));
+		z1.x = z.x * z.x - z.y * z.y + c.x;
+		z1.y = 2 * z.x * z.y + c.y;
 		z = z1;
 	}
 
