@@ -127,6 +127,36 @@ public:
     }
 };
 
+// Uses DFS
+template<class _Pr>
+void TraverseSkeleton(Bone* root, _Pr pred)
+{
+    pred(root);
+    for (Bone* bone : root->Children())
+    {
+        TraverseSkeleton<_Pr>(bone, pred);
+    }
+}
+// Uses DFS
+template<class _Pr>
+Bone* SearchSkeleton(Bone* root, _Pr pred)
+{
+    if (pred(root))
+        return root;
+
+    for (Bone* bone : root->Children())
+    {
+        if (Bone* found = SearchSkeleton<_Pr>(bone, pred); found)
+            return found;
+    }
+    return nullptr;
+}
+
+Bone* FindBoneEndingNearPosition(Bone* root, Vector2 position, float radius = 0.001f)
+{
+    return SearchSkeleton(root, [position, radius](Bone* root) { return Vector2Distance(root->EndPoint(), position) <= radius; });
+}
+
 int main()
 {
     int windowWidth = 1280;
@@ -139,6 +169,7 @@ int main()
     ******************************************/
 
     std::vector<Bone*> skeletons;
+    Bone* selected = nullptr;
 
     while (!WindowShouldClose())
     {
@@ -146,18 +177,25 @@ int main()
         *   Simulate frame and update variables   *
         ******************************************/
 
+        Bone* hovered;
+        for (Bone* root : skeletons)
+        {
+            hovered = FindBoneEndingNearPosition(root, GetMousePosition(), 2.0f);
+            if (!!hovered)
+                break;
+        }
+
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
         {
-            std::vector<Vector2> checkPoints;
-            for (Bone* root : skeletons)
-            {
-                Bone* start = root;
-                for (Bone* bone : start->Children())
-                {
-
-                }
-            }
-            skeletons.push_back(new Bone("root"));
+            selected = new Bone("bone", Vector2Zero(), Vector2Zero(), 0.0f, hovered);
+            if (!hovered)
+                selected->SetOffset(GetMousePosition());
+            skeletons.push_back(selected);
+        }
+        if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && selected)
+        {
+            selected->SetLength(Vector2Distance(selected->StartPoint(), GetMousePosition()));
+            selected->SetDirection();
         }
 
         /******************************************
