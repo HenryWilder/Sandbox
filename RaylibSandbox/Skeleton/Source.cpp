@@ -195,7 +195,9 @@ int main()
         if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && selected)
         {
             selected->SetLength(Vector2Distance(selected->StartPoint(), GetMousePosition()));
-            selected->SetDirection();
+            Vector2 rootDirection = selected->Parent()->WorldDirection();
+            Vector2 worldDirection = GetMousePosition() - selected->StartPoint();
+            selected->SetDirection(worldDirection - rootDirection);
         }
 
         /******************************************
@@ -206,7 +208,14 @@ int main()
 
             ClearBackground(BLACK);
 
-            // TODO: Draw frame
+            for (Bone* root : skeletons)
+            {
+                auto DrawBone = [](Bone* bone)
+                {
+                    DrawLineV(bone->StartPoint(), bone->EndPoint(), WHITE);
+                };
+                TraverseSkeleton(root, DrawBone);
+            }
 
         } EndDrawing();
     }
