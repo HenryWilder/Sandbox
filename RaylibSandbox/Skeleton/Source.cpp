@@ -1,6 +1,10 @@
 #include <raylib.h>
 #include <raymath.h>
 #include <vector>
+#include <unordered_set>
+#include <algorithm>
+#include <string>
+#include "hankorithms.h"
 
 #define sign(x) (((x) > (decltype(x))(0)) - ((x) < (decltype(x))(0)))
 
@@ -46,14 +50,81 @@ inline Vector3& operator/=(Vector3& a, float div) { return (a = Vector3Scale(a, 
 
 #pragma endregion
 
-struct Bone
+class Bone
 {
-    Vector2 startOffset;
-    Vector2 direction;
-    float length;
+private:
+    std::string m_name;
+    Vector2 m_offset;
+    Vector2 m_direction;
+    float m_length;
+    Bone* m_parent;
+    std::vector<Bone*> m_children;
 
-    Bone* parent;
-    std::vector<Bone*> children;
+public:
+    Bone(const std::string& name,
+        Vector2 offset,
+        Vector2 direction,
+        float length,
+        Bone* parent = nullptr) :
+        m_name(name),
+        m_offset(offset),
+        m_direction(direction),
+        m_length(length),
+        m_parent(parent),
+        m_children{}
+    {}
+
+    Bone(const Bone& src) = default;
+
+    const std::string& Name() const { return m_name; }
+    Vector2 Offset() const { return m_offset; }
+    Vector2 StartPoint() const { return (m_parent ? m_parent->EndPoint() + m_offset : m_offset); }
+    Vector2 EndPoint() const { return StartPoint() + m_direction * m_length; }
+    Vector2 Direction() const { return m_direction; }
+    Vector2 WorldDirection() const { return (m_parent ? m_parent->WorldDirection() + m_direction : m_direction); }
+    float Length() const { return m_length; }
+    Bone* Parent() const { return m_parent; }
+    size_t ChildCount() const { return m_children.size(); }
+    Bone* Child(size_t i) const { return m_children[i]; }
+    const std::vector<Bone*>& Children() const { return m_children; }
+
+
+    void SetName(const std::string& name) { m_name = name; }
+    void SetOffset(Vector2 offset) { m_offset = offset; }
+    void SetDirection(Vector2 direction) { m_direction = direction; }
+    void SetLength(float length) { m_length = length; }
+    void RemoveParent() { m_parent = nullptr; }
+    void SetParent(Bone* parent) { m_parent = parent; }
+
+    void AddChild(Bone* child)
+    {
+        if (child == nullptr)
+            return;
+
+        if (std::find(m_children.begin(), m_children.end(), child) == m_children.end())
+            m_children.push_back(child);
+    }
+    void RemoveChild(Bone* child)
+    {
+        if (child == nullptr)
+            return;
+
+        std::vector<Bone*>::const_iterator it = std::find(m_children.begin(), m_children.end(), child);
+        if (it != m_children.end())
+            m_children.erase(it);
+    }
+    void AddChildren(const std::vector<Bone*>& children)
+    {
+        hw::multi_push(m_children, children);
+    }
+    void RemoveChildren(const std::unordered_set<Bone*>& children)
+    {
+        hw::multi_erase(m_children, children);
+    }
+    void RemoveChildren(const std::vector<Bone*>& children)
+    {
+        hw::multi_erase(m_children, children);
+    }
 };
 
 int main()
@@ -67,7 +138,7 @@ int main()
     *   Load textures, shaders, and meshes    *
     ******************************************/
 
-    // @TODO: Load persistent assets & variables
+    std::vector<Bone*> skeletons;
 
     while (!WindowShouldClose())
     {
@@ -75,7 +146,19 @@ int main()
         *   Simulate frame and update variables   *
         ******************************************/
 
-        // @TODO: simulate frame
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+        {
+            std::vector<Vector2> checkPoints;
+            for (Bone* root : skeletons)
+            {
+                Bone* start = root;
+                for (Bone* bone : start->Children())
+                {
+
+                }
+            }
+            skeletons.push_back(new Bone("root"));
+        }
 
         /******************************************
         *   Draw the frame                        *
