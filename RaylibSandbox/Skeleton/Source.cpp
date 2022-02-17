@@ -168,6 +168,7 @@ int main()
     *   Load textures, shaders, and meshes    *
     ******************************************/
 
+    std::vector<Bone*> bones;
     std::vector<Bone*> skeletons;
     Bone* selected = nullptr;
 
