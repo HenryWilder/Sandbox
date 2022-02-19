@@ -67,6 +67,10 @@ int main()
 
     Shader shader = LoadShader(0, "BGShader.frag");
 
+    int radiusLoc = GetShaderLocation(shader, "maxDepth");
+    int density1Loc = GetShaderLocation(shader, "outerDensity");
+    int density2Loc = GetShaderLocation(shader, "innerDensity");
+
     Image img = GenImageColor(1, 1, WHITE);
     Texture2D blankTex = LoadTextureFromImage(img);
     UnloadImage(img);
@@ -99,17 +103,22 @@ int main()
             }
             else if (CheckCollisionPointRec(GetMousePosition(), Rectangle{ 0, radiusSlider.y, (float)windowWidth, radiusSlider.height }))
             {
-                float max = ((float)windowWidth - radiusSlider.x * 2) - 10.0f * 2;
-
                 radius = ((float)GetMouseX() - radiusSlider.x);
                 if (radius < 10) radius = 10;
-                else if (radius > max) radius = max;
+                else if (radius > 400) radius = 400;
             }
         }
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && CheckCollisionPointRec(GetMousePosition(), density2SliderCheckbox))
         {
             density2Active = !density2Active;
             if (!density2Active) density2 = density1;
+        }
+
+        {
+            float percentRadius = radius / 200.0f;
+            SetShaderValue(shader, radiusLoc, &percentRadius, UNIFORM_FLOAT);
+            SetShaderValue(shader, density1Loc, &density1, UNIFORM_FLOAT);
+            SetShaderValue(shader, density2Loc, &density2, UNIFORM_FLOAT);
         }
 
         /******************************************
