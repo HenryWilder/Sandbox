@@ -14,6 +14,10 @@ out vec4 finalColor;
 // NOTE: Add here your custom variables
 uniform vec2 resolution = vec2(1280, 720);
 
+vec3 deep = vec3(29,25,40)   / vec3(255);
+vec3 glow = vec3(129,21,206) / vec3(255);
+vec3 refl = vec3(38,144,252) / vec3(255);
+
 uniform float maxDepth     = 0.5;
 uniform float outerDensity = 0.5;
 uniform float innerDensity = 0.5;
@@ -25,9 +29,15 @@ void main()
 
 	// Code here
 
-	if (distance(fragTexCoord, vec2(0.5)) <= 0.5) // Mask
+	if (distance(fragTexCoord, vec2(0.5)) <= 0.5) // Circle cutout
 	{
-		finalColor = vec4(fragTexCoord * (2.0 - maxDepth), 1.0, 1.0);
+		vec3 position = vec3(fragTexCoord * 2 - 1, 0);
+		position.z = sqrt(1 - (position.x * position.x + position.y * position.y));
+
+		float penetration = dot(vec3(0,0,1), position);
+		vec3 color = mix(glow, deep, penetration);
+
+		finalColor = vec4(color, 1.0);
 	}
 	else
 	{
