@@ -57,19 +57,23 @@ int main()
     ******************************************/
 
     float radius = 200.0f;
-    float density1 = 0.5f;
-    float density2 = 0.5f;
+    float density1 = 0.75f;
+    float density2 = 0.75f;
     bool density2Active = false;
     Rectangle radiusSlider;
     Rectangle density1Slider;
     Rectangle density2Slider;
     Rectangle density2SliderCheckbox;
 
+    Vector2 lightPos = { (float)windowWidth / 2.0f, (float)windowHeight / 6.0f };
+    float lightRadius = 5.0f;
+
     Shader shader = LoadShader(0, "BGShader.frag");
 
     int radiusLoc = GetShaderLocation(shader, "maxDepth");
     int density1Loc = GetShaderLocation(shader, "outerDensity");
     int density2Loc = GetShaderLocation(shader, "innerDensity");
+    int lightPosLoc = GetShaderLocation(shader, "lightSource");
 
     Image img = GenImageColor(1, 1, WHITE);
     Texture2D blankTex = LoadTextureFromImage(img);
@@ -92,22 +96,35 @@ int main()
 
         if (IsMouseButtonDown(MOUSE_LEFT_BUTTON))
         {
+            // Density 1
             if (CheckCollisionPointRec(GetMousePosition(), density1Slider))
             {
                 density1 = ((float)GetMouseX() - density1Slider.x) / density1Slider.width;
                 if (!density2Active) density2 = density1;
             }
+            // Density 2
             else if (density2Active && CheckCollisionPointRec(GetMousePosition(), density2Slider))
             {
                 density2 = ((float)GetMouseX() - density2Slider.x) / density2Slider.width;
             }
+            // Radius
             else if (CheckCollisionPointRec(GetMousePosition(), Rectangle{ 0, radiusSlider.y, (float)windowWidth, radiusSlider.height }))
             {
                 radius = ((float)GetMouseX() - radiusSlider.x);
                 if (radius < 10) radius = 10;
                 else if (radius > 400) radius = 400;
+                density1Slider.width = radius;
+                density2Slider.width = radius;
             }
+            else if (CheckCollisionPointCircle(GetMousePosition(), lightPos, lightRadius))
+            {
+                lightRadius = 20.0f;
+                lightPos = GetMousePosition();
+            }
+            else
+                lightRadius = 5.0f;
         }
+        // Checkbox
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && CheckCollisionPointRec(GetMousePosition(), density2SliderCheckbox))
         {
             density2Active = !density2Active;
@@ -119,6 +136,8 @@ int main()
             SetShaderValue(shader, radiusLoc, &percentRadius, UNIFORM_FLOAT);
             SetShaderValue(shader, density1Loc, &density1, UNIFORM_FLOAT);
             SetShaderValue(shader, density2Loc, &density2, UNIFORM_FLOAT);
+            Vector3 light = { (lightPos.x - windowWidth / 2 - radius) / (radius * 2), (lightPos.y - windowHeight / 2 - radius) / (radius * 2), 200.0f };
+            SetShaderValue(shader, lightPosLoc, &light, UNIFORM_VEC3);
         }
 
         /******************************************
@@ -141,6 +160,9 @@ int main()
 
             Rectangle fillBar;
 
+            // Light Source Point
+            DrawCircleV(lightPos, lightRadius, YELLOW);
+
             // Radius Slider
             fillBar = radiusSlider;
             fillBar.width = radius;
@@ -149,17 +171,23 @@ int main()
 
             // Density 1 Slider
             DrawRectangleRec(density1Slider, WHITE);
+            DrawText("Outside Density", density1Slider.x + 2, density1Slider.y + 2, 8, BLUE);
             fillBar = density1Slider;
             fillBar.width = density1 * density1Slider.width;
             DrawRectangleRec(fillBar, BLUE);
-            DrawText("Outside Density", density1Slider.x + 2, density1Slider.y + 2, 8, BLACK);
+            BeginScissorMode(fillBar.x, fillBar.y, fillBar.width, fillBar.height);
+            DrawText("Outside Density", density1Slider.x + 2, density1Slider.y + 2, 8, WHITE);
+            EndScissorMode();
 
             // Density 2 Slider
             DrawRectangleRec(density2Slider, (density2Active ? WHITE : GRAY));
+            DrawText("Inside Density", density2Slider.x + 2, density2Slider.y + 2, 8, BLUE);
             fillBar = density2Slider;
             fillBar.width = density2 * density2Slider.width;
             DrawRectangleRec(fillBar, BLUE);
-            DrawText("Inside Density", density2Slider.x + 2, density2Slider.y + 2, 8, BLACK);
+            BeginScissorMode(fillBar.x, fillBar.y, fillBar.width, fillBar.height);
+            DrawText("Inside Density", density2Slider.x + 2, density2Slider.y + 2, 8, WHITE);
+            EndScissorMode();
 
             // Density 2 Checkbox
             DrawRectangleRec(density2SliderCheckbox, (density2Active ? BLUE : GRAY));
