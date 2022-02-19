@@ -65,6 +65,12 @@ int main()
     Rectangle density2Slider;
     Rectangle density2SliderCheckbox;
 
+    Shader shader = LoadShader(0, "BGShader.frag");
+
+    Image img = GenImageColor(1, 1, WHITE);
+    Texture2D blankTex = LoadTextureFromImage(img);
+    UnloadImage(img);
+
     density2Slider.width = density1Slider.width = radius;
     density2SliderCheckbox.width = density2SliderCheckbox.height = density2Slider.height = 25;
     (density2Slider.y = density2SliderCheckbox.y = windowHeight - ((density2SliderCheckbox.x = 10) + density2SliderCheckbox.height));
@@ -114,7 +120,11 @@ int main()
 
             ClearBackground(BLACK);
 
-            DrawTextureEx(windowWidth / 2 - radius, windowHeight / 2 - radius, radius * 2, radius * 2, WHITE);
+            BeginShaderMode(shader); {
+
+                DrawTextureEx(blankTex, { windowWidth / 2 - radius, windowHeight / 2 - radius }, 0.0f, radius * 2, WHITE);
+
+            } EndShaderMode();
 
             /******************************************
             *   UI                                    *
@@ -152,7 +162,8 @@ int main()
     *   Unload and free memory                *
     ******************************************/
 
-    // @TODO: Unload variables
+    UnloadTexture(blankTex);
+    UnloadShader(shader);
 
     CloseWindow();
 
