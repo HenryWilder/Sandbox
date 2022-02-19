@@ -32,12 +32,12 @@ void main()
 	if (distance(fragTexCoord, vec2(0.5)) <= 0.5) // Circle cutout
 	{
 		vec3 position = vec3(fragTexCoord * 2 - 1, 0);
-		position.z = sqrt(1 - (position.x * position.x + position.y * position.y));
+		position.z = sqrt(1.0 - (position.x * position.x + position.y * position.y));
 
-		float penetration = dot(vec3(0,0,1), position);
-		vec3 color = mix(glow, deep, penetration);
+		float value = outerDensity * position.z;
+		vec3 color = value < 0.5 ? mix(glow, deep, value * 2) : mix(deep, vec3(1), (value - 0.5) * 2);
 
-		finalColor = vec4(color, 1.0);
+		finalColor = vec4(color, 1.0 - (position.z * (1.0 - maxDepth)));
 	}
 	else
 	{
