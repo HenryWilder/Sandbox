@@ -56,6 +56,15 @@ int main()
     *   Load textures, shaders, and meshes    *
     ******************************************/
 
+    enum class Control
+    {
+        None,
+        SliderRadius,
+        SliderDensity1,
+        SliderDensity2,
+        PointLightPos,
+    };
+    Control currentControl = Control::None;
     float radius = 200.0f;
     float density1 = 0.75f;
     float density2 = 0.75f;
@@ -64,7 +73,6 @@ int main()
     Rectangle density1Slider;
     Rectangle density2Slider;
     Rectangle density2SliderCheckbox;
-
     Vector2 lightPos = { (float)windowWidth / 2.0f, (float)windowHeight / 6.0f };
     float lightRadius = 5.0f;
 
@@ -94,49 +102,55 @@ int main()
         *   Simulate frame and update variables   *
         ******************************************/
 
-        if (IsMouseButtonDown(MOUSE_LEFT_BUTTON))
+        if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) currentControl = Control::None;
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
         {
-            // Density 1
-            if (CheckCollisionPointRec(GetMousePosition(), density1Slider))
-            {
-                density1 = ((float)GetMouseX() - density1Slider.x) / density1Slider.width;
-                if (!density2Active) density2 = density1;
-            }
-            // Density 2
-            else if (density2Active && CheckCollisionPointRec(GetMousePosition(), density2Slider))
-            {
-                density2 = ((float)GetMouseX() - density2Slider.x) / density2Slider.width;
-            }
-            // Radius
-            else if (CheckCollisionPointRec(GetMousePosition(), Rectangle{ 0, radiusSlider.y, (float)windowWidth, radiusSlider.height }))
-            {
-                radius = ((float)GetMouseX() - radiusSlider.x);
-                if (radius < 10) radius = 10;
-                else if (radius > 400) radius = 400;
-                density1Slider.width = radius;
-                density2Slider.width = radius;
-            }
-            else if (CheckCollisionPointCircle(GetMousePosition(), lightPos, lightRadius))
-            {
-                lightRadius = 20.0f;
-                lightPos = GetMousePosition();
-            }
-            else
-                lightRadius = 5.0f;
-        }
-        // Checkbox
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && CheckCollisionPointRec(GetMousePosition(), density2SliderCheckbox))
-        {
-            density2Active = !density2Active;
-            if (!density2Active) density2 = density1;
+            if      (CheckCollisionPointRec   (GetMousePosition(), radiusSlider          )                  ) currentControl = Control::SliderRadius;
+            else if (CheckCollisionPointRec   (GetMousePosition(), density1Slider        )                  ) currentControl = Control::SliderDensity1;
+            else if (CheckCollisionPointRec   (GetMousePosition(), density2Slider        ) && density2Active) currentControl = Control::SliderDensity2;
+            else if (CheckCollisionPointRec   (GetMousePosition(), density2SliderCheckbox)                  ) density2Active = !density2Active;
+            else if (CheckCollisionPointCircle(GetMousePosition(), lightPos, lightRadius )                  ) currentControl = Control::PointLightPos;
         }
 
+        switch (currentControl)
+        {
+        case Control::None: break;
+
+        case Control::SliderRadius:
+            density1Slider.width = density2Slider.width = radius = Clamp((float)GetMouseX() - radiusSlider.x, 10, 400);
+            break;
+
+        case Control::SliderDensity1:
+            density1 = Clamp(((float)GetMouseX() - density1Slider.x), 0, density1Slider.width) / density1Slider.width;
+            if (!density2Active) density2 = density1;
+            break;
+
+        case Control::SliderDensity2:
+            density2 = Clamp(((float)GetMouseX() - density2Slider.x), 0, density2Slider.width) / density2Slider.width;
+            break;
+
+        case Control::PointLightPos:
+        {
+            lightPos = GetMousePosition();
+            Vector2 center = { (float)windowWidth * 0.5f, (float)windowHeight * 0.5f };
+            float diameter = radius * 2.0f;
+            if (Vector2Distance(lightPos, center) > diameter)
+                lightPos = center + Vector2Normalize(lightPos) * diameter;
+        }
+            break;
+        }
+
+        // Set shader uniforms
         {
             float percentRadius = radius / 200.0f;
             SetShaderValue(shader, radiusLoc, &percentRadius, UNIFORM_FLOAT);
             SetShaderValue(shader, density1Loc, &density1, UNIFORM_FLOAT);
             SetShaderValue(shader, density2Loc, &density2, UNIFORM_FLOAT);
-            Vector3 light = { (lightPos.x - windowWidth / 2 - radius) / (radius * 2), (lightPos.y - windowHeight / 2 - radius) / (radius * 2), 200.0f };
+            Vector3 light;
+            float diameter = radius * 2.0f;
+            light.x = (lightPos.x - (((float)windowWidth ) - diameter) * 0.5f) / diameter - 0.5f;
+            light.y = (lightPos.y - (((float)windowHeight) - diameter) * 0.5f) / diameter - 0.5f;
+            light.z = sqrt(1.0f - (light.x * light.x + light.y * light.y));
             SetShaderValue(shader, lightPosLoc, &light, UNIFORM_VEC3);
         }
 
