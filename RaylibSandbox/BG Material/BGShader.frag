@@ -47,7 +47,7 @@ void main()
 		vec3 color = mix(mix(mix(glow, refl, lightStrength), deep, outerDensity), mix(deep, mix(glow * 20, refl * 20, innerDensity), innerDensity), innerDensity);
 		vec3 shallowColor = mix(deep, vec3(glow * 20), clamp((outerDensity - 0.75) * 3,0,1));
 		vec3 deepColor	  = mix(glow, vec3(refl * 20), clamp((innerDensity - 0.75) * 3,0,1));
-		finalColor = vec4((lightStrength < 1.0 ? shallowColor : refl), 1.0);
+		finalColor = vec4((lightStrength < 1.0 ? mix(deep, glow, 1.0 - position.z) : refl), 1.0);
 		// Soft
 		//finalColor = vec4(vec3(mix(deep, glow, 1-sliceMass)), 1.0);
 	}

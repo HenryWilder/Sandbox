@@ -102,7 +102,6 @@ int main()
         *   Simulate frame and update variables   *
         ******************************************/
 
-        if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) currentControl = Control::None;
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
         {
             if      (CheckCollisionPointRec   (GetMousePosition(), radiusSlider          )                  ) currentControl = Control::SliderRadius;
@@ -111,6 +110,7 @@ int main()
             else if (CheckCollisionPointRec   (GetMousePosition(), density2SliderCheckbox)                  ) density2Active = !density2Active;
             else if (CheckCollisionPointCircle(GetMousePosition(), lightPos, lightRadius )                  ) currentControl = Control::PointLightPos;
         }
+        if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON)) currentControl = Control::None;
 
         switch (currentControl)
         {
@@ -135,7 +135,7 @@ int main()
             Vector2 center = { (float)windowWidth * 0.5f, (float)windowHeight * 0.5f };
             float diameter = radius * 2.0f;
             if (Vector2Distance(lightPos, center) > diameter)
-                lightPos = center + Vector2Normalize(lightPos) * diameter;
+                lightPos = center + (Vector2Normalize(lightPos - center) * (diameter - 1));
         }
             break;
         }
