@@ -117,7 +117,11 @@ int main()
         case Control::None: break;
 
         case Control::SliderRadius:
+            lightPos -= (Vector2{ (float)windowWidth, (float)windowHeight } * 0.5f);
+            lightPos /= radius;
             density1Slider.width = density2Slider.width = radius = Clamp((float)GetMouseX() - radiusSlider.x, 10, 400);
+            lightPos *= radius;
+            lightPos += (Vector2{ (float)windowWidth, (float)windowHeight } *0.5f);
             break;
 
         case Control::SliderDensity1:
@@ -175,6 +179,8 @@ int main()
             Rectangle fillBar;
 
             // Light Source Point
+            if (currentControl == Control::PointLightPos)
+                DrawLineV(lightPos, GetMousePosition(), LIME);
             DrawCircleV(lightPos, lightRadius, YELLOW);
 
             // Radius Slider

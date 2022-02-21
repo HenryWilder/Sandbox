@@ -23,6 +23,7 @@ uniform float outerDensity = 0.5;
 uniform float innerDensity = 0.5;
 
 uniform vec3 lightSource = vec3(0.5,-0.5,1.0);
+uniform float maskSubdiv = 1.0 / 3.0;
 
 void main()
 {
@@ -31,28 +32,29 @@ void main()
 
 	// Code here
 
-	if (distance(fragTexCoord, vec2(0.5)) <= 0.5) // Circle cutout
-	{
-		vec3 position = vec3(fragTexCoord * 2 - 1, 0);
-		position.z = sqrt(1.0 - (position.x * position.x + position.y * position.y));
+	float mask = 0;
+	mask += (distance(fragTexCoord + vec2(x * -maskSubdiv, y * -maskSubdiv), vec2(0.5)) < 0.5 ? 1.0 : 0.0);
+	mask += (distance(fragTexCoord + vec2(x *           0, y * -maskSubdiv), vec2(0.5)) < 0.5 ? 1.0 : 0.0);
+	mask += (distance(fragTexCoord + vec2(x * +maskSubdiv, y * -maskSubdiv), vec2(0.5)) < 0.5 ? 1.0 : 0.0);
+	mask += (distance(fragTexCoord + vec2(x * -maskSubdiv, y *           0), vec2(0.5)) < 0.5 ? 1.0 : 0.0);
+	mask += (distance(fragTexCoord + vec2(x *           0, y *           0), vec2(0.5)) < 0.5 ? 1.0 : 0.0);
+	mask += (distance(fragTexCoord + vec2(x * +maskSubdiv, y *           0), vec2(0.5)) < 0.5 ? 1.0 : 0.0);
+	mask += (distance(fragTexCoord + vec2(x * -maskSubdiv, y * +maskSubdiv), vec2(0.5)) < 0.5 ? 1.0 : 0.0);
+	mask += (distance(fragTexCoord + vec2(x *           0, y * +maskSubdiv), vec2(0.5)) < 0.5 ? 1.0 : 0.0);
+	mask += (distance(fragTexCoord + vec2(x * +maskSubdiv, y * +maskSubdiv), vec2(0.5)) < 0.5 ? 1.0 : 0.0);
+	mask /= 9.0;
 
-		float dist = distance(position, lightSource);
-		float lightStrength = (maxDepth * 0.25) / (dist * dist);
-
-		float sliceVolume = position.z * maxDepth; // Assume width/height of 1
-		float averageDensity = (outerDensity * 2 + innerDensity) / 3;
-		float sliceMass = averageDensity * sliceVolume;
-
-		// Cell
-		vec3 color = mix(mix(mix(glow, refl, lightStrength), deep, outerDensity), mix(deep, mix(glow * 20, refl * 20, innerDensity), innerDensity), innerDensity);
-		vec3 shallowColor = mix(deep, vec3(glow * 20), clamp((outerDensity - 0.75) * 3,0,1));
-		vec3 deepColor	  = mix(glow, vec3(refl * 20), clamp((innerDensity - 0.75) * 3,0,1));
-		finalColor = vec4((lightStrength < 1.0 ? mix(deep, glow, 1.0 - position.z) : refl), 1.0);
-		// Soft
-		//finalColor = vec4(vec3(mix(deep, glow, 1-sliceMass)), 1.0);
-	}
-	else
-	{
-		finalColor = vec4(0.0);
-	}
+	//vec3 position = vec3(fragTexCoord * 2 - 1, 0);
+	//position.z = sqrt(1.0 - (position.x * position.x + position.y * position.y));
+	//
+	//float dist = distance(position, lightSource);
+	//float lightStrength = (abs(dot(normalize(position), normalize(lightSource))) * 0.25) / (dist * maxDepth);
+	//
+	//float sliceVolume = position.z * maxDepth; // Assume width/height of 1
+	//float averageDensity = (outerDensity * 2 + innerDensity) / 3;
+	//float sliceMass = averageDensity * sliceVolume;
+	//
+	//vec3 base = mix(deep, glow, 1.0 - position.z);
+	//vec3 shaded = mix(base, refl, lightStrength);
+	finalColor = vec4(vec3(1.0), mask);
 }
