@@ -44,17 +44,24 @@ void main()
 	mask += (distance(fragTexCoord + vec2(x * +maskSubdiv, y * +maskSubdiv), vec2(0.5)) < 0.5 ? 1.0 : 0.0);
 	mask /= 9.0;
 
-	//vec3 position = vec3(fragTexCoord * 2 - 1, 0);
-	//position.z = sqrt(1.0 - (position.x * position.x + position.y * position.y));
-	//
-	//float dist = distance(position, lightSource);
-	//float lightStrength = (abs(dot(normalize(position), normalize(lightSource))) * 0.25) / (dist * maxDepth);
-	//
-	//float sliceVolume = position.z * maxDepth; // Assume width/height of 1
-	//float averageDensity = (outerDensity * 2 + innerDensity) / 3;
-	//float sliceMass = averageDensity * sliceVolume;
-	//
-	//vec3 base = mix(deep, glow, 1.0 - position.z);
-	//vec3 shaded = mix(base, refl, lightStrength);
-	finalColor = vec4(vec3(1.0), mask);
+	vec3 position = vec3(fragTexCoord * 2 - 1, 0);
+	position.z = sqrt(1.0 - (position.x * position.x + position.y * position.y));
+
+	float inverseDensity = 1.0 + (1.0 - innerDensity);
+	vec3 subsurfacePosition = vec3(position.xy * inverseDensity, 0);
+	subsurfacePosition.z = sqrt(inverseDensity - (subsurfacePosition.x * subsurfacePosition.x + subsurfacePosition.y * subsurfacePosition.y));
+	
+	float dist = distance(position, lightSource);
+	float lightStrength = (max(dot(normalize(position), normalize(lightSource)), 0) * 0.0625) / (dist * maxDepth);
+
+	float ssdist = distance(subsurfacePosition, lightSource);
+	float sslightStrength = max((max(dot(normalize(subsurfacePosition), normalize(lightSource)), 0) * 0.125) / (ssdist * maxDepth), 0);
+	
+	float sliceVolume = position.z * maxDepth; // Assume width/height of 1
+	float averageDensity = (outerDensity * 2 + innerDensity) / 3;
+	float sliceMass = averageDensity * sliceVolume;
+	
+	vec3 base = mix(deep, glow, 1.0 - position.z);
+	vec3 shaded = base + (refl * lightStrength) + (refl * sslightStrength);
+	finalColor = vec4(shaded, mask);
 }
