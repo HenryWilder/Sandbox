@@ -272,7 +272,7 @@ int main()
         { "DragV", "Shows the ability to drag a button while it is held.",
             20, 80, 60, 20, Button::Type_Hold, false, false },
         { "DragH", "Shows the ability to drag a button while it is held.",
-            90, 110, 60, 20, Button::Type_Hold, false, false },
+            20, 110, 60, 20, Button::Type_Hold, false, false },
 
         { "A", "Only one of these two can be active at a time.",
             90, 20, 20, 20, Button::Type_Toggle, false, false, &(radios[0]) },
@@ -361,30 +361,19 @@ int main()
         // Handle 3rd button dragging
         if (buttons[2].IsActive())
         {
-            Rectangle rec = buttons[2].GetRect();
-            rec.y = Clamp(cursor.y - rec.height * 0.5f, 80.0f, 280.0f);
+            float y = Clamp(cursor.y - buttons[2].GetHeight() * 0.5f, 80.0f, 280.0f);
 
-            buttons[2].SetRect(rec);
-
-            Rectangle rec1 = buttons[3].GetRect();
-            rec1.y = rec.y;
-            buttons[3].SetRect(rec1);
-
-            rec1 = buttons[6].GetRect();
-            rec1.y = rec.y;
-            buttons[6].SetRect(rec1);
+            buttons[2].SetY(y);
+            buttons[3].SetY(y + 30);
+            buttons[6].SetY(y);
         }
         // Handle 3rd button dragging
         if (buttons[3].IsActive())
         {
-            Rectangle rec = buttons[3].GetRect();
-            rec.y = Clamp(cursor.y - rec.height * 0.5f, 80.0f, 280.0f);
+            float x = Clamp(cursor.x - buttons[3].GetWidth() * 0.5f, 20.0f, 220.0f);
 
-            buttons[3].SetRect(rec);
-
-            Rectangle rec1 = buttons[6].GetRect();
-            rec1.y = rec.y;
-            buttons[6].SetRect(rec1);
+            buttons[3].SetX(x);
+            buttons[6].SetX(x + 70);
         }
 
         // Mark handled
