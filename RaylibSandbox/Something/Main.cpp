@@ -49,22 +49,46 @@ inline Vector3& operator/=(Vector3& a, float div) { return (a = Vector3Scale(a, 
 
 class Button
 {
+public:
+    enum class State : unsigned char
+    {
+        NONE     = 0,
+        ACTIVE   = 0b1,
+        HOVERED  = 0b10,
+        DISABLED = 0b100,
+    };
+
+private:
+    static bool GetFlag(State flags, State bit)
+    {
+        return !!((unsigned char)flags & (unsigned char)bit);
+    }
+    static void SetFlag(State& flags, State bit, bool value)
+    {
+        flags = (State)((unsigned char)flags ^ ((-(unsigned char)value ^ (unsigned char)flags) & (unsigned char)bit));
+    }
+
 private:
     Rectangle m_rect;
     bool m_isToggle;
-    bool m_state;
-
+    State m_state;
     std::string m_displayName;
 
 public:
     static constexpr bool Type_Toggle = true;
     static constexpr bool Type_Hold = false;
 
-    Button(const std::string displayName, float x, float y, float width, float height, bool isToggle, bool defaultState = false) :
-        m_rect{ x, y, width, height }, m_isToggle(isToggle), m_state(defaultState), m_displayName(displayName) {}
+    Button(const std::string displayName, float x, float y, float width, float height, bool isToggle, bool startActive, bool startDisabled) :
+        m_rect{ x, y, width, height },
+        m_isToggle(isToggle),
+        m_state((State)(((unsigned char)State::ACTIVE * (unsigned char)startActive) | ((unsigned char)State::DISABLED * (unsigned char)startDisabled))),
+        m_displayName(displayName) {}
 
-    Button(const std::string displayName, Rectangle rect, bool isToggle, bool defaultState = false) :
-        m_rect(rect), m_isToggle(isToggle), m_state(defaultState), m_displayName(displayName) {}
+    Button(const std::string displayName, Rectangle rect, bool isToggle, bool startActive, bool startDisabled) :
+        m_rect(rect),
+        m_isToggle(isToggle),
+        m_state((State)(((unsigned char)State::ACTIVE* (unsigned char)startActive) | ((unsigned char)State::DISABLED * (unsigned char)startDisabled))),
+        m_displayName(displayName) {}
 
     Rectangle GetRect() const
     {
@@ -88,17 +112,31 @@ public:
         m_isToggle = isToggle;
     }
 
-    bool GetState() const
+    bool IsActive() const
     {
-        return m_state;
+        return GetFlag(m_state, State::ACTIVE);
     }
-    void SetState(bool state)
+    void SetActive(bool isActive)
     {
-        m_state = state;
+        SetFlag(m_state, State::ACTIVE, isActive);
     }
-    void ToggleState()
+
+    bool IsHovered() const
     {
-        m_state = !m_state;
+        return GetFlag(m_state, State::HOVERED);
+    }
+    void SetHovered(bool hovered)
+    {
+        SetFlag(m_state, State::HOVERED, hovered);
+    }
+
+    bool IsDisabled() const
+    {
+        return GetFlag(m_state, State::DISABLED);
+    }
+    void SetDisabled(bool disabled)
+    {
+        SetFlag(m_state, State::DISABLED, disabled);
     }
 
     const std::string& GetDisplayName() const
@@ -110,6 +148,10 @@ public:
         m_displayName = displayName;
     }
 };
+Button::State operator|(Button::State lValue, Button::State rValue)
+{
+    return (Button::State)((unsigned char)lValue | (unsigned char)rValue);
+}
 
 int main()
 {
@@ -123,9 +165,9 @@ int main()
     ******************************************/
 
     std::vector<Button> buttons = {
-        { "Hold button", 20, 20, 60, 20, Button::Type_Hold },
-        { "Toggle button", 20, 50, 60, 20, Button::Type_Toggle },
-        { "Draggable button", 20, 80, 60, 20, Button::Type_Hold },
+        { "Hold button", 20, 20, 60, 20, Button::Type_Hold, false, false },
+        { "Toggle button", 20, 50, 60, 20, Button::Type_Toggle, false, false },
+        { "Draggable button", 20, 80, 60, 20, Button::Type_Hold, false, false },
     };
 
     while (!WindowShouldClose())
@@ -144,9 +186,10 @@ int main()
 
             ClearBackground(BLACK);
 
+            Vector2 cursor = GetMousePosition();
             for (Button& button : buttons)
             {
-                DrawRectangleRec(button.GetRect(), BLUE);
+                DrawRectangleRec(button.GetRect(), button.IsOverlapping(cursor) ? SKYBLUE : BLUE);
             }
 
         } EndDrawing();
