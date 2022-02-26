@@ -47,6 +47,8 @@ inline Vector3& operator/=(Vector3& a, float div) { return (a = Vector3Scale(a, 
 
 #pragma endregion
 
+struct RadioButtonHandler;
+
 class Button
 {
 public:
@@ -70,29 +72,35 @@ private:
 
 private:
     std::string m_displayName;
+    std::string m_tooltip;
     Rectangle m_rect;
     bool m_isToggle;
     State m_state;
     bool m_callbackDirty;
+    RadioButtonHandler* m_group;
 
 public:
     static constexpr bool Type_Toggle = true;
     static constexpr bool Type_Hold = false;
 
-    Button(const std::string displayName, float x, float y, float width, float height, bool isToggle, bool startActive, bool startDisabled) :
+    Button(
+        const std::string& displayName,
+        const std::string& toolTip,
+        float x,
+        float y,
+        float width,
+        float height,
+        bool isToggle,
+        bool startActive,
+        bool startDisabled,
+        RadioButtonHandler* group = nullptr) :
         m_displayName(displayName),
+        m_tooltip(toolTip),
         m_rect{ x, y, width, height },
         m_isToggle(isToggle),
         m_state((State)(((unsigned char)State::ACTIVE * (unsigned char)startActive) | ((unsigned char)State::DISABLED * (unsigned char)startDisabled))),
-        m_callbackDirty(false)
-    {}
-
-    Button(const std::string displayName, Rectangle rect, bool isToggle, bool startActive, bool startDisabled) :
-        m_displayName(displayName),
-        m_rect(rect),
-        m_isToggle(isToggle),
-        m_state((State)(((unsigned char)State::ACTIVE* (unsigned char)startActive) | ((unsigned char)State::DISABLED * (unsigned char)startDisabled))),
-        m_callbackDirty(false)
+        m_callbackDirty(false),
+        m_group(group)
     {}
 
     Rectangle GetRect() const
@@ -148,6 +156,15 @@ public:
         SetFlag(m_state, State::DISABLED, disabled);
     }
 
+    const std::string& GetToolTip() const
+    {
+        return m_tooltip;
+    }
+    void SetToolTip(const std::string& toolTip)
+    {
+        m_tooltip = toolTip;
+    }
+
     const std::string& GetDisplayName() const
     {
         return m_displayName;
@@ -157,17 +174,42 @@ public:
         m_displayName = displayName;
     }
 
-    bool IsUnhandled() const
+    bool IsChanged() const
     {
         return m_callbackDirty;
     }
-    void MarkUnhandled()
+    void MarkChanged()
     {
         m_callbackDirty = true;
     }
-    void MarkHandled()
+    void ResetChanged()
     {
         m_callbackDirty = true;
+    }
+
+    RadioButtonHandler* GetGroup() const
+    {
+        return m_group;
+    }
+    void SetGroup(RadioButtonHandler* group)
+    {
+        m_group = group;
+    }
+};
+
+// Buttons which only allow one to be active at a time
+struct RadioButtonHandler
+{
+    std::vector<Button*> m_children;
+
+    void Activate(Button* selection)
+    {
+        for (Button* button : m_children)
+        {
+            button->MarkChanged();
+            button->SetActive(false);
+        }
+        selection->SetActive(true);
     }
 };
 
@@ -182,11 +224,24 @@ int main()
     *   Load textures, shaders, and meshes    *
     ******************************************/
 
-    std::vector<Button> buttons = {
-        { "Hold", 20, 20, 60, 20, Button::Type_Hold, false, false },
-        { "Toggle", 20, 50, 60, 20, Button::Type_Toggle, false, false },
-        { "Draggable", 20, 80, 60, 20, Button::Type_Hold, false, false },
+    std::vector<RadioButtonHandler> radios = {
+        {}
     };
+    std::vector<Button> buttons = {
+        { "Hold", "Stays active only while the mouse is pressed.", 20, 20, 60, 20, Button::Type_Hold, false, false },
+        { "Toggle", "Changes states when the mouse is pressed.", 20, 50, 60, 20, Button::Type_Toggle, false, false },
+        { "Draggable", "Shows the ability to drag a button while it is held.", 20, 80, 60, 20, Button::Type_Hold, false, false },
+
+        { "A", "Only one of these two can be active at a time.", 90, 20, 20, 20, Button::Type_Toggle, false, false, &(radios[0]) },
+        { "B", "Only one of these two can be active at a time.", 90, 50, 20, 20, Button::Type_Toggle, false, false, &(radios[0]) },
+    };
+    radios[0].m_children.reserve(2);
+    radios[0].m_children.push_back(&(buttons[3]));
+    radios[0].m_children.push_back(&(buttons[4]));
+
+    constexpr float toolTipHoverTime = 0.5f;
+    float timeSinceMouseMove = 0.0f;
+    Vector2 cursor{ 0,0 };
 
     while (!WindowShouldClose())
     {
@@ -194,7 +249,13 @@ int main()
         *   Simulate frame and update variables   *
         ******************************************/
 
-        Vector2 cursor = GetMousePosition();
+        // Update mouse hold still time
+        if (cursor.x != GetMousePosition().x || cursor.y != GetMousePosition().y || IsMouseButtonDown(MOUSE_LEFT_BUTTON))
+            timeSinceMouseMove = 0.0f;
+        else if (timeSinceMouseMove <= toolTipHoverTime) // I am irrationally afraid of floating point imprecision
+            timeSinceMouseMove += GetFrameTime();
+
+        cursor = GetMousePosition();
 
         // Find state
         for (Button& button : buttons)
@@ -203,18 +264,28 @@ int main()
             button.SetHovered(hovered);
             if (hovered && button.IsToggle() && IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
             {
-                button.MarkUnhandled();
-                button.SetActive(!button.IsActive());
+                if (!!button.GetGroup())
+                {
+                    button.GetGroup()->Activate(&button);
+                }
+                else
+                {
+                    button.MarkChanged();
+                    button.SetActive(!button.IsActive());
+                }
             }
             else if (!button.IsToggle())
             {
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && hovered)
                 {
+                    button.MarkChanged();
                     button.SetActive(true);
-                    button.MarkUnhandled();
                 }
                 else if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+                {
+                    button.MarkChanged();
                     button.SetActive(false);
+                }
             }
         }
 
@@ -230,7 +301,7 @@ int main()
         // Mark handled
         for (Button& button : buttons)
         {
-            button.MarkHandled();
+            button.ResetChanged();
         }
 
         /******************************************
@@ -269,6 +340,30 @@ int main()
 
                 DrawRectangleRec(button.GetRect(), color); // Rectangle
                 DrawText(button.GetDisplayName().c_str(), button.GetRect().x + 2, button.GetRect().y + 2, 8, BLACK); // Name
+            }
+
+            // Draw tooltip
+            if (timeSinceMouseMove > toolTipHoverTime)
+            {
+                for (const Button& button : buttons)
+                {
+                    if (button.IsHovered())
+                    {
+                        Rectangle rec = { cursor.x, cursor.y + 20, 200, 200 };
+                        Vector2 size = MeasureTextEx(GetFontDefault(), button.GetToolTip().c_str(), 10, 1);
+                        float lines = (fmodf(size.x, rec.width - 4) / size.y);
+                        rec.height = (lines) * size.y + 4.0f;
+
+                        DrawRectangleRec(rec, WHITE);
+                        rec.x += 2;
+                        rec.y += 2;
+                        rec.width -= 4;
+                        rec.height -= 4;
+                        DrawTextRec(GetFontDefault(), button.GetToolTip().c_str(), rec, 10, 1, true, BLACK);
+
+                        break;
+                    }
+                }
             }
 
         } EndDrawing();
