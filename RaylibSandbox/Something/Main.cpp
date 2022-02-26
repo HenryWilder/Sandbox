@@ -116,6 +116,42 @@ public:
         return CheckCollisionPointRec(pt, m_rect);
     }
 
+    float GetX() const
+    {
+        return m_rect.x;
+    }
+    void SetX(float x)
+    {
+        m_rect.x = x;
+    }
+
+    float GetY() const
+    {
+        return m_rect.y;
+    }
+    void SetY(float y)
+    {
+        m_rect.y = y;
+    }
+
+    float GetWidth() const
+    {
+        return m_rect.width;
+    }
+    void SetWidth(float width)
+    {
+        m_rect.width = width;
+    }
+
+    float GetHeight() const
+    {
+        return m_rect.height;
+    }
+    void SetHeight(float height)
+    {
+        m_rect.height = height;
+    }
+
     bool IsToggle() const
     {
         return m_isToggle;
@@ -227,17 +263,29 @@ int main()
     std::vector<RadioButtonHandler> radios = {
         {}
     };
-    std::vector<Button> buttons = {
-        { "Hold", "Stays active only while the mouse is pressed.", 20, 20, 60, 20, Button::Type_Hold, false, false },
-        { "Toggle", "Changes states when the mouse is pressed.", 20, 50, 60, 20, Button::Type_Toggle, false, false },
-        { "Draggable", "Shows the ability to drag a button while it is held.", 20, 80, 60, 20, Button::Type_Hold, false, false },
 
-        { "A", "Only one of these two can be active at a time.", 90, 20, 20, 20, Button::Type_Toggle, false, false, &(radios[0]) },
-        { "B", "Only one of these two can be active at a time.", 90, 50, 20, 20, Button::Type_Toggle, false, false, &(radios[0]) },
+    std::vector<Button> buttons = {
+        { "Hold", "Stays active only while the mouse is pressed.",
+            20, 20, 60, 20, Button::Type_Hold, false, false },
+        { "Toggle", "Changes states when the mouse is pressed.",
+            20, 50, 60, 20, Button::Type_Toggle, false, false },
+        { "DragV", "Shows the ability to drag a button while it is held.",
+            20, 80, 60, 20, Button::Type_Hold, false, false },
+        { "DragH", "Shows the ability to drag a button while it is held.",
+            90, 110, 60, 20, Button::Type_Hold, false, false },
+
+        { "A", "Only one of these two can be active at a time.",
+            90, 20, 20, 20, Button::Type_Toggle, false, false, &(radios[0]) },
+        { "B", "Only one of these two can be active at a time.",
+            90, 50, 20, 20, Button::Type_Toggle, false, false, &(radios[0]) },
+        { "C'", "Only one of these two can be active at a time. Also, this one moves with the one on its left!",
+            90, 80, 20, 20, Button::Type_Toggle, false, false, &(radios[0]) },
     };
-    radios[0].m_children.reserve(2);
-    radios[0].m_children.push_back(&(buttons[3]));
+
+    radios[0].m_children.reserve(3);
     radios[0].m_children.push_back(&(buttons[4]));
+    radios[0].m_children.push_back(&(buttons[5]));
+    radios[0].m_children.push_back(&(buttons[6]));
 
     constexpr float toolTipHoverTime = 0.5f;
     float timeSinceMouseMove = 0.0f;
@@ -289,6 +337,7 @@ int main()
             }
         }
 
+        // Highlight grouped buttons together
         for (RadioButtonHandler& radio : radios)
         {
             bool hovered = false;
@@ -316,6 +365,26 @@ int main()
             rec.y = Clamp(cursor.y - rec.height * 0.5f, 80.0f, 280.0f);
 
             buttons[2].SetRect(rec);
+
+            Rectangle rec1 = buttons[3].GetRect();
+            rec1.y = rec.y;
+            buttons[3].SetRect(rec1);
+
+            rec1 = buttons[6].GetRect();
+            rec1.y = rec.y;
+            buttons[6].SetRect(rec1);
+        }
+        // Handle 3rd button dragging
+        if (buttons[3].IsActive())
+        {
+            Rectangle rec = buttons[3].GetRect();
+            rec.y = Clamp(cursor.y - rec.height * 0.5f, 80.0f, 280.0f);
+
+            buttons[3].SetRect(rec);
+
+            Rectangle rec1 = buttons[6].GetRect();
+            rec1.y = rec.y;
+            buttons[6].SetRect(rec1);
         }
 
         // Mark handled
