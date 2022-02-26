@@ -638,7 +638,6 @@ bool GameScreen()
     return true;
 }
 
-
 int main()
 {
     int windowWidth = 1280;
