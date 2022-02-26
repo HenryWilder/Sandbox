@@ -289,6 +289,26 @@ int main()
             }
         }
 
+        for (RadioButtonHandler& radio : radios)
+        {
+            bool hovered = false;
+            for (Button* child : radio.m_children)
+            {
+                if (child->IsHovered())
+                {
+                    hovered = true;
+                    break;
+                }
+            }
+            if (hovered)
+            {
+                for (Button* child : radio.m_children)
+                {
+                    child->SetHovered(true);
+                }
+            }
+        }
+
         // Handle 3rd button dragging
         if (buttons[2].IsActive())
         {
