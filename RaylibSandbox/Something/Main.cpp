@@ -54,12 +54,17 @@ private:
     bool m_isToggle;
     bool m_state;
 
-public:
-    Button(float x, float y, float width, float height, bool isToggle, bool defaultState = false) :
-        m_rect{ x, y, width, height }, m_isToggle(isToggle), m_state(defaultState) {}
+    std::string m_displayName;
 
-    Button(Rectangle rect, bool isToggle, bool defaultState = false) :
-        m_rect(rect), m_isToggle(isToggle), m_state(defaultState) {}
+public:
+    static constexpr bool Type_Toggle = true;
+    static constexpr bool Type_Hold = false;
+
+    Button(const std::string displayName, float x, float y, float width, float height, bool isToggle, bool defaultState = false) :
+        m_rect{ x, y, width, height }, m_isToggle(isToggle), m_state(defaultState), m_displayName(displayName) {}
+
+    Button(const std::string displayName, Rectangle rect, bool isToggle, bool defaultState = false) :
+        m_rect(rect), m_isToggle(isToggle), m_state(defaultState), m_displayName(displayName) {}
 
     Rectangle GetRect() const
     {
@@ -72,6 +77,37 @@ public:
     bool IsOverlapping(Vector2 pt) const
     {
         return CheckCollisionPointRec(pt, m_rect);
+    }
+
+    bool IsToggle() const
+    {
+        return m_isToggle;
+    }
+    void SetToggle(bool isToggle)
+    {
+        m_isToggle = isToggle;
+    }
+
+    bool GetState() const
+    {
+        return m_state;
+    }
+    void SetState(bool state)
+    {
+        m_state = state;
+    }
+    void ToggleState()
+    {
+        m_state = !m_state;
+    }
+
+    const std::string& GetDisplayName() const
+    {
+        return m_displayName;
+    }
+    void SetDisplayName(const std::string& displayName)
+    {
+        m_displayName = displayName;
     }
 };
 
@@ -86,8 +122,11 @@ int main()
     *   Load textures, shaders, and meshes    *
     ******************************************/
 
-    std::vector<Button*> buttons;
-    buttons.push_back(new Button(20, 20, 60, 20));
+    std::vector<Button> buttons = {
+        { "Hold button", 20, 20, 60, 20, Button::Type_Hold },
+        { "Toggle button", 20, 50, 60, 20, Button::Type_Toggle },
+        { "Draggable button", 20, 80, 60, 20, Button::Type_Hold },
+    };
 
     while (!WindowShouldClose())
     {
@@ -105,7 +144,10 @@ int main()
 
             ClearBackground(BLACK);
 
-            // TODO: Draw frame
+            for (Button& button : buttons)
+            {
+                DrawRectangleRec(button.GetRect(), BLUE);
+            }
 
         } EndDrawing();
     }
