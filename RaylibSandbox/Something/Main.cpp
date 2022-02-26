@@ -337,6 +337,20 @@ int main()
             }
         }
 
+        {
+            bool hovering = false;
+            for (const Button& button : buttons)
+            {
+                if (button.IsHovered())
+                {
+                    hovering = true;
+                    break;
+                }
+            }
+
+            SetMouseCursor(hovering ? MOUSE_CURSOR_POINTING_HAND : MOUSE_CURSOR_DEFAULT);
+        }
+
         // Highlight grouped buttons together
         for (RadioButtonHandler& radio : radios)
         {
