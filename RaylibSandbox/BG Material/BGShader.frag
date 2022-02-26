@@ -25,6 +25,11 @@ uniform float innerDensity = 0.5;
 uniform vec3 lightSource = vec3(0.5,-0.5,1.0);
 uniform float maskSubdiv = 1.0 / 3.0;
 
+vec3 Scatter(vec3 )
+{
+	
+}
+
 void main()
 {
 	float x = 1.0/resolution.x;

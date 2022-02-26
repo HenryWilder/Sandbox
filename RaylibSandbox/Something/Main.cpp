@@ -1,6 +1,7 @@
 #include <raylib.h>
 #include <raymath.h>
-#include "Tool.h"
+#include <algorithm>
+#include <functional>
 
 #define sign(x) (((x) > (decltype(x))(0)) - ((x) < (decltype(x))(0)))
 
@@ -46,7 +47,33 @@ inline Vector3& operator/=(Vector3& a, float div) { return (a = Vector3Scale(a, 
 
 #pragma endregion
 
+class Button
+{
+private:
+    Rectangle m_rect;
+    bool m_isToggle;
+    bool m_state;
 
+public:
+    Button(float x, float y, float width, float height, bool isToggle, bool defaultState = false) :
+        m_rect{ x, y, width, height }, m_isToggle(isToggle), m_state(defaultState) {}
+
+    Button(Rectangle rect, bool isToggle, bool defaultState = false) :
+        m_rect(rect), m_isToggle(isToggle), m_state(defaultState) {}
+
+    Rectangle GetRect() const
+    {
+        return m_rect;
+    }
+    void SetRect(Rectangle rect)
+    {
+        m_rect = rect;
+    }
+    bool IsOverlapping(Vector2 pt) const
+    {
+        return CheckCollisionPointRec(pt, m_rect);
+    }
+};
 
 int main()
 {
@@ -59,7 +86,8 @@ int main()
     *   Load textures, shaders, and meshes    *
     ******************************************/
 
-    // @TODO: Load persistent assets & variables
+    std::vector<Button*> buttons;
+    buttons.push_back(new Button(20, 20, 60, 20));
 
     while (!WindowShouldClose())
     {
