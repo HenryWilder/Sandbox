@@ -112,6 +112,10 @@ public:
     {
         return m_isToggle;
     }
+    bool IsHold() const
+    {
+        return !m_isToggle;
+    }
     void SetToggle(bool isToggle)
     {
         m_isToggle = isToggle;
@@ -166,10 +170,6 @@ public:
         m_callbackDirty = true;
     }
 };
-Button::State operator|(Button::State lValue, Button::State rValue)
-{
-    return (Button::State)((unsigned char)lValue | (unsigned char)rValue);
-}
 
 int main()
 {
@@ -196,6 +196,7 @@ int main()
 
         Vector2 cursor = GetMousePosition();
 
+        // Find state
         for (Button& button : buttons)
         {
             bool hovered = button.IsOverlapping(cursor);
@@ -217,15 +218,16 @@ int main()
             }
         }
 
+        // Handle 3rd button dragging
         if (buttons[2].IsActive())
         {
             Rectangle rec = buttons[2].GetRect();
-            rec.y = Clamp(GetMousePosition().y - rec.height * 0.5f, 80.0f, 280.0f);
+            rec.y = Clamp(cursor.y - rec.height * 0.5f, 80.0f, 280.0f);
 
             buttons[2].SetRect(rec);
         }
 
-        // Handle
+        // Mark handled
         for (Button& button : buttons)
         {
             button.MarkHandled();
@@ -239,9 +241,12 @@ int main()
 
             ClearBackground(BLACK);
 
+            // Draw buttons
             for (const Button& button : buttons)
             {
                 Color color;
+
+                // Determine color of state
                 if (button.IsDisabled())
                     color = GRAY;
                 else
@@ -261,8 +266,9 @@ int main()
                             color = DARKBLUE;
                     }
                 }
-                DrawRectangleRec(button.GetRect(), color);
-                DrawText(button.GetDisplayName().c_str(), button.GetRect().x + 2, button.GetRect().y + 2, 8, BLACK);
+
+                DrawRectangleRec(button.GetRect(), color); // Rectangle
+                DrawText(button.GetDisplayName().c_str(), button.GetRect().x + 2, button.GetRect().y + 2, 8, BLACK); // Name
             }
 
         } EndDrawing();
