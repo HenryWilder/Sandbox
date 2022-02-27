@@ -187,6 +187,11 @@ public:
     void SetWidth(float width) { m_rect.width = width; }
     void SetHeight(float height) { m_rect.height = height; }
 
+    void SetPosition(float x, float y)
+    {
+        m_rect.x = x;
+        m_rect.y = y;
+    }
     void SetShape(float width, float height)
     {
         m_rect.width = width;
@@ -220,6 +225,7 @@ public:
             break;
         }
     }
+    
     // Takes the width/height of the base without taking the position
     void CopyShape(const Button& base)
     {
@@ -540,6 +546,7 @@ bool GameScreen()
 
     Button button_Hold("Hold", "Stays active only while the mouse is pressed.",
         { 20, 20, 60, 20 }, Button::Type_Hold, false, false);
+    button_Hold.SetRect();
 
     Button button_Toggle("Toggle", "Changes states when the mouse is pressed.",
         { 20, 50, 60, 20 }, Button::Type_Toggle, false, false);
