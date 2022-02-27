@@ -543,34 +543,59 @@ bool MenuScreen()
 // Returns true when program should exit
 bool GameScreen()
 {
+    Button button_Hold;
+    button_Hold.SetDisplayName("Hold");
+    button_Hold.SetToolTip("Stays active only while the mouse is pressed.");
+    button_Hold.SetShape(60,20);
+    button_Hold.SetPosition(20,20);
 
-    Button button_Hold("Hold", "Stays active only while the mouse is pressed.",
-        { 20, 20, 60, 20 }, Button::Type_Hold, false, false);
-    button_Hold.SetRect();
+    Button button_Toggle;
+    button_Toggle.SetDisplayName("Toggle");
+    button_Toggle.SetToolTip("Changes states when the mouse is pressed.");
+    button_Toggle.SetToggle(true);
+    button_Toggle.CopyShape(button_Hold);
+    button_Toggle.OffsetFrom(button_Hold, Spacing::OVERLAP, 0, Spacing::PAD, 10);
 
-    Button button_Toggle("Toggle", "Changes states when the mouse is pressed.",
-        { 20, 50, 60, 20 }, Button::Type_Toggle, false, false);
+    Button button_DragV;
+    button_DragV.SetDisplayName("DragV");
+    button_DragV.SetToolTip("Shows the ability to drag a button while it is held.");
+    button_DragV.CopyShape(button_Hold);
+    button_DragV.OffsetFrom(button_Toggle, Spacing::OVERLAP, 0, Spacing::PAD, 10);
 
-    Button button_DragV("DragV", "Shows the ability to drag a button while it is held.",
-        { 20, 80, 60, 20 }, Button::Type_Hold, false, false);
-
-    Button button_DragH("DragH", "Shows the ability to drag a button while it is held.",
-        { 20, 110, 60, 20 }, Button::Type_Hold, false, false);
+    Button button_DragH;
+    button_DragH.SetDisplayName("DragH");
+    button_DragH.SetToolTip(button_DragH.GetToolTip());
+    button_DragH.CopyShape(button_Hold);
+    button_DragH.OffsetFrom(button_DragV, Spacing::OVERLAP, 0, Spacing::PAD, 10);
 
     RadioButtonHandler group0;
+
+    Button button_A;
+    button_A.SetDisplayName("A");
+    button_A.SetToolTip("Only one of these two can be active at a time.");
+    button_A.SetToggle(true);
+    button_A.SetShape(20,20);
+    button_A.OffsetFrom(button_Hold, Spacing::PAD, 10, Spacing::OVERLAP, 0);
+
+    Button button_B;
+    button_B.SetDisplayName("B");
+    button_B.SetToolTip(button_A.GetToolTip());
+    button_B.SetToggle(true);
+    button_B.CopyShape(button_A);
+    button_B.OffsetFrom(button_A, Spacing::OVERLAP, 0, Spacing::PAD, 10);
+
+    Button button_C;
+    button_C.SetDisplayName("C");
+    button_C.SetToolTip(button_A.GetToolTip() + " Also, this one moves with the one on its left!");
+    button_C.SetToggle(true);
+    button_C.CopyShape(button_A);
+    button_C.OffsetFrom(button_B, Spacing::OVERLAP, 0, Spacing::PAD, 10);
 
     UIHandler::Global().Expect(7);
     UIHandler::Global().AddButton_New(&button_Hold);
     UIHandler::Global().AddButton_New(&button_Toggle);
     UIHandler::Global().AddButton_New(&button_DragV);
     UIHandler::Global().AddButton_New(&button_DragH);
-
-    Button button_A({ 90, 20, 20, 20 });
-    button_A.SetRect({ 90, 20, 20, 20 });
-    Button button_B("B", "Only one of these two can be active at a time.",
-        { 90, 50, 20, 20 }, Button::Type_Toggle, false, false);
-    Button button_C("C", "Only one of these two can be active at a time. Also, this one moves with the one on its left!",
-        { 90, 80, 20, 20 }, Button::Type_Toggle, false, false);
     UIHandler::Global().CreateButtonGroup_FromNew(&group0, { &button_A, &button_B, &button_C });
 
     while (true)
