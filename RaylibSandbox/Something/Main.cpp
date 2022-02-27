@@ -187,6 +187,12 @@ public:
     void SetWidth(float width) { m_rect.width = width; }
     void SetHeight(float height) { m_rect.height = height; }
 
+    void SetShape(float width, float height)
+    {
+        m_rect.width = width;
+        m_rect.height = height; 
+    }
+
     // Offset is treated as padding. Negatives put the button left of base, while positives put it right.
     void OffsetFrom(const Button& base, Spacing xType, float x, Spacing yType, float y)
     {
@@ -531,27 +537,29 @@ bool MenuScreen()
 // Returns true when program should exit
 bool GameScreen()
 {
-    UIHandler::Global().Expect(7);
 
     Button button_Hold("Hold", "Stays active only while the mouse is pressed.",
         { 20, 20, 60, 20 }, Button::Type_Hold, false, false);
-    UIHandler::Global().AddButton_New(&button_Hold);
 
     Button button_Toggle("Toggle", "Changes states when the mouse is pressed.",
         { 20, 50, 60, 20 }, Button::Type_Toggle, false, false);
-    UIHandler::Global().AddButton_New(&button_Toggle);
 
     Button button_DragV("DragV", "Shows the ability to drag a button while it is held.",
         { 20, 80, 60, 20 }, Button::Type_Hold, false, false);
-    UIHandler::Global().AddButton_New(&button_DragV);
 
     Button button_DragH("DragH", "Shows the ability to drag a button while it is held.",
         { 20, 110, 60, 20 }, Button::Type_Hold, false, false);
-    UIHandler::Global().AddButton_New(&button_DragH);
 
     RadioButtonHandler group0;
-    Button button_A("A", "Only one of these two can be active at a time.",
-        { 90, 20, 20, 20 }, Button::Type_Toggle, false, false);
+
+    UIHandler::Global().Expect(7);
+    UIHandler::Global().AddButton_New(&button_Hold);
+    UIHandler::Global().AddButton_New(&button_Toggle);
+    UIHandler::Global().AddButton_New(&button_DragV);
+    UIHandler::Global().AddButton_New(&button_DragH);
+
+    Button button_A({ 90, 20, 20, 20 });
+    button_A.SetRect({ 90, 20, 20, 20 });
     Button button_B("B", "Only one of these two can be active at a time.",
         { 90, 50, 20, 20 }, Button::Type_Toggle, false, false);
     Button button_C("C", "Only one of these two can be active at a time. Also, this one moves with the one on its left!",
