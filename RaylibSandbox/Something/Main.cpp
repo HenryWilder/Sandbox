@@ -134,12 +134,24 @@ private:
     State m_state;
     bool m_callbackDirty;
     RadioButtonHandler* m_group;
-    Color m_stateColor; // Precalculated color for current state
     ColorScheme m_colors;
+    Color m_stateColor; // Precalculated color for current state
 
 public:
     static constexpr bool Type_Toggle = true;
     static constexpr bool Type_Hold = false;
+
+    Button() :
+        m_displayName(),
+        m_tooltip(),
+        m_rect{ 0, 0, 0, 0 },
+        m_isToggle(false),
+        m_state(State::NONE),
+        m_callbackDirty(false),
+        m_group(nullptr),
+        m_colors(ColorScheme()),
+        m_stateColor(m_colors.inactiveColor)
+    {}
 
     Button(
         const std::string& displayName,
@@ -150,7 +162,6 @@ public:
         bool startDisabled,
         ColorScheme colors = ColorScheme(),
         RadioButtonHandler* group = nullptr) :
-
         m_displayName(displayName),
         m_tooltip(toolTip),
         m_rect{ shape.x, shape.y, shape.width, shape.height },
@@ -158,8 +169,8 @@ public:
         m_state((State)(((unsigned char)State::ACTIVE * (unsigned char)startActive) | ((unsigned char)State::DISABLED * (unsigned char)startDisabled))),
         m_callbackDirty(false),
         m_group(group),
-        m_stateColor(colors.inactiveColor),
-        m_colors(m_colors)
+        m_colors(m_colors),
+        m_stateColor(m_colors.inactiveColor)
     {}
 
     Rectangle GetRect() const { return m_rect; }
@@ -179,11 +190,12 @@ public:
     // Offset is treated as padding. Negatives put the button left of base, while positives put it right.
     void OffsetFrom(const Button& base, Spacing xType, float x, Spacing yType, float y)
     {
-        switch (yType)
+        switch (xType)
         {
         case Spacing::OVERLAP:
-            SetX(base.GetX() + (base.GetWidth() * 0.5f) - (GetWidth() * 0.5f) + x);
+            SetX(base.GetX() + (base.GetWidth() - GetWidth()) * 0.5f + x);
             break;
+
         case Spacing::PAD:
             if (x < 0.0) SetX(base.GetX() - (     GetWidth() - x));
             else         SetX(base.GetX() + (base.GetWidth() + x));
@@ -193,8 +205,9 @@ public:
         switch (yType)
         {
         case Spacing::OVERLAP:
-            SetY(base.GetY() + (base.GetHeight() * 0.5f) - (GetHeight() * 0.5f) + y);
+            SetY(base.GetY() + (base.GetHeight() - GetHeight()) * 0.5f + y);
             break;
+
         case Spacing::PAD:
             if (y < 0.0) SetY(base.GetY() - (     GetHeight() - y));
             else         SetY(base.GetY() + (base.GetHeight() + y));
@@ -466,14 +479,17 @@ public:
 // Returns true when program should exit
 bool MenuScreen()
 {
+    Button button_start;
+    button_start.SetDisplayName("Start");
+    button_start.SetRect({ 20, 20, 60, 20 });
+
+    Button button_close;
+    button_close.SetDisplayName("Close");
+    button_close.CopyShape(button_start);
+    button_close.OffsetFrom(button_start, Spacing::OVERLAP, 0.0f, Spacing::PAD, 10.0f);
+
     UIHandler::Global().Expect(2);
-
-    Button button_start("Start", "",
-        { 20, 20, 60, 20 }, Button::Type_Hold, false, false);
     UIHandler::Global().AddButton_New(&button_start);
-
-    Button button_close("Close", "",
-        { 20, 50, 60, 20 }, Button::Type_Hold, false, false);
     UIHandler::Global().AddButton_New(&button_close);
 
     while (true)
