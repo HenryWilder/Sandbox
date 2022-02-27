@@ -65,6 +65,12 @@ void ExpandRec(Rectangle* rec, float amt)
 
 struct RadioButtonHandler;
 
+enum class Spacing
+{
+    OVERLAP, // Offset from the center of the base
+    PAD, // Space between the edges
+};
+
 class Button
 {
 public:
@@ -138,10 +144,7 @@ public:
     Button(
         const std::string& displayName,
         const std::string& toolTip,
-        float x,
-        float y,
-        float width,
-        float height,
+        Rectangle shape,
         bool isToggle,
         bool startActive,
         bool startDisabled,
@@ -150,28 +153,7 @@ public:
 
         m_displayName(displayName),
         m_tooltip(toolTip),
-        m_rect{ x, y, width, height },
-        m_isToggle(isToggle),
-        m_state((State)(((unsigned char)State::ACTIVE * (unsigned char)startActive) | ((unsigned char)State::DISABLED * (unsigned char)startDisabled))),
-        m_callbackDirty(false),
-        m_group(group),
-        m_stateColor(colors.inactiveColor),
-        m_colors(m_colors)
-    {}
-    
-    Button(
-        const std::string& displayName,
-        const std::string& toolTip,
-        const Button& shapeBase,
-        bool isToggle,
-        bool startActive,
-        bool startDisabled,
-        ColorScheme colors = ColorScheme(),
-        RadioButtonHandler* group = nullptr) :
-
-        m_displayName(displayName),
-        m_tooltip(toolTip),
-        m_rect(shapeBase.GetRect()),
+        m_rect{ shape.x, shape.y, shape.width, shape.height },
         m_isToggle(isToggle),
         m_state((State)(((unsigned char)State::ACTIVE * (unsigned char)startActive) | ((unsigned char)State::DISABLED * (unsigned char)startDisabled))),
         m_callbackDirty(false),
@@ -194,18 +176,30 @@ public:
     void SetWidth(float width) { m_rect.width = width; }
     void SetHeight(float height) { m_rect.height = height; }
 
-    // Offset is treated as padding. Negatives put the button above/left of base, while positives put it below/right.
-    void OffsetFrom(const Button& base, float x, float y)
+    // Offset is treated as padding. Negatives put the button left of base, while positives put it right.
+    void OffsetFrom(const Button& base, Spacing xType, float x, Spacing yType, float y)
     {
-        if (x < 0.0)
-            SetX(base.GetX() - (GetWidth() - x));
-        else
-            SetX(base.GetX() + (base.GetWidth() + x));
+        switch (yType)
+        {
+        case Spacing::OVERLAP:
+            SetX(base.GetX() + base.GetWidth() * 0.5f + x);
+            break;
+        case Spacing::PAD:
+            if (x < 0.0) SetX(base.GetX() - (     GetWidth() - x));
+            else         SetX(base.GetX() + (base.GetWidth() + x));
+            break;
+        }
 
-        if (y < 0.0)
-            SetY(base.GetY() - (GetHeight() - y));
-        else
-            SetY(base.GetY() + (base.GetHeight() + y));
+        switch (yType)
+        {
+        case Spacing::OVERLAP:
+            SetY(base.GetY() + base.GetHeight() * 0.5f + y);
+            break;
+        case Spacing::PAD:
+            if (y < 0.0) SetY(base.GetY() - (     GetHeight() - y));
+            else         SetY(base.GetY() + (base.GetHeight() + y));
+            break;
+        }
     }
     // Takes the width/height of the base without taking the position
     void CopyShape(const Button& base)
@@ -475,11 +469,11 @@ bool MenuScreen()
     UIHandler::Global().Expect(2);
 
     Button button_start("Start", "",
-        20, 20, 60, 20, Button::Type_Hold, false, false);
+        { 20, 20, 60, 20 }, Button::Type_Hold, false, false);
     UIHandler::Global().AddButton_New(&button_start);
 
     Button button_close("Close", "",
-        20, 50, 60, 20, Button::Type_Hold, false, false);
+        { 20, 50, 60, 20 }, Button::Type_Hold, false, false);
     UIHandler::Global().AddButton_New(&button_close);
 
     while (true)
@@ -524,28 +518,28 @@ bool GameScreen()
     UIHandler::Global().Expect(7);
 
     Button button_Hold("Hold", "Stays active only while the mouse is pressed.",
-        20, 20, 60, 20, Button::Type_Hold, false, false);
+        { 20, 20, 60, 20 }, Button::Type_Hold, false, false);
     UIHandler::Global().AddButton_New(&button_Hold);
 
     Button button_Toggle("Toggle", "Changes states when the mouse is pressed.",
-        20, 50, 60, 20, Button::Type_Toggle, false, false);
+        { 20, 50, 60, 20 }, Button::Type_Toggle, false, false);
     UIHandler::Global().AddButton_New(&button_Toggle);
 
     Button button_DragV("DragV", "Shows the ability to drag a button while it is held.",
-        20, 80, 60, 20, Button::Type_Hold, false, false);
+        { 20, 80, 60, 20 }, Button::Type_Hold, false, false);
     UIHandler::Global().AddButton_New(&button_DragV);
 
     Button button_DragH("DragH", "Shows the ability to drag a button while it is held.",
-        20, 110, 60, 20, Button::Type_Hold, false, false);
+        { 20, 110, 60, 20 }, Button::Type_Hold, false, false);
     UIHandler::Global().AddButton_New(&button_DragH);
 
     RadioButtonHandler group0;
     Button button_A("A", "Only one of these two can be active at a time.",
-        90, 20, 20, 20, Button::Type_Toggle, false, false);
+        { 90, 20, 20, 20 }, Button::Type_Toggle, false, false);
     Button button_B("B", "Only one of these two can be active at a time.",
-        90, 50, 20, 20, Button::Type_Toggle, false, false);
+        { 90, 50, 20, 20 }, Button::Type_Toggle, false, false);
     Button button_C("C", "Only one of these two can be active at a time. Also, this one moves with the one on its left!",
-        90, 80, 20, 20, Button::Type_Toggle, false, false);
+        { 90, 80, 20, 20 }, Button::Type_Toggle, false, false);
     UIHandler::Global().CreateButtonGroup_FromNew(&group0, { &button_A, &button_B, &button_C });
 
     while (true)
