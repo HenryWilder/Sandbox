@@ -487,7 +487,7 @@ public:
         {
             if (!!m_tooltipButton)
             {
-                Rectangle rec = { m_tooltipButton->GetX(), m_tooltipButton->GetY() + m_tooltipButton->GetHeight(), 200, 100 };
+                Rectangle rec = { m_cursor.x, m_cursor.y + 25, 200, 100 };
                 DrawRectangleRec(rec, WHITE);
                 DrawTextRec(GetFontDefault(), m_tooltipButton->GetToolTip().c_str(), ExpandRec(rec, -2.0f), 10, 1, true, BLACK);
             }
