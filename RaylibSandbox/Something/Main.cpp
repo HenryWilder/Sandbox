@@ -47,6 +47,22 @@ inline Vector3& operator/=(Vector3& a, float div) { return (a = Vector3Scale(a, 
 
 #pragma endregion
 
+Rectangle ExpandRec(Rectangle rec, float amt)
+{
+    rec.x -= amt;
+    rec.y -= amt;
+    rec.width += amt;
+    rec.height += amt;
+    return rec;
+}
+void ExpandRec(Rectangle* rec, float amt)
+{
+    rec->x -= amt;
+    rec->y -= amt;
+    rec->width += amt;
+    rec->height += amt;
+}
+
 struct RadioButtonHandler;
 
 class Button
@@ -54,9 +70,9 @@ class Button
 public:
     enum class State : unsigned char
     {
-        NONE     = 0,
-        ACTIVE   = 0b1,
-        HOVERED  = 0b10,
+        NONE = 0,
+        ACTIVE = 0b1,
+        HOVERED = 0b10,
         DISABLED = 0b100,
     };
 
@@ -70,6 +86,40 @@ private:
         flags = (State)((unsigned char)flags ^ ((-(unsigned char)value ^ (unsigned char)flags) & (unsigned char)bit));
     }
 
+public:
+    struct ColorScheme
+    {
+        Color disabledColor = GRAY;
+        Color inactiveColor = BLUE;
+        Color activeColor = SKYBLUE;
+        Color inactiveColor_hovered = DARKBLUE;
+        Color activeColor_hovered = WHITE;
+
+        // Determine color of state
+        Color GetStateColor(Button::State state) const
+        {
+            if (GetFlag(state, State::DISABLED))
+                return disabledColor;
+            else
+            {
+                if (GetFlag(state, State::HOVERED))
+                {
+                    if (GetFlag(state, State::ACTIVE))
+                        return activeColor_hovered;
+                    else
+                        return inactiveColor_hovered;
+                }
+                else
+                {
+                    if (GetFlag(state, State::ACTIVE))
+                        return activeColor;
+                    else
+                        return inactiveColor;
+                }
+            }
+        }
+    };
+
 private:
     std::string m_displayName;
     std::string m_tooltip;
@@ -78,6 +128,8 @@ private:
     State m_state;
     bool m_callbackDirty;
     RadioButtonHandler* m_group;
+    Color m_stateColor; // Precalculated color for current state
+    ColorScheme m_colors;
 
 public:
     static constexpr bool Type_Toggle = true;
@@ -93,144 +145,72 @@ public:
         bool isToggle,
         bool startActive,
         bool startDisabled,
+        ColorScheme colors = ColorScheme(),
         RadioButtonHandler* group = nullptr) :
+
         m_displayName(displayName),
         m_tooltip(toolTip),
         m_rect{ x, y, width, height },
         m_isToggle(isToggle),
         m_state((State)(((unsigned char)State::ACTIVE * (unsigned char)startActive) | ((unsigned char)State::DISABLED * (unsigned char)startDisabled))),
         m_callbackDirty(false),
-        m_group(group)
+        m_group(group),
+        m_stateColor(colors.inactiveColor),
+        m_colors(m_colors)
     {}
 
-    Rectangle GetRect() const
-    {
-        return m_rect;
-    }
-    void SetRect(Rectangle rect)
-    {
-        m_rect = rect;
-    }
-    bool IsOverlapping(Vector2 pt) const
-    {
-        return CheckCollisionPointRec(pt, m_rect);
-    }
+    Rectangle GetRect() const { return m_rect; }
+    void SetRect(Rectangle rect) { m_rect = rect; }
+    bool IsOverlapping(Vector2 pt) const { return CheckCollisionPointRec(pt, m_rect); }
 
-    float GetX() const
-    {
-        return m_rect.x;
-    }
-    void SetX(float x)
-    {
-        m_rect.x = x;
-    }
+    float GetX() const { return m_rect.x; }
+    float GetY() const { return m_rect.y; }
+    float GetWidth() const { return m_rect.width; }
+    float GetHeight() const { return m_rect.height; }
 
-    float GetY() const
-    {
-        return m_rect.y;
-    }
-    void SetY(float y)
-    {
-        m_rect.y = y;
-    }
+    void SetX(float x) { m_rect.x = x; }
+    void SetY(float y) { m_rect.y = y; }
+    void SetWidth(float width) { m_rect.width = width; }
+    void SetHeight(float height) { m_rect.height = height; }
 
-    float GetWidth() const
-    {
-        return m_rect.width;
-    }
-    void SetWidth(float width)
-    {
-        m_rect.width = width;
-    }
+    bool IsToggle() const { return m_isToggle; }
+    bool IsHold() const { return !m_isToggle; }
+    void SetToggle(bool isToggle) { m_isToggle = isToggle; }
 
-    float GetHeight() const
-    {
-        return m_rect.height;
-    }
-    void SetHeight(float height)
-    {
-        m_rect.height = height;
-    }
+    bool IsActive() const { return GetFlag(m_state, State::ACTIVE); }
+    bool IsHovered() const { return GetFlag(m_state, State::HOVERED); }
+    bool IsDisabled() const { return GetFlag(m_state, State::DISABLED); }
+    void SetActive(bool isActive) { SetFlag(m_state, State::ACTIVE, isActive); }
+    void SetHovered(bool hovered) { SetFlag(m_state, State::HOVERED, hovered); }
+    void SetDisabled(bool disabled) { SetFlag(m_state, State::DISABLED, disabled); }
 
-    bool IsToggle() const
-    {
-        return m_isToggle;
-    }
-    bool IsHold() const
-    {
-        return !m_isToggle;
-    }
-    void SetToggle(bool isToggle)
-    {
-        m_isToggle = isToggle;
-    }
+    const std::string& GetToolTip() const { return m_tooltip; }
+    const std::string& GetDisplayName() const { return m_displayName; }
+    void SetToolTip(const std::string& toolTip) { m_tooltip = toolTip; }
+    void SetDisplayName(const std::string& displayName) { m_displayName = displayName; }
 
-    bool IsActive() const
-    {
-        return GetFlag(m_state, State::ACTIVE);
-    }
-    void SetActive(bool isActive)
-    {
-        SetFlag(m_state, State::ACTIVE, isActive);
-    }
+    bool IsChanged() const { return m_callbackDirty; }
+    void MarkChanged() { m_callbackDirty = true; }
+    void ResetChanged() { m_callbackDirty = false; }
 
-    bool IsHovered() const
-    {
-        return GetFlag(m_state, State::HOVERED);
-    }
-    void SetHovered(bool hovered)
-    {
-        SetFlag(m_state, State::HOVERED, hovered);
-    }
+    RadioButtonHandler* GetGroup() const { return m_group; }
+    void SetGroup(RadioButtonHandler* group) { m_group = group; }
 
-    bool IsDisabled() const
-    {
-        return GetFlag(m_state, State::DISABLED);
-    }
-    void SetDisabled(bool disabled)
-    {
-        SetFlag(m_state, State::DISABLED, disabled);
-    }
+    Color GetColor() const { return m_stateColor; }
+    void SetColorScheme(ColorScheme scheme) { m_colors = scheme; }
+    void UpdateStateColor() { m_stateColor = m_colors.GetStateColor(m_state); }
 
-    const std::string& GetToolTip() const
-    {
-        return m_tooltip;
-    }
-    void SetToolTip(const std::string& toolTip)
-    {
-        m_tooltip = toolTip;
-    }
+    Color GetColor_Disabled() { return m_colors.disabledColor; }
+    Color GetColor_Inactive() { return m_colors.inactiveColor; }
+    Color GetColor_Active() { return m_colors.activeColor; }
+    Color GetColor_Inactive_Hovered() { return m_colors.inactiveColor_hovered; }
+    Color GetColor_Active_Hovered() { return m_colors.activeColor_hovered; }
 
-    const std::string& GetDisplayName() const
-    {
-        return m_displayName;
-    }
-    void SetDisplayName(const std::string& displayName)
-    {
-        m_displayName = displayName;
-    }
-
-    bool IsChanged() const
-    {
-        return m_callbackDirty;
-    }
-    void MarkChanged()
-    {
-        m_callbackDirty = true;
-    }
-    void ResetChanged()
-    {
-        m_callbackDirty = true;
-    }
-
-    RadioButtonHandler* GetGroup() const
-    {
-        return m_group;
-    }
-    void SetGroup(RadioButtonHandler* group)
-    {
-        m_group = group;
-    }
+    void SetColor_Disabled(Color color) { m_colors.disabledColor = color; }
+    void SetColor_Inactive(Color color) { m_colors.inactiveColor = color; }
+    void SetColor_Active(Color color) { m_colors.activeColor = color; }
+    void SetColor_Inactive_Hovered(Color color) { m_colors.inactiveColor_hovered = color; }
+    void SetColor_Active_Hovered(Color color) { m_colors.activeColor_hovered = color; }
 };
 
 // Buttons which only allow one to be active at a time
@@ -252,8 +232,12 @@ struct RadioButtonHandler
 class UIHandler
 {
 private:
-    UIHandler() {}
+    UIHandler() : m_toolTipHoverTime(0.5f), m_timeSinceMouseMove(0.0f), m_cursor(Vector2Zero()), m_tooltipButton(nullptr), m_buttons{}, m_groups{} {}
 
+    float m_toolTipHoverTime;
+    float m_timeSinceMouseMove;
+    Vector2 m_cursor;
+    Button* m_tooltipButton;
     std::vector<Button*> m_buttons;
     std::vector<RadioButtonHandler*> m_groups;
 
@@ -325,6 +309,16 @@ public:
         }
     }
 
+    void UpdateCursorPos(Vector2 newPosition)
+    {
+        // Update mouse hold still time
+        if (m_cursor.x != newPosition.x || m_cursor.y != newPosition.y || IsMouseButtonDown(MOUSE_LEFT_BUTTON))
+            m_timeSinceMouseMove = 0.0f;
+        else if (m_timeSinceMouseMove <= m_toolTipHoverTime) // I am irrationally afraid of floating point imprecision
+            m_timeSinceMouseMove += GetFrameTime();
+
+        m_cursor = newPosition;
+    }
     void UpdateButtons()
     {
         // Cleanup from last frame
@@ -366,17 +360,17 @@ public:
         }
 
         {
-            bool hovering = false;
-            for (const Button* button : m_buttons)
+            m_tooltipButton = nullptr;
+            for (Button* button : m_buttons)
             {
                 if (button->IsHovered())
                 {
-                    hovering = true;
+                    m_tooltipButton = button;
                     break;
                 }
             }
 
-            SetMouseCursor(hovering ? MOUSE_CURSOR_POINTING_HAND : MOUSE_CURSOR_DEFAULT);
+            SetMouseCursor(!!m_tooltipButton ? MOUSE_CURSOR_POINTING_HAND : MOUSE_CURSOR_DEFAULT);
         }
 
         // Highlight grouped buttons together
@@ -399,38 +393,30 @@ public:
                 }
             }
         }
-    }
 
-    void DrawButtons()
+        for (Button* button : m_buttons)
+        {
+            button->UpdateStateColor();
+        }
+    }
+    void Draw()
     {
         // Draw buttons
         for (const Button* button : m_buttons)
         {
-            Color color;
-
-            // Determine color of state
-            if (button->IsDisabled())
-                color = GRAY;
-            else
-            {
-                if (button->IsHovered())
-                {
-                    if (button->IsActive())
-                        color = WHITE;
-                    else
-                        color = BLUE;
-                }
-                else
-                {
-                    if (button->IsActive())
-                        color = SKYBLUE;
-                    else
-                        color = DARKBLUE;
-                }
-            }
-
-            DrawRectangleRec(button->GetRect(), color); // Rectangle
+            DrawRectangleRec(button->GetRect(), button->GetColor()); // Rectangle
             DrawText(button->GetDisplayName().c_str(), button->GetRect().x + 2, button->GetRect().y + 2, 8, BLACK); // Name
+        }
+
+        // Draw tooltip
+        if (m_timeSinceMouseMove > m_toolTipHoverTime)
+        {
+            if (!!m_tooltipButton)
+            {
+                Rectangle rec = { m_tooltipButton->GetX(), m_tooltipButton->GetY() + m_tooltipButton->GetHeight(), 200, 100 };
+                DrawRectangleRec(rec, WHITE);
+                DrawTextRec(GetFontDefault(), m_tooltipButton->GetToolTip().c_str(), ExpandRec(rec, -2.0f), 10, 1, true, BLACK);
+            }
         }
     }
 
@@ -455,24 +441,13 @@ bool MenuScreen()
         20, 50, 60, 20, Button::Type_Hold, false, false);
     UIHandler::Global().AddButton_New(&button_close);
 
-    constexpr float toolTipHoverTime = 0.5f;
-    float timeSinceMouseMove = 0.0f;
-    Vector2 cursor{ 0,0 };
-
     while (true)
     {
         /******************************************
         *   Simulate frame and update variables   *
         ******************************************/
 
-        // Update mouse hold still time
-        if (cursor.x != GetMousePosition().x || cursor.y != GetMousePosition().y || IsMouseButtonDown(MOUSE_LEFT_BUTTON))
-            timeSinceMouseMove = 0.0f;
-        else if (timeSinceMouseMove <= toolTipHoverTime) // I am irrationally afraid of floating point imprecision
-            timeSinceMouseMove += GetFrameTime();
-
-        cursor = GetMousePosition();
-
+        UIHandler::Global().UpdateCursorPos(GetMousePosition());
         UIHandler::Global().UpdateButtons();
 
         if (button_start.IsActive())
@@ -489,31 +464,7 @@ bool MenuScreen()
 
             ClearBackground(BLACK);
 
-            UIHandler::Global().DrawButtons();
-
-            // Draw tooltip
-            if (timeSinceMouseMove > toolTipHoverTime)
-            {
-                for (const Button* button : UIHandler::Global().GetButtons())
-                {
-                    if (button->IsHovered())
-                    {
-                        Rectangle rec = { cursor.x, cursor.y + 20, 200, 200 };
-                        Vector2 size = MeasureTextEx(GetFontDefault(), button->GetToolTip().c_str(), 10, 1);
-                        float lines = (fmodf(size.x, rec.width - 4) / size.y);
-                        rec.height = (lines)*size.y + 4.0f;
-
-                        DrawRectangleRec(rec, WHITE);
-                        rec.x += 2;
-                        rec.y += 2;
-                        rec.width -= 4;
-                        rec.height -= 4;
-                        DrawTextRec(GetFontDefault(), button->GetToolTip().c_str(), rec, 10, 1, true, BLACK);
-
-                        break;
-                    }
-                }
-            }
+            UIHandler::Global().Draw();
 
         } EndDrawing();
 
@@ -556,30 +507,19 @@ bool GameScreen()
         90, 80, 20, 20, Button::Type_Toggle, false, false);
     UIHandler::Global().CreateButtonGroup_FromNew(&group0, { &button_A, &button_B, &button_C });
 
-    constexpr float toolTipHoverTime = 0.5f;
-    float timeSinceMouseMove = 0.0f;
-    Vector2 cursor{ 0,0 };
-
     while (true)
     {
         /******************************************
         *   Simulate frame and update variables   *
         ******************************************/
 
-        // Update mouse hold still time
-        if (cursor.x != GetMousePosition().x || cursor.y != GetMousePosition().y || IsMouseButtonDown(MOUSE_LEFT_BUTTON))
-            timeSinceMouseMove = 0.0f;
-        else if (timeSinceMouseMove <= toolTipHoverTime) // I am irrationally afraid of floating point imprecision
-            timeSinceMouseMove += GetFrameTime();
-
-        cursor = GetMousePosition();
-
+        UIHandler::Global().UpdateCursorPos(GetMousePosition());
         UIHandler::Global().UpdateButtons();
 
         // Handle 3rd button dragging
         if (button_DragV.IsActive())
         {
-            float y = Clamp(cursor.y - button_DragV.GetHeight() * 0.5f, 80.0f, 280.0f);
+            float y = Clamp(GetMousePosition().y - button_DragV.GetHeight() * 0.5f, 80.0f, 280.0f);
 
             button_DragV.SetY(y);
             button_DragH.SetY(y + 30);
@@ -588,7 +528,7 @@ bool GameScreen()
         // Handle 3rd button dragging
         if (button_DragH.IsActive())
         {
-            float x = Clamp(cursor.x - button_DragH.GetWidth() * 0.5f, 20.0f, 220.0f);
+            float x = Clamp(GetMousePosition().x - button_DragH.GetWidth() * 0.5f, 20.0f, 220.0f);
 
             button_DragH.SetX(x);
             button_C.SetX(x + 70);
@@ -602,31 +542,7 @@ bool GameScreen()
 
             ClearBackground(BLACK);
 
-            UIHandler::Global().DrawButtons();
-
-            // Draw tooltip
-            if (timeSinceMouseMove > toolTipHoverTime)
-            {
-                for (const Button* button : UIHandler::Global().GetButtons())
-                {
-                    if (button->IsHovered())
-                    {
-                        Rectangle rec = { cursor.x, cursor.y + 20, 200, 200 };
-                        Vector2 size = MeasureTextEx(GetFontDefault(), button->GetToolTip().c_str(), 10, 1);
-                        float lines = (fmodf(size.x, rec.width - 4) / size.y);
-                        rec.height = (lines)*size.y + 4.0f;
-
-                        DrawRectangleRec(rec, WHITE);
-                        rec.x += 2;
-                        rec.y += 2;
-                        rec.width -= 4;
-                        rec.height -= 4;
-                        DrawTextRec(GetFontDefault(), button->GetToolTip().c_str(), rec, 10, 1, true, BLACK);
-
-                        break;
-                    }
-                }
-            }
+            UIHandler::Global().Draw();
 
         } EndDrawing();
 
