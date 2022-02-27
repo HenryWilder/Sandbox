@@ -419,18 +419,32 @@ public:
             }
         }
 
+        // Change cursor
+        {
+            bool hovering = false;
+            for (Button* button : m_buttons)
+            {
+                if (!button->IsDisabled() && button->IsHovered())
+                {
+                    hovering = true;
+                    break;
+                }
+            }
+
+            SetMouseCursor(hovering ? MOUSE_CURSOR_POINTING_HAND : MOUSE_CURSOR_DEFAULT);
+        }
+
+        // Get tooltip
         {
             m_tooltipButton = nullptr;
             for (Button* button : m_buttons)
             {
-                if (button->IsHovered())
+                if (!button->GetToolTip().empty() && button->IsOverlapping(m_cursor))
                 {
                     m_tooltipButton = button;
                     break;
                 }
             }
-
-            SetMouseCursor(!!m_tooltipButton ? MOUSE_CURSOR_POINTING_HAND : MOUSE_CURSOR_DEFAULT);
         }
 
         // Highlight grouped buttons together
