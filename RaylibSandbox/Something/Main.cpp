@@ -158,6 +158,27 @@ public:
         m_stateColor(colors.inactiveColor),
         m_colors(m_colors)
     {}
+    
+    Button(
+        const std::string& displayName,
+        const std::string& toolTip,
+        const Button& shapeBase,
+        bool isToggle,
+        bool startActive,
+        bool startDisabled,
+        ColorScheme colors = ColorScheme(),
+        RadioButtonHandler* group = nullptr) :
+
+        m_displayName(displayName),
+        m_tooltip(toolTip),
+        m_rect(shapeBase.GetRect()),
+        m_isToggle(isToggle),
+        m_state((State)(((unsigned char)State::ACTIVE * (unsigned char)startActive) | ((unsigned char)State::DISABLED * (unsigned char)startDisabled))),
+        m_callbackDirty(false),
+        m_group(group),
+        m_stateColor(colors.inactiveColor),
+        m_colors(m_colors)
+    {}
 
     Rectangle GetRect() const { return m_rect; }
     void SetRect(Rectangle rect) { m_rect = rect; }
@@ -172,6 +193,26 @@ public:
     void SetY(float y) { m_rect.y = y; }
     void SetWidth(float width) { m_rect.width = width; }
     void SetHeight(float height) { m_rect.height = height; }
+
+    // Offset is treated as padding. Negatives put the button above/left of base, while positives put it below/right.
+    void OffsetFrom(const Button& base, float x, float y)
+    {
+        if (x < 0.0)
+            SetX(base.GetX() - (GetWidth() - x));
+        else
+            SetX(base.GetX() + (base.GetWidth() + x));
+
+        if (y < 0.0)
+            SetY(base.GetY() - (GetHeight() - y));
+        else
+            SetY(base.GetY() + (base.GetHeight() + y));
+    }
+    // Takes the width/height of the base without taking the position
+    void CopyShape(const Button& base)
+    {
+        SetWidth(base.GetWidth());
+        SetHeight(base.GetHeight());
+    }
 
     bool IsToggle() const { return m_isToggle; }
     bool IsHold() const { return !m_isToggle; }
