@@ -379,6 +379,7 @@ public:
 
         m_cursor = newPosition;
     }
+
     void UpdateButtons()
     {
         // Cleanup from last frame
@@ -435,8 +436,9 @@ public:
         }
 
         // Get tooltip
+        m_tooltipButton = nullptr;
+        if (m_timeSinceMouseMove > m_toolTipHoverTime)
         {
-            m_tooltipButton = nullptr;
             for (Button* button : m_buttons)
             {
                 if (!button->GetToolTip().empty() && button->IsOverlapping(m_cursor))
@@ -468,11 +470,13 @@ public:
             }
         }
 
+        // Update state color
         for (Button* button : m_buttons)
         {
             button->UpdateStateColor();
         }
     }
+
     void Draw()
     {
         // Draw buttons
@@ -483,14 +487,11 @@ public:
         }
 
         // Draw tooltip
-        if (m_timeSinceMouseMove > m_toolTipHoverTime)
+        if (!!m_tooltipButton)
         {
-            if (!!m_tooltipButton)
-            {
-                Rectangle rec = { m_cursor.x, m_cursor.y + 25, 200, 100 };
-                DrawRectangleRec(rec, WHITE);
-                DrawTextRec(GetFontDefault(), m_tooltipButton->GetToolTip().c_str(), ExpandRec(rec, -2.0f), 10, 1, true, BLACK);
-            }
+            Rectangle rec = { m_cursor.x, m_cursor.y + 25, 200, 100 };
+            DrawRectangleRec(rec, WHITE);
+            DrawTextRec(GetFontDefault(), m_tooltipButton->GetToolTip().c_str(), ExpandRec(rec, -2.0f), 10, 1, true, BLACK);
         }
     }
 
