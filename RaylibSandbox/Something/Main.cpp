@@ -1,5 +1,8 @@
 #include <raylib.h>
+#pragma warning(push)
+#pragma warning(disable : 26451)
 #include <raymath.h>
+#pragma warning(pop)
 #include <algorithm>
 #include <functional>
 #include "HUI.h"

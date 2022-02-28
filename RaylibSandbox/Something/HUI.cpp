@@ -1,5 +1,8 @@
 #include <raylib.h>
+#pragma warning(push)
+#pragma warning(disable : 26451)
 #include <raymath.h>
+#pragma warning(pop)
 #include <algorithm>
 #include <functional>
 #include <vector>
@@ -346,8 +349,10 @@ void UIHandler::UpdateButtons()
                 break;
             }
         }
-
+#pragma warning(push)
+#pragma warning(disable : 26812)
         SetMouseCursor(hovering ? MOUSE_CURSOR_POINTING_HAND : MOUSE_CURSOR_DEFAULT);
+#pragma warning(pop)
     }
 
     // Get tooltip
