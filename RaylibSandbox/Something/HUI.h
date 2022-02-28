@@ -117,13 +117,11 @@ public:
     Color GetColor_Inactive();
     Color GetColor_Active();
     Color GetColor_Inactive_Hovered();
-    Color GetColor_Active_Hovered();
 
     void SetColor_Disabled(Color color);
     void SetColor_Inactive(Color color);
     void SetColor_Active(Color color);
     void SetColor_Inactive_Hovered(Color color);
-    void SetColor_Active_Hovered(Color color);
 };
 
 // Buttons which only allow one to be active at a time
