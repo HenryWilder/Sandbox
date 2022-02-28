@@ -171,6 +171,10 @@
     <ClCompile Include="Source.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <None Include="Grid.frag">
+      <SubType>
+      </SubType>
+    </None>
     <None Include="save.graph" />
   </ItemGroup>
   <ItemGroup>

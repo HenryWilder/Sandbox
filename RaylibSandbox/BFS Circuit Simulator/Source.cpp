@@ -247,7 +247,7 @@ int Editor(int windowWidth, int windowHeight)
     button_select.SetDisplayName("sel");
     button_select.SetToolTip("[@todo]");
     button_select.SetToggle(true);
-    button_select.SetRect({ 30, 30, 30, 30 });
+    button_select.SetRect({ 6, 6, 30, 30 });
     
     Button button_pen;
     button_pen.SetDisplayName("pen");
@@ -294,6 +294,20 @@ int Editor(int windowWidth, int windowHeight)
     *   Load textures, shaders, and meshes    *
     ******************************************/
 
+    Shader gridShader = LoadShader(0, "Grid.frag");
+    int gridShaderResolutionLoc = GetShaderLocation(gridShader, "resolution");
+    {
+        float temp[2] = { (float)windowWidth, (float)windowHeight };
+        SetShaderValue(gridShader, gridShaderResolutionLoc, temp, UNIFORM_VEC2);
+    }
+    int gridShaderCursorLoc = GetShaderLocation(gridShader, "cursor");
+    Texture2D gridTex;
+    {
+        Image img = GenImageColor(windowWidth, windowHeight, BLACK);
+        gridTex = LoadTextureFromImage(img);
+        UnloadImage(img);
+    }
+
     while (!WindowShouldClose())
     {
         /******************************************
@@ -317,6 +331,15 @@ int Editor(int windowWidth, int windowHeight)
             if (tool.mode == Tool::Mode::Pen && !!tool.pen.wireStart)
                 cursor = ConstrainOffset(tool.pen.wireStart->GetPosition(), cursor);
         }
+
+#define DRAW_GRID_AS_SHADER 1
+
+#if DRAW_GRID_AS_SHADER
+        {
+            float temp[2] = { cursor.x, cursor.y };
+            SetShaderValue(gridShader, gridShaderCursorLoc, temp, UNIFORM_VEC2);
+        }
+#endif
 
         UIHandler::Global().UpdateCursorPos(cursor);
         UIHandler::Global().UpdateButtons();
@@ -598,6 +621,13 @@ int Editor(int windowWidth, int windowHeight)
 
             constexpr int gridRadius = 8;
 
+#if DRAW_GRID_AS_SHADER
+            BeginShaderMode(gridShader); {
+
+                DrawTextureRec(gridTex, { 0, 0, (float)windowWidth, (float)windowHeight }, Vector2Zero(), WHITE);
+
+            } EndShaderMode();
+#else
             // World grid
             static const Color worldGridColor = ColorAlpha(DARKGRAY, 0.125f);
             for (float x = 0.0f; x < (float)windowWidth; x += 2.0f * g_nodeRadius)
@@ -608,6 +638,7 @@ int Editor(int windowWidth, int windowHeight)
             {
                 DrawLineV({ 0.0f, y }, { (float)windowWidth, y }, worldGridColor);
             }
+#endif
 
             if (tool.sel.b_selecting)
             {
@@ -684,6 +715,8 @@ int Editor(int windowWidth, int windowHeight)
             }
             else
             {
+#if DRAW_GRID_AS_SHADER
+#else
                 // Cursor grid
                 for (int y = -gridRadius; y <= gridRadius; ++y)
                 {
@@ -697,15 +730,20 @@ int Editor(int windowWidth, int windowHeight)
                         DrawPixelV(Vector2Add(cursor, offset), ColorAlpha(WHITE, alpha));
                     }
                 }
+#endif
             }
 
+#if DRAW_GRID_AS_SHADER
+
+#else
             // Crosshair
             {
                 Color color = ColorAlpha(WHITE, 0.0625);
                 DrawLineV({ cursor.x, 0 }, { cursor.x, (float)windowHeight }, color);
                 DrawLineV({ 0, cursor.y }, { (float)windowWidth,  cursor.y }, color);
             }
-
+#endif
+#undef DRAW_GRID_AS_SHADER
 
             // Wires
             Graph::Global().DrawWires();
@@ -822,6 +860,8 @@ int Editor(int windowWidth, int windowHeight)
     {
         delete node;
     }
+
+    UnloadShader(gridShader);
 
     return 0;
 }

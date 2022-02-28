@@ -35,6 +35,9 @@
     <None Include="save.graph">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="Grid.frag">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Node.h">
