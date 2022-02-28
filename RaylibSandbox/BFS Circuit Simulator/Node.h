@@ -105,13 +105,7 @@ struct Wire
     inline bool operator==(const Wire& other) { return (a == other.a) && (b == other.b); }
 };
 // Test if a wire might not be valid anymore
-bool CheckWireIntegrity(Wire wire)
-{
-    return
-        (bool)wire &&
-        wire.a->HasNodeAsOutput(wire.b) &&
-        wire.b->HasNodeAsInput(wire.a);
-}
+bool CheckWireIntegrity(Wire wire);
 inline constexpr Wire WireNull() { return Wire{ nullptr, nullptr }; }
 
 struct WireRelative

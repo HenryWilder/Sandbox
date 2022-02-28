@@ -1,5 +1,8 @@
 #include <raylib.h>
+#pragma warning(push)
+#pragma warning(disable : 26451)
 #include <raymath.h>
+#pragma warning(pop)
 #include <vector>
 #include <fstream>
 #include <stack>
@@ -336,6 +339,7 @@ void Graph::AddNode(Node* newNode)
 }
 void Graph::AddNodes(const std::vector<Node*>& source)
 {
+    nodes.reserve(source.size());
     for (Node* node : source)
     {
         AddNode(node);
@@ -515,23 +519,22 @@ Wire Graph::FindWireIntersectingGridPoint(Vector2 point) const
     }
     return Wire{ nullptr, nullptr };
 }
-void Graph::FindObjectsInRectangle(Selection* output, Rectangle search) const
+void Graph::FindObjectsInRectangle(std::vector<Node*>& nodeOutput, std::vector<Component*>& compOutput, Rectangle search) const
 {
-    output->nodes.clear();
+    nodeOutput.clear();
     for (Node* node : nodes)
     {
         if (CheckCollisionPointRec(node->GetPosition(), search))
-            output->nodes.push_back(node);
+            nodeOutput.push_back(node);
     }
-    output->comps.clear();
+    compOutput.clear();
     for (Component* comp : components)
     {
         if (CheckCollisionRecs(search, comp->GetCasingA()) ||
             CheckCollisionRecs(search, comp->GetCasingB()))
-            output->comps.push_back(comp);
+            compOutput.push_back(comp);
     }
-    output->Dirty();
-    output->Clean();
+    // todo: Extract nodes from components?
 }
 void Graph::RemoveObjects(const Selection& remove)
 {
@@ -854,49 +857,6 @@ void Graph::OffsetNodes(const Selection& source, Vector2 offset)
     {
         if (!node->IsInComponent())
             node->SetPosition(Vector2Add(node->GetPosition(), offset));
-    }
-}
-
-void Graph::CloneNodesWithOffset(const std::vector<Selectable>& source, Vector2 offset)
-{
-    std::vector<Selectable> copies;
-
-    copies.reserve(source.size());
-    for (Selectable src : source)
-    {
-        if (src.type == Selectable::Type::COMP)
-        {
-            CloneComponentAtPosition(src.comp->GetBlueprint(), Vector2Add(src.comp->GetPosition(), offset));
-        }
-        else
-        {
-            Selectable copy = Selectable(new Node(Vector2Add(src.node->GetPosition(), offset), src.node->GetGate()));
-            copies.push_back(copy);
-            AddNode(copies.back().node);
-        }
-    }
-
-    ResetVisited();
-    for (Selectable start : source)
-    {
-        if (start.node->GetVisited())
-            continue;
-
-        size_t a = std::find(source.begin(), source.end(), start) - source.begin();
-
-        for (Node* end : start.node->GetOutputs())
-        {
-            if (end->GetVisited())
-                break;
-
-            auto it = std::find(source.begin(), source.end(), end);
-
-            if (it != source.end())
-            {
-                size_t b = it - source.begin();
-                ConnectNodes(copies[a].node, copies[b].node);
-            }
-        }
     }
 }
 

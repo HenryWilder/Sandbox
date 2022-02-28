@@ -1,5 +1,8 @@
 #include <raylib.h>
+#pragma warning(push)
+#pragma warning(disable : 26451)
 #include <raymath.h>
+#pragma warning(pop)
 #include <vector>
 #include <fstream>
 #include <stack>
@@ -291,6 +294,15 @@ void MapNodeRelativeIndices(const std::vector<Node*>& source, std::unordered_map
     {
         dest.insert({ source[i],i });
     }
+}
+
+// Test if a wire might not be valid anymore
+bool CheckWireIntegrity(Wire wire)
+{
+    return
+        (bool)wire &&
+        wire.a->HasNodeAsOutput(wire.b) &&
+        wire.b->HasNodeAsInput(wire.a);
 }
 
 void ListWireRelativeIndices(const std::vector<Node*>& source, std::vector<WireRelative>& dest)

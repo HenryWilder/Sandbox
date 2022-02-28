@@ -1,5 +1,8 @@
 #include <raylib.h>
+#pragma warning(push)
+#pragma warning(disable : 26451)
 #include <raymath.h>
+#pragma warning(pop)
 #include <vector>
 #include <fstream>
 #include <stack>
@@ -56,7 +59,7 @@ GateSelection ClosestHoveredGateOption(Vector2 cursor, Vector2 origin)
 {
     if (Vector2Distance(cursor, origin) > 0.01f)
     {
-        Vector2 direction = Vector2Normalize(cursor - origin);
+        Vector2 direction = Vector2Normalize(Vector2Subtract(cursor, origin));
         float cloesetDot = -1;
         size_t closestIndex = -1;
         for (size_t i = 0; i < 4; ++i)
@@ -97,14 +100,195 @@ Vector2 ConstrainOffset(Vector2 constraint, Vector2 point)
     }
 }
 
-
-
-int main()
+enum ModifierKey
 {
-    int windowWidth = 1280;
-    int windowHeight = 720;
-    InitWindow(windowWidth, windowHeight, "My Raylib Program");
-    SetTargetFPS(60);
+    KEY_CONTROL,
+    KEY_ALT,
+    KEY_SHIFT,
+};
+bool IsModifierDown(int id)
+{
+    switch (id)
+    {
+    case KEY_CONTROL: return IsKeyDown(KEY_LEFT_CONTROL) || IsKeyDown(KEY_RIGHT_CONTROL);
+    case KEY_ALT: return IsKeyDown(KEY_LEFT_ALT) || IsKeyDown(KEY_RIGHT_ALT);
+    case KEY_SHIFT: return IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT);
+    default: return false;
+    }
+}
+
+Rectangle TwoPointRec(Vector2 a, Vector2 b)
+{
+    auto [x1, x2] = std::minmax(a.x, b.x);
+    auto [y1, y2] = std::minmax(a.y, b.y);
+    return { x1, y1, x2 - x1, y2 - y1 };
+}
+
+int Editor(int windowWidth, int windowHeight)
+{
+    struct Tool {
+        Tool()
+        {
+            g.plt.activeBlueprint = nullptr;
+            g.plt.activeGate = Gate::OR;
+            g.hvr.comp = nullptr;
+            g.hvr.node = nullptr;
+            g.hvr.wire = WireNull();
+            g.drawGateOptions = false;
+            SetMode(Mode::Select);
+        }
+        ~Tool() {}
+
+        struct {
+            struct {
+                ComponentBlueprint* activeBlueprint;
+                Gate activeGate;
+            } plt;
+
+            struct {
+                Component* comp;
+                Node* node;
+                Wire wire;
+            } hvr;
+
+            bool drawGateOptions;
+        } g;
+
+        enum class Mode {
+            // (V) Selects nodes and components if the start point overlaps none.
+            //     Replaces the selection with the clicked object if it is not in the current selection.
+            //     Moves the currently selected elements if the element clicked is in the current selection.
+            //     Sets all selected elements to match the gate/blueprint picker if the picker changes.
+            //     Displays the inputs and outputs of the hovered node, wire, or component
+            Select,
+
+            // (P) Draws nodes of the active gate connected by wires where the mouse is pressed.
+            //     Connects nodes when a wire is drawn between one another.
+            //     Cancels the current wire when right clicking
+            Pen,
+
+            // (A) Manually orders the input/output nodes on the hovered component.
+            //     Reverses the direction of clicked wires.
+            //     Moves dragged nodes.
+            Direct,
+
+            // (K) Sets the gate of the clicked node to match the active gate.
+            //     Sets the blueprint of clicked components to match the active blueprint.
+            Edit,
+
+            // (Z) Moves the camera when dragging.
+            //     Zooms when scrolling.
+            Camera,
+        } mode;
+
+        void SetMode(Mode newMode)
+        {
+            switch (mode = newMode)
+            {
+            case Tool::Mode::Select:
+                sel.start = Vector2Zero();
+                sel.rect = {};
+                sel.b_selecting = false;
+                sel.b_dragging = false;
+                break;
+            case Tool::Mode::Pen:
+                pen.wireStart = nullptr;
+                break;
+            case Tool::Mode::Direct:
+                // todo
+                break;
+            case Tool::Mode::Edit:
+                // todo
+                break;
+            case Tool::Mode::Camera:
+                // todo
+                break;
+            default:
+                static_assert("error");
+                break;
+            }
+        }
+
+        union {
+            struct {
+                Vector2 start;
+                Rectangle rect;
+                bool b_selecting;
+                bool b_dragging;
+                std::vector<Node*> nodes;
+                std::vector<Component*> comps;
+            } sel;
+
+            struct {
+                Node* wireStart; // The previous node in the wire
+                Node* wireEnd; // The next node in the wire
+            } pen;
+
+            struct {
+                // todo
+            } dir;
+            
+            struct {
+                // todo
+            } edt;
+            
+            struct {
+                // todo
+            } cam;
+        };
+    } tool;
+    bool holdingTemporaryComponent = false;
+
+    // UI
+
+    RadioButtonHandler group0;
+
+    Button button_select;
+    button_select.SetDisplayName("sel");
+    button_select.SetToolTip("[@todo]");
+    button_select.SetToggle(true);
+    button_select.SetRect({ 30, 30, 30, 30 });
+    
+    Button button_pen;
+    button_pen.SetDisplayName("pen");
+    button_pen.SetToolTip("[@todo]");
+    button_pen.SetToggle(true);
+    button_pen.CopyShape(button_select);
+    button_pen.OffsetFrom(button_select, Spacing::OVERLAP, 0, Spacing::PAD, 10);
+    
+    Button button_direct;
+    button_direct.SetDisplayName("dir");
+    button_direct.SetToolTip("[@todo]");
+    button_direct.SetToggle(true);
+    button_direct.CopyShape(button_select);
+    button_direct.OffsetFrom(button_pen, Spacing::OVERLAP, 0, Spacing::PAD, 10);
+    
+    Button button_edit;
+    button_edit.SetDisplayName("edit");
+    button_edit.SetToolTip("[@todo]");
+    button_edit.SetToggle(true);
+    button_edit.CopyShape(button_select);
+    button_edit.OffsetFrom(button_direct, Spacing::OVERLAP, 0, Spacing::PAD, 10);
+    
+    Button button_camera;
+    button_camera.SetDisplayName("cam");
+    button_camera.SetToolTip("[@todo]");
+    button_camera.SetToggle(true);
+    button_camera.CopyShape(button_select);
+    button_camera.OffsetFrom(button_edit, Spacing::OVERLAP, 0, Spacing::PAD, 10);
+
+    UIHandler::Global().Expect(5);
+    UIHandler::Global().CreateButtonGroup_FromNew(&group0, { &button_select, &button_pen, &button_direct, &button_edit, &button_camera });
+
+    Rectangle uiContainerRec = TwoPointRec(
+        { button_select.GetX(), button_select.GetY() },
+        { button_camera.GetX() + button_camera.GetWidth(), button_camera.GetY() + button_camera.GetHeight() }
+    );
+    uiContainerRec.x -= 6;
+    uiContainerRec.y -= 6;
+    uiContainerRec.width += 12;
+    uiContainerRec.height += 12;
+
 
     /******************************************
     *   Load textures, shaders, and meshes    *
@@ -125,248 +309,280 @@ int main()
                 Graph::Global().Save("save.graph");
         }
 
-
         // Grid-snapped cursor
         Vector2 cursor = Snap(GetMousePosition(), g_nodeRadius * 2.0f);
 
         // Lock wire directions
         {
-            const Tool_Pen* pen = dynamic_cast<const Tool_Pen*>(ToolHandler::Global().GetTool());
-            if (pen && pen->GetStartNode())
-                cursor = ConstrainOffset(pen->GetStartNode()->GetPosition(), cursor);
+            if (tool.mode == Tool::Mode::Pen && !!tool.pen.wireStart)
+                cursor = ConstrainOffset(tool.pen.wireStart->GetPosition(), cursor);
+        }
+
+        UIHandler::Global().UpdateCursorPos(cursor);
+        UIHandler::Global().UpdateButtons();
+        if (!CheckCollisionPointRec(GetMousePosition(), uiContainerRec))
+        {
+            SetMouseCursor(MOUSE_CURSOR_CROSSHAIR);
         }
 
         // Hover
-        Node* hoveredNode = Graph::Global().FindNodeAtGridPoint(cursor);
-        Wire hoveredWire = (hoveredNode ? WireNull()  : Graph::Global().FindWireIntersectingGridPoint(cursor));
+        tool.g.hvr.node = Graph::Global().FindNodeAtGridPoint(cursor);
+        tool.g.hvr.wire = (tool.g.hvr.node ? WireNull() : Graph::Global().FindWireIntersectingGridPoint(cursor));
 
-        if (!marqueeSelecting)
+        if (!tool.sel.b_selecting)
         {
-            if (!selection.empty())
+            if (!(tool.sel.nodes.empty() && tool.sel.comps.empty()))
             {
                 if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
                 {
                     if (!holdingTemporaryComponent)
-                        marqueeStart = cursor;
-                    marqueeDragging = true;
+                        tool.sel.start = cursor;
+                    tool.sel.b_selecting = true;
                 }
 
                 if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                 {
-                    marqueeDragging = false;
-                    Vector2 offset = Vector2Subtract(cursor, marqueeStart);
+                    tool.sel.b_selecting = false;
+                    Vector2 offset = Vector2Subtract(cursor, tool.sel.start);
 
                     // Copy
                     if (IsModifierDown(KEY_ALT) && !holdingTemporaryComponent)
-                        Graph::Global().CloneNodesWithOffset(selection, offset);
-                    // Move
-                    else
-                    {
-                        Graph::Global().OffsetNodes(selection, offset);
-
-                        // todo: ????
-                        if (holdingTemporaryComponent)
-                            holdingTemporaryComponent = false;
+                    {                        
+                        for (Component*& comp : tool.sel.comps)
+                        {
+                            Component* clone = new Component(comp->GetBlueprint());
+                            comp = clone;
+                        }
+                        for (Node*& node : tool.sel.nodes)
+                        {
+                            Node* clone = new Node(node->GetPosition(), node->GetGate());
+                            node = clone;
+                        }
+                        Graph::Global().AddNodes(tool.sel.nodes);
                     }
+
+                    // Move
+                    for (Component* comp : tool.sel.comps)
+                    {
+                        comp->SetPosition(Vector2Add(comp->GetPosition(), offset));
+                    }
+                    for (Node* node : tool.sel.nodes)
+                    {
+                        if (!node->IsInComponent())
+                            node->SetPosition(Vector2Add(node->GetPosition(), offset));
+                    }
+
+                    // todo: ????
+                    if (holdingTemporaryComponent)
+                        holdingTemporaryComponent = false;
                 }
             }
             else
             {
                 // Drag
-                if (selectionStart)
+                if (!!tool.pen.wireStart)
                 {
-                    selectionEnd = hoveredNode;
+                    tool.pen.wireEnd = tool.g.hvr.node;
 
                     // Finish making connection
                     if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
                     {
-                        if (selectionEnd != selectionStart)
+                        if (tool.pen.wireEnd != tool.pen.wireStart)
                         {
-                            if (!selectionEnd)
-                                selectionEnd = Graph::Global().AddNewNode(cursor);
+                            if (!tool.pen.wireEnd)
+                                tool.pen.wireEnd = Graph::Global().AddNewNode(cursor);
 
-                            Graph::Global().ConnectNodes(selectionStart, selectionEnd);
-                            graphDirty = true;
+                            Graph::Global().ConnectNodes(tool.pen.wireStart, tool.pen.wireEnd);
+                            Graph::Global().MarkRouteDirty();
 
                             // Divide wire
-                            if (hoveredWire)
+                            if (tool.g.hvr.wire)
                             {
-                                Graph::Global().DivideWire(hoveredWire, selectionEnd);
-                                hoveredWire = WireNull();
+                                Graph::Global().DivideWire(tool.g.hvr.wire, tool.pen.wireEnd);
+                                tool.g.hvr.wire = WireNull();
                             }
                         }
-                        selectionStart = selectionEnd = nullptr;
+                        tool.pen.wireStart = tool.pen.wireEnd = nullptr;
                     }
                 }
                 // Create new node
-                else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !selectionStart)
+                else if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !tool.pen.wireStart)
                 {
-                    selectionStart = hoveredNode;
+                    Node* wireEnd = tool.g.hvr.node;
 
-                    if (!selectionStart)
+                    if (!tool.pen.wireStart)
                     {
-                        selectionStart = Graph::Global().AddNewNode(cursor);
-                        graphDirty = true;
+                        tool.pen.wireStart = Graph::Global().AddNewNode(cursor);
+                        Graph::Global().MarkRouteDirty();
 
                         // Divide wire
-                        if (hoveredWire)
+                        if (tool.g.hvr.wire)
                         {
-                            graph.DivideWire(hoveredWire, selectionStart);
-                            hoveredWire = WireNull();
+                            Graph::Global().DivideWire(tool.g.hvr.wire, tool.pen.wireStart);
+                            tool.g.hvr.wire = WireNull();
                         }
                     }
                 }
 
-                drawGateOptions = (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON) && selectionStart);
-                if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON) && !selectionStart)
+                //drawGateOptions = (IsMouseButtonDown(MOUSE_MIDDLE_BUTTON) && tool.pen.wireStart); // todo: What?...
+                if (IsMouseButtonPressed(MOUSE_MIDDLE_BUTTON) && !tool.pen.wireStart)
                 {
-                    if (hoveredNode)
-                        selectionStart = hoveredNode;
-                    else if (hoveredWire)
+                    if (tool.g.hvr.node)
+                        tool.pen.wireStart = tool.g.hvr.node;
+                    else if (tool.g.hvr.wire)
                     {
-                        hoveredWire = Graph::Global().ReverseWire(hoveredWire);
-                        graphDirty = true;
+                        tool.g.hvr.wire = Graph::Global().ReverseWire(tool.g.hvr.wire);
+                        Graph::Global().MarkRouteDirty();
                     }
                 }
-                if (IsMouseButtonReleased(MOUSE_MIDDLE_BUTTON) && selectionStart)
+                if (IsMouseButtonReleased(MOUSE_MIDDLE_BUTTON) && tool.pen.wireStart)
                 {
 
                     // Middle click
-                    if (Vector2Equals(cursor, selectionStart->GetPosition()))
+                    if (Vector2Equals(cursor, tool.pen.wireStart->GetPosition()))
                     {
-                        selectionStart->SetGate(selectionStart->GetGate() != Gate::NOR ? Gate::NOR : Gate::OR);
+                        tool.pen.wireStart->SetGate(tool.pen.wireStart->GetGate() != Gate::NOR ? Gate::NOR : Gate::OR);
                     }
                     // Middle drag
                     else
                     {
                         // In clockwise order
-                        GateSelection select = ClosestHoveredGateOption(cursor, selectionStart->GetPosition());
-                        selectionStart->SetGate(GateSelection::gates[select.index]);
+                        GateSelection select = ClosestHoveredGateOption(cursor, tool.pen.wireStart->GetPosition());
+                        tool.pen.wireStart->SetGate(GateSelection::gates[select.index]);
                     }
 
                     // Inputless nodes take output from the user and therefore are treated as mutable
-                    if (!selectionStart->HasNoInputs())
-                        gateDirty = true;
+                    if (!tool.pen.wireStart->HasNoInputs())
+                        Graph::Global().MarkGateDirty();
                     else
-                        selectionStart->SetState(selectionStart->GetGate() == Gate::NOR);
+                        tool.pen.wireStart->SetState(tool.pen.wireStart->GetGate() == Gate::NOR);
 
-                    selectionStart = selectionEnd = nullptr;
+                    tool.pen.wireStart = tool.pen.wireEnd = nullptr;
                 }
             }
         }
 
         // Delete selected
-        if ((IsKeyPressed(KEY_DELETE) || IsKeyPressed(KEY_BACKSPACE)) && !selection.empty())
+        if ((IsKeyPressed(KEY_DELETE) || IsKeyPressed(KEY_BACKSPACE)))
         {
-            for (Selectable element : selection)
+            if (!tool.sel.nodes.empty())
             {
-                if (element.type == Selectable::Type::COMP)
-                    Graph::Global().RemoveComponentEntirely(element.comp);
-                else
-                    Graph::Global().RemoveNodeEntirely(element.node);
+                for (Node* node : tool.sel.nodes)
+                {
+                    Graph::Global().RemoveNode(node);
+                    delete node;
+                }
+                tool.sel.nodes.clear();
             }
-            selection.clear();
+            if (!tool.sel.comps.empty())
+            {
+                for (Component* comp : tool.sel.comps)
+                {
+                    Graph::Global().RemoveComponentEntirely(comp);
+                }
+                tool.sel.comps.clear();
+            }
         }
 
         // Make sure no other locally stored nodes can possibly exist at the time, or set them to nullptr
-        if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON) && !selectionStart && !selectionEnd && !marqueeSelecting)
+        if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON) && !tool.pen.wireStart && !tool.pen.wireEnd && !tool.sel.b_selecting)
         {
-            if (hoveredNode)
+            if (tool.g.hvr.node)
             {
-                bool removed;
+                bool removed; // ???
 
                 // Transfer inputs to outputs
                 if (IsModifierDown(KEY_SHIFT) &&
-                    !(hoveredNode->InputCount () == 1 &&
-                      hoveredNode->OutputCount() == 1))
+                    !(tool.g.hvr.node->InputCount() == 1 &&
+                        tool.g.hvr.node->OutputCount() == 1))
                 {
-                    hoveredNode->SetGate(Gate::OR);
+                    tool.g.hvr.node->SetGate(Gate::OR);
                 }
                 else
                 {
                     if (IsModifierDown(KEY_SHIFT))
-                        Graph::Global().ConnectNodes(hoveredNode->GetInput(0), hoveredNode->GetOutput(0));
+                        Graph::Global().ConnectNodes(tool.g.hvr.node->GetInput(0), tool.g.hvr.node->GetOutput(0));
 
-                    Graph::Global().RemoveNodeEntirely(hoveredNode);
-                    hoveredNode = nullptr;
+                    Graph::Global().RemoveNode(tool.g.hvr.node);
+                    delete tool.g.hvr.node;
+                    tool.g.hvr.node = nullptr;
                 }
 
-                graphDirty = true;
+                Graph::Global().MarkRouteDirty();
             }
-            else if (hoveredWire)
+            else if (tool.g.hvr.wire)
             {
                 if (IsModifierDown(KEY_SHIFT)) // Also delete the related nodes
                 {
-                    Graph::Global().RemoveNodeEntirely(hoveredWire.a);
-                    Graph::Global().RemoveNodeEntirely(hoveredWire.b);
+                    Graph::Global().RemoveNode(tool.g.hvr.wire.a);
+                    Graph::Global().RemoveNode(tool.g.hvr.wire.b);
+                    delete tool.g.hvr.wire.a;
+                    delete tool.g.hvr.wire.b;
+                    tool.g.hvr.wire.a = nullptr;
+                    tool.g.hvr.wire.b = nullptr;
                 }
                 else
-                    Graph::Global().DisconnectNodes(hoveredWire.a, hoveredWire.b);
+                    Graph::Global().DisconnectNodes(tool.g.hvr.wire.a, tool.g.hvr.wire.b);
 
-                hoveredWire = WireNull();
-                graphDirty = true;
+                tool.g.hvr.wire = WireNull();
+                Graph::Global().MarkRouteDirty();
             }
             else
             {
-                marqueeStart = cursor;
-                marqueeSelecting = true;
+                tool.sel.start = cursor;
+                tool.sel.b_selecting = true;
             }
         }
-        if (marqueeSelecting)
+        if (tool.sel.b_selecting)
         {
             Vector2 a = {
-                std::min(marqueeStart.x, cursor.x),
-                std::min(marqueeStart.y, cursor.y)
+                std::min(tool.sel.start.x, cursor.x),
+                std::min(tool.sel.start.y, cursor.y)
             };
-            selectionRec = {
+            tool.sel.rect = {
                     a.x,
                     a.y,
-                    std::max(marqueeStart.x, cursor.x) - a.x,
-                    std::max(marqueeStart.y, cursor.y) - a.y,
+                    std::max(tool.sel.start.x, cursor.x) - a.x,
+                    std::max(tool.sel.start.y, cursor.y) - a.y,
             };
-            Graph::Global().FindSelectablesInRectangle(&selection, selectionRec);
+            Graph::Global().FindObjectsInRectangle(tool.sel.nodes, tool.sel.comps, tool.sel.rect); // todo: remove selectables
 
             // Finalize
             if (IsMouseButtonReleased(MOUSE_RIGHT_BUTTON))
-                marqueeSelecting = false;
+                tool.sel.b_selecting = false;
         }
 
         // Package up components
-        if (IsKeyPressed(KEY_SPACE) && selection.size() > 1)
+        if (IsKeyPressed(KEY_SPACE) && (tool.sel.nodes.size() + tool.sel.comps.size()) > 1)
         {
-            size_t nodeCount = selection.size();
-            for (Selectable element : selection)
+            size_t nodeCount = tool.sel.nodes.size();
+            for (Component* comp : tool.sel.comps)
             {
-                if (element.type == Selectable::Type::COMP)
-                {
-                    nodeCount += element.comp->GetNodeCount() - 1;
-                }
+                nodeCount += comp->GetNodeCount();
             }
             std::vector<Node*> breakdown;
             breakdown.reserve(nodeCount);
-            for (Selectable element : selection)
+            for (Node* node : tool.sel.nodes)
             {
-                if (element.type == Selectable::Type::COMP)
+                breakdown.push_back(node);
+            }
+            for (Component* comp : tool.sel.comps)
+            {
+                for (Node* node : comp->GetNodesVector())
                 {
-                    for (Node* node : element.comp->GetNodes())
-                    {
-                        breakdown.push_back(node);
-                    }
-                }
-                else
-                {
-                    breakdown.push_back(element.node);
+                    breakdown.push_back(node);
                 }
             }
 
             ComponentBlueprint* blueprint = new ComponentBlueprint();
             blueprint->GenerateBlueprintFromSelection(breakdown);
-            selection.clear();
-            marqueeStart = { g_gridUnit * -6, 0 };
-            Component* clone = Graph::Global().CloneComponentAtPosition(blueprint, marqueeStart); // Place the component offscreen
-            selection.push_back(Selectable(clone));
+            tool.sel.nodes.clear();
+            tool.sel.comps.clear();
+            tool.sel.start = { g_gridUnit * -6, 0 };
+            Component* clone = Graph::Global().CloneComponentAtPosition(blueprint, tool.sel.start); // Place the component offscreen
+            tool.sel.comps.push_back(clone);
             holdingTemporaryComponent = true;
-            graphDirty = true;
+            Graph::Global().MarkRouteDirty();
         }
 
         Graph::Global().UnDirty();
@@ -393,26 +609,26 @@ int main()
                 DrawLineV({ 0.0f, y }, { (float)windowWidth, y }, worldGridColor);
             }
 
-            if (marqueeSelecting)
+            if (tool.sel.b_selecting)
             {
-                DrawRectangleRec(selectionRec, ColorAlpha(GRAY, 0.125));
-                DrawRectangleLines((int)lroundf(selectionRec.x), (int)lroundf(selectionRec.y), (int)lroundf(selectionRec.width), (int)lroundf(selectionRec.height), GRAY);
+                DrawRectangleRec(tool.sel.rect, ColorAlpha(GRAY, 0.125));
+                DrawRectangleLines((int)lroundf(tool.sel.rect.x), (int)lroundf(tool.sel.rect.y), (int)lroundf(tool.sel.rect.width), (int)lroundf(tool.sel.rect.height), GRAY);
             }
 
 
             // Current wire being made
-            if (selectionStart)
+            if (!!tool.pen.wireStart)
             {
                 Vector2 end;
-                if (selectionEnd)
-                    end = selectionEnd->GetPosition();
+                if (tool.pen.wireEnd)
+                    end = tool.pen.wireEnd->GetPosition();
                 else
                     end = cursor;
 
-                DrawLineV(selectionStart->GetPosition(), end, GRAY);
+                DrawLineV(tool.pen.wireStart->GetPosition(), end, GRAY);
 
                 // Cursor grid
-                Vector2 p = selectionStart->GetPosition();
+                Vector2 p = tool.pen.wireStart->GetPosition();
                 Vector2 c = cursor;
 
                 float xLength = abs(c.x - p.x);
@@ -448,7 +664,7 @@ int main()
                     Color color = ColorAlpha(WHITE, 1.0f - abs((float)o / (float)gridRadius));
                     for (int i = 0; i < 3; ++i)
                     {
-                        DrawPixelV((p + directions[i] * s) + (directions[i] * g_gridUnit * (float)o), color);
+                        DrawPixelV(Vector2Add(Vector2Add(p, Vector2Scale(directions[i], s)), Vector2Scale(directions[i], g_gridUnit * (float)o)), color);
                     }
                 }
 
@@ -462,7 +678,7 @@ int main()
                     };
                     for (int i = 0; i < 2; ++i)
                     {
-                        DrawPixelV(cursor + offsets[i], color);
+                        DrawPixelV(Vector2Add(cursor, offsets[i]), color);
                     }
                 }
             }
@@ -478,7 +694,7 @@ int main()
                         offset.x = x * g_gridUnit;
                         offset.y = y * g_gridUnit;
                         float alpha = 1.0f - Clamp(Vector2Length(offset) / ((float)gridRadius * g_gridUnit), 0.0f, 1.0f);
-                        DrawPixelV(cursor + offset, ColorAlpha(WHITE, alpha));
+                        DrawPixelV(Vector2Add(cursor, offset), ColorAlpha(WHITE, alpha));
                     }
                 }
             }
@@ -495,103 +711,105 @@ int main()
             Graph::Global().DrawWires();
 
             // Moving points
-            if (marqueeDragging || holdingTemporaryComponent)
+            if (tool.sel.b_dragging || holdingTemporaryComponent)
             {
-                Vector2 offset = cursor - marqueeStart;
-                for (Selectable element : selection)
+                Vector2 offset = Vector2Subtract(cursor, tool.sel.start);
+                for (Component* comp : tool.sel.comps)
                 {
-                    if (element.type == Selectable::Type::COMP)
-                    {
-                        /*
+                    /*
                         * 0---1
                         * | 3-2
                         * 5-4
-                        * 
+                        *
                         * 0 is repeated for 6
                         */
-                        const Rectangle& a = element.comp->GetCasingA();
-                        const Rectangle& b = element.comp->GetCasingB();
+                    const Rectangle& a = comp->GetCasingA();
+                    const Rectangle& b = comp->GetCasingB();
 
-                        Vector2 points[7] = {
-                            { a.x + offset.x,           a.y + offset.y            },
-                            { b.x + offset.x + b.width, a.y + offset.y            },
-                            { b.x + offset.x + b.width, b.y + offset.y + b.height },
-                            { b.x + offset.x,           b.y + offset.y + b.height },
-                            { b.x + offset.x,           a.y + offset.y + a.height },
-                            { a.x + offset.x,           a.y + offset.y + a.height },
-                            points[0]
-                        };
+                    Vector2 points[7] = {
+                        { a.x + offset.x,           a.y + offset.y            },
+                        { b.x + offset.x + b.width, a.y + offset.y            },
+                        { b.x + offset.x + b.width, b.y + offset.y + b.height },
+                        { b.x + offset.x,           b.y + offset.y + b.height },
+                        { b.x + offset.x,           a.y + offset.y + a.height },
+                        { a.x + offset.x,           a.y + offset.y + a.height },
+                        points[0]
+                    };
 
-                        DrawLineStrip(points, 7, MAGENTA);
-                    }
-                    else
-                        DrawCircleV(element.node->GetPosition() + offset, 2.0f, MAGENTA);
+                    DrawLineStrip(points, 7, MAGENTA);
+                }
+                for (Node* node : tool.sel.nodes)
+                {
+                    DrawCircleV(Vector2Add(node->GetPosition(), offset), 2.0f, MAGENTA);
                 }
             }
 
             // Selection
-            for (Selectable element : selection)
+            for (Component* comp : tool.sel.comps)
             {
-                if (element.type == Selectable::Type::COMP)
-                {
-                    Rectangle rec;
+                Rectangle rec;
 
-                    rec = element.comp->GetCasingA();
-                    rec.x -= 2.0f;
-                    rec.y -= 2.0f;
-                    rec.width += 4.0f;
-                    rec.height += 4.0f;
-                    DrawRectangleRec(rec, WHITE);
+                rec = comp->GetCasingA();
+                rec.x -= 2.0f;
+                rec.y -= 2.0f;
+                rec.width += 4.0f;
+                rec.height += 4.0f;
+                DrawRectangleRec(rec, WHITE);
 
-                    rec = element.comp->GetCasingB();
-                    rec.x -= 2.0f;
-                    rec.y -= 2.0f;
-                    rec.width += 4.0f;
-                    rec.height += 4.0f;
-                    DrawRectangleRec(rec, WHITE);
-                }
-                else
-                    DrawGateIcon(element.node->GetGate(), element.node->GetPosition(), g_nodeRadius + 2.0f, WHITE);
+                rec = comp->GetCasingB();
+                rec.x -= 2.0f;
+                rec.y -= 2.0f;
+                rec.width += 4.0f;
+                rec.height += 4.0f;
+                DrawRectangleRec(rec, WHITE);
+            }
+            for (Node* node : tool.sel.nodes)
+            {
+                DrawGateIcon(node->GetGate(), node->GetPosition(), g_nodeRadius + 2.0f, WHITE);
             }
 
             // Components
             Graph::Global().DrawComponents();
 
             // Hovered wire
-            if (hoveredWire.a && !drawGateOptions)
-                DrawLineV(hoveredWire.a->GetPosition(), hoveredWire.b->GetPosition(), LIGHTGRAY);
+            if (tool.g.hvr.wire.a && !tool.g.drawGateOptions) // Todo: find a good spot to store this
+                DrawLineV(tool.g.hvr.wire.a->GetPosition(), tool.g.hvr.wire.b->GetPosition(), LIGHTGRAY);
 
             // Nodes
             Graph::Global().DrawNodes();
 
             // Cursor
-            if (hoveredNode)
-                DrawHighlightedGate(hoveredNode->GetPosition(), hoveredNode->GetGate());
+            if (tool.g.hvr.node)
+                DrawHighlightedGate(tool.g.hvr.node->GetPosition(), tool.g.hvr.node->GetGate());
             else
                 DrawRectanglePro({ cursor.x,cursor.y,5,5 }, { 2.5,2.5 }, 45, RAYWHITE);
 
             // Gate options
-            if (drawGateOptions)
+            if (tool.g.drawGateOptions)
             {
-                if (selectionStart)
-                    DrawHighlightedGate(selectionStart->GetPosition(), selectionStart->GetGate());
+                if (!!tool.pen.wireStart)
+                    DrawHighlightedGate(tool.pen.wireStart->GetPosition(), tool.pen.wireStart->GetGate());
 
-                GateSelection select = ClosestHoveredGateOption(cursor, selectionStart->GetPosition());
+                GateSelection select = ClosestHoveredGateOption(cursor, tool.pen.wireStart->GetPosition());
                 Gate pick;
                 if (select.b_toggle)
-                    pick = (selectionStart->GetGate() != Gate::NOR ? Gate::NOR : Gate::OR);
+                    pick = (tool.pen.wireStart->GetGate() != Gate::NOR ? Gate::NOR : Gate::OR);
                 else
                     pick = GateSelection::gates[select.index];
 
                 for (size_t i = 0; i < 4; ++i)
                 {
                     constexpr float l = g_nodeRadius * 7.0f;
-                    Vector2 center = GateSelection::sectors[i] * l;
-                    DrawCircleV(selectionStart->GetPosition() + center, g_nodeRadius * 3.0f + 2.0f, GRAY);
-                    DrawCircleV(selectionStart->GetPosition() + center, g_nodeRadius * 3.0f, (pick == GateSelection::gates[i] ? GRAY : Color{ 30, 30, 30, 255 }));
-                    DrawGateIcon(GateSelection::gates[i], selectionStart->GetPosition() + center, g_nodeRadius * 1.5f, WHITE);
+                    Vector2 center = Vector2Scale(GateSelection::sectors[i], l);
+                    DrawCircleV(Vector2Add(tool.pen.wireStart->GetPosition(), center), g_nodeRadius * 3.0f + 2.0f, GRAY);
+                    DrawCircleV(Vector2Add(tool.pen.wireStart->GetPosition(), center), g_nodeRadius * 3.0f, (pick == GateSelection::gates[i] ? GRAY : Color{ 30, 30, 30, 255 }));
+                    DrawGateIcon(GateSelection::gates[i], Vector2Add(tool.pen.wireStart->GetPosition(), center), g_nodeRadius * 1.5f, WHITE);
                 }
             }
+            
+            DrawRectangleRec(uiContainerRec, RAYWHITE);
+
+            UIHandler::Global().Draw();
 
         } EndDrawing();
     }
@@ -604,6 +822,18 @@ int main()
     {
         delete node;
     }
+
+    return 0;
+}
+
+int main()
+{
+    int windowWidth = 1280;
+    int windowHeight = 720;
+    InitWindow(windowWidth, windowHeight, "My Raylib Program");
+    SetTargetFPS(60);
+
+    Editor(windowWidth, windowHeight);
 
     CloseWindow();
 

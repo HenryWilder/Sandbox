@@ -154,7 +154,7 @@ public:
 #pragma endregion
 #pragma region Selection
 
-    void FindObjectsInRectangle(Selection* output, Rectangle search) const;
+    void FindObjectsInRectangle(std::vector<Node*>& nodeOutput, std::vector<Component*>& compOutput, Rectangle search) const;
     void RemoveObjects(const Selection& remove);
 
 #pragma endregion
