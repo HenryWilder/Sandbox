@@ -15,6 +15,7 @@ Rectangle ExpandRec(Rectangle rec, float amt)
 }
 void ExpandRec(Rectangle* rec, float amt)
 {
+    _ASSERT_EXPR(!!rec, "ExpandRec(*) was passed a nullptr.");
     rec->x -= amt;
     rec->y -= amt;
     rec->width += amt;
@@ -34,29 +35,29 @@ void Button::SetFlag(State& flags, State bit, bool value)
 
 #pragma region ColorScheme
 
-    // Determine color of state
-    Color Button::ColorScheme::GetStateColor(Button::State state) const
+// Determine color of state
+Color Button::ColorScheme::GetStateColor(Button::State state) const
+{
+    if (GetFlag(state, State::DISABLED))
+        return disabledColor;
+    else
     {
-        if (GetFlag(state, State::DISABLED))
-            return disabledColor;
+        if (GetFlag(state, State::HOVERED))
+        {
+            if (GetFlag(state, State::ACTIVE))
+                return activeColor_hovered;
+            else
+                return inactiveColor_hovered;
+        }
         else
         {
-            if (GetFlag(state, State::HOVERED))
-            {
-                if (GetFlag(state, State::ACTIVE))
-                    return activeColor_hovered;
-                else
-                    return inactiveColor_hovered;
-            }
+            if (GetFlag(state, State::ACTIVE))
+                return activeColor;
             else
-            {
-                if (GetFlag(state, State::ACTIVE))
-                    return activeColor;
-                else
-                    return inactiveColor;
-            }
+                return inactiveColor;
         }
     }
+}
 
 #pragma endregion
 
@@ -114,6 +115,9 @@ void Button::SetShape(float width, float height)
 // Offset is treated as padding. Negatives put the button left of base, while positives put it right.
 void Button::OffsetFrom(const Button& base, Spacing xType, float x, Spacing yType, float y)
 {
+    _ASSERT_EXPR((xType == Spacing::OVERLAP) || (xType == Spacing::PAD), "OffsetFrom requires that xType be either OVERLAP or PAD.");
+    _ASSERT_EXPR((yType == Spacing::OVERLAP) || (yType == Spacing::PAD), "OffsetFrom requires that yType be either OVERLAP or PAD.");
+
     switch (xType)
     {
     case Spacing::OVERLAP:
@@ -230,23 +234,28 @@ void UIHandler::Expect(size_t newButtons)
 // For when you're certain the button being added is new
 void UIHandler::AddButton_New(Button* button)
 {
+    _ASSERT_EXPR(!!button, "AddButton_New() was passed a nullptr.");
+    _ASSERT_EXPR(std::find(m_buttons.begin(), m_buttons.end(), button) == m_buttons.end(), "AddButton_New() was passed a button already existing in the UIHandler.");
     if (!!button)
         m_buttons.push_back(button);
 }
 void UIHandler::AddButton(Button* button)
 {
-    if (!!button && std::find(m_buttons.begin(), m_buttons.end(), button) == m_buttons.end())
+    _ASSERT_EXPR(!!button, "AddButton() was passed a nullptr.");
+    if (std::find(m_buttons.begin(), m_buttons.end(), button) == m_buttons.end())
         m_buttons.push_back(button);
 }
 
 // All buttons being supplied are already in the handler
 void UIHandler::CreateButtonGroup_FromExisting(RadioButtonHandler* group, const std::vector<Button*>& buttons)
 {
-    if (!group) return;
+    _ASSERT_EXPR(!!group, "The RadioButtonHandler* parameter passed to CreateButtonGroup_FromExisting() cannot be nullptr.");
+    _ASSERT_EXPR(std::find(m_groups.begin(), m_groups.end(), group) == m_groups.end(), "The RadioButtonHandler* parameter passed to CreateButtonGroup_FromExisting() is expected not to pre-exist in the UIHandler.");
     m_groups.push_back(group);
     m_groups.back()->m_children.reserve(buttons.size());
     for (Button* button : buttons)
     {
+        _ASSERT_EXPR(std::find(m_buttons.begin(), m_buttons.end(), button) != m_buttons.end(), "CreateButtonGroup_FromExisting() was passed a button that did not exist in the UIHandler.");
         button->SetGroup(m_groups.back());
         m_groups.back()->m_children.push_back(button);
     }
@@ -254,11 +263,13 @@ void UIHandler::CreateButtonGroup_FromExisting(RadioButtonHandler* group, const 
 // All buttons being supplied are NOT already in the handler
 void UIHandler::CreateButtonGroup_FromNew(RadioButtonHandler* group, const std::vector<Button*>& buttons)
 {
-    if (!group) return;
+    _ASSERT_EXPR(!!group, "The RadioButtonHandler* parameter passed to CreateButtonGroup_FromNew() cannot be nullptr.");
+    _ASSERT_EXPR(std::find(m_groups.begin(), m_groups.end(), group) == m_groups.end(), "The RadioButtonHandler* parameter passed to CreateButtonGroup_FromNew() is expected not to pre-exist in the UIHandler.");
     m_groups.push_back(group);
     m_groups.back()->m_children.reserve(buttons.size());
     for (Button* button : buttons)
     {
+        _ASSERT_EXPR(std::find(m_buttons.begin(), m_buttons.end(), button) == m_buttons.end(), "CreateButtonGroup_FromNew() was passed a button already existing in the UIHandler.");
         AddButton_New(button);
         button->SetGroup(m_groups.back());
         m_groups.back()->m_children.push_back(button);
@@ -266,7 +277,8 @@ void UIHandler::CreateButtonGroup_FromNew(RadioButtonHandler* group, const std::
 }
 void UIHandler::CreateButtonGroup(RadioButtonHandler* group, const std::vector<Button*>& buttons)
 {
-    if (!group) return;
+    _ASSERT_EXPR(!!group, "The RadioButtonHandler* parameter passed to CreateButtonGroup() cannot be nullptr.");
+    _ASSERT_EXPR(std::find(m_groups.begin(), m_groups.end(), group) == m_groups.end(), "The RadioButtonHandler* parameter passed to CreateButtonGroup() is expected not to pre-exist in the UIHandler.");
     m_groups.push_back(group);
     m_groups.back()->m_children.reserve(buttons.size());
     for (Button* button : buttons)
