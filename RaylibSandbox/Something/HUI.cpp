@@ -57,7 +57,7 @@ Tooltip::Tooltip(const std::string& text)
         width = lineWidth;
 
     if (lines == 1)
-        height = s_fontSize + s_spacingWidth;
+        height = s_fontSize;
     else
         height = (s_fontSize + 2 * s_spacingWidth) * lines;
 }

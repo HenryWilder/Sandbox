@@ -142,7 +142,7 @@ bool GameScreen()
 
     Button button_B;
     button_B.SetDisplayName("B");
-    button_B.SetToolTip(button_A.GetToolTip());
+    button_B.SetToolTip("aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa");
     button_B.SetToggle(true);
     button_B.CopyShape(button_A);
     button_B.OffsetFrom(button_A, Spacing::OVERLAP, 0, Spacing::PAD, 10);
