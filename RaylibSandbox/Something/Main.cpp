@@ -51,20 +51,34 @@ inline Vector3& operator/=(Vector3& a, float div) { return (a = Vector3Scale(a, 
 
 #pragma endregion
 
-// Returns true when program should exit
-bool MenuScreen()
+enum class GameMode
 {
-    Button button_start;
-    button_start.SetDisplayName("Start");
-    button_start.SetRect({ 20, 20, 60, 20 });
+    Exit,
+    Menu,
+    ModeA,
+    ModeB,
+};
+
+// Returns true when program should exit
+GameMode MenuScreen()
+{
+    Button button_A;
+    button_A.SetDisplayName("Game");
+    button_A.SetRect({ 20, 20, 60, 20 });
+    
+    Button button_B;
+    button_B.SetDisplayName("Test");
+    button_B.SetRect({ 20, 20, 60, 20 });
+    button_B.OffsetFrom(button_A, Spacing::OVERLAP, 0.0f, Spacing::PAD, 10.0f);
 
     Button button_close;
     button_close.SetDisplayName("Close");
-    button_close.CopyShape(button_start);
-    button_close.OffsetFrom(button_start, Spacing::OVERLAP, 0.0f, Spacing::PAD, 10.0f);
+    button_close.CopyShape(button_A);
+    button_close.OffsetFrom(button_B, Spacing::OVERLAP, 0.0f, Spacing::PAD, 10.0f);
 
-    UIHandler::Global().Expect(2);
-    UIHandler::Global().AddButton_New(&button_start);
+    UIHandler::Global().Expect(3);
+    UIHandler::Global().AddButton_New(&button_A);
+    UIHandler::Global().AddButton_New(&button_B);
     UIHandler::Global().AddButton_New(&button_close);
 
     while (true)
@@ -76,11 +90,19 @@ bool MenuScreen()
         UIHandler::Global().UpdateCursorPos(GetMousePosition());
         UIHandler::Global().UpdateButtons();
 
-        if (button_start.IsActive())
-            break;
+        if (button_A.IsActive())
+        {
+            UIHandler::Global().Unload();
+            return GameMode::ModeA;
+        }
+        if (button_B.IsActive())
+        {
+            UIHandler::Global().Unload();
+            return GameMode::ModeB;
+        }
 
         if (button_close.IsActive())
-            return true;
+            return GameMode::Exit;
 
         /******************************************
         *   Draw the frame                        *
@@ -95,16 +117,14 @@ bool MenuScreen()
         } EndDrawing();
 
         if (WindowShouldClose())
-            return true;
+            return GameMode::Exit;
     }
-
-    UIHandler::Global().Unload();
-    return false;
+    return GameMode::Exit; // Just in case
 }
 
 
 // Returns true when program should exit
-bool GameScreen()
+GameMode GameScreen()
 {
     Button button_Hold;
     button_Hold.SetDisplayName("Hold");
@@ -142,7 +162,7 @@ bool GameScreen()
 
     Button button_B;
     button_B.SetDisplayName("B");
-    button_B.SetToolTip("aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa aaaaaaaaaaaa");
+    button_B.SetToolTip(button_A.GetToolTip());
     button_B.SetToggle(true);
     button_B.CopyShape(button_A);
     button_B.OffsetFrom(button_A, Spacing::OVERLAP, 0, Spacing::PAD, 10);
@@ -201,12 +221,48 @@ bool GameScreen()
         } EndDrawing();
 
         if (WindowShouldClose())
-            return true;
+            break;
     }
 
     UIHandler::Global().Unload();
-    return true;
+    return GameMode::Menu;
 }
+
+// Returns true when program should exit
+GameMode TestScreen()
+{
+    while (true)
+    {
+        /******************************************
+        *   Simulate frame and update variables   *
+        ******************************************/
+
+        UIHandler::Global().UpdateCursorPos(GetMousePosition());
+        UIHandler::Global().UpdateButtons();
+
+        // Update button actions
+
+        /******************************************
+        *   Draw the frame                        *
+        ******************************************/
+
+        BeginDrawing(); {
+
+            ClearBackground(RAYWHITE);
+
+            UIHandler::Global().Draw();
+
+        } EndDrawing();
+
+        if (WindowShouldClose())
+            break;
+    }
+
+    UIHandler::Global().Unload();
+    return GameMode::Menu;
+}
+
+typedef GameMode(*Screen)(void);
 
 int main()
 {
@@ -219,20 +275,18 @@ int main()
     *   Load textures, shaders, and meshes    *
     ******************************************/
 
-    enum class GameMode
-    {
-        Menu,
-        Game,
-    } mode = GameMode::Menu;
+    GameMode mode = GameMode::Menu;
 
-    bool requestedClose = false;
-    while (!requestedClose)
+    Screen screen[] =
     {
-        switch (mode)
-        {
-        case GameMode::Menu: requestedClose = MenuScreen(); mode = GameMode::Game; break;
-        case GameMode::Game: requestedClose = GameScreen(); mode = GameMode::Menu; break;
-        }
+        MenuScreen,
+        GameScreen,
+        TestScreen,
+    };
+
+    while (mode != GameMode::Exit)
+    {
+        mode = screen[(int)mode - 1]();
     }
 
     CloseWindow();
