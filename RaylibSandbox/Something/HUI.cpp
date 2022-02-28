@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <functional>
 #include <vector>
+#include <cassert>
 #include "HUI.h"
 
 Rectangle ExpandRec(Rectangle rec, float amt)
@@ -283,6 +284,7 @@ void UIHandler::CreateButtonGroup_FromExisting(RadioButtonHandler* group, const 
     for (Button* button : buttons)
     {
         _ASSERT_EXPR(std::find(m_buttons.begin(), m_buttons.end(), button) != m_buttons.end(), "CreateButtonGroup_FromExisting() was passed a button that did not exist in the UIHandler.");
+        _ASSERT_EXPR(button->IsToggle(), "Radio buttons must be toggle to work properly.");
         button->SetGroup(group);
         group->m_children.push_back(button);
     }
@@ -297,6 +299,7 @@ void UIHandler::CreateButtonGroup_FromNew(RadioButtonHandler* group, const std::
     for (Button* button : buttons)
     {
         _ASSERT_EXPR(std::find(m_buttons.begin(), m_buttons.end(), button) == m_buttons.end(), "CreateButtonGroup_FromNew() was passed a button already existing in the UIHandler.");
+        _ASSERT_EXPR(button->IsToggle(), "Radio buttons must be toggle to work properly.");
         AddButton_New(button);
         button->SetGroup(group);
         group->m_children.push_back(button);
@@ -310,6 +313,7 @@ void UIHandler::CreateButtonGroup(RadioButtonHandler* group, const std::vector<B
     group->m_children.reserve(buttons.size());
     for (Button* button : buttons)
     {
+        _ASSERT_EXPR(button->IsToggle(), "Radio buttons must be toggle to work properly.");
         AddButton(button);
         button->SetGroup(group);
         group->m_children.push_back(button);

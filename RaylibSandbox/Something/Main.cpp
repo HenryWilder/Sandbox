@@ -231,6 +231,25 @@ GameMode GameScreen()
 // Returns true when program should exit
 GameMode TestScreen()
 {
+    RadioButtonHandler group0;
+
+    Button button_pen;
+    button_pen.SetDisplayName("Pen");
+    button_pen.SetToolTip("");
+    button_pen.SetToggle(true);
+    button_pen.SetShape(20, 20);
+    button_pen.SetPosition(20, 20);
+
+    Button button_edit;
+    button_edit.SetDisplayName("Edit");
+    button_edit.SetToolTip("");
+    button_edit.SetToggle(true);
+    button_edit.SetShape(20, 20);
+    button_edit.OffsetFrom(button_pen, Spacing::OVERLAP, 0, Spacing::PAD, 10);
+
+    UIHandler::Global().Expect(2);
+    UIHandler::Global().CreateButtonGroup_FromNew(&group0, { &button_pen, &button_edit });
+
     while (true)
     {
         /******************************************
