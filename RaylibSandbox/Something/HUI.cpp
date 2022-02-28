@@ -38,25 +38,10 @@ void Button::SetFlag(State& flags, State bit, bool value)
 // Determine color of state
 Color Button::ColorScheme::GetStateColor(Button::State state) const
 {
-    if (GetFlag(state, State::DISABLED))
-        return disabledColor;
-    else
-    {
-        if (GetFlag(state, State::HOVERED))
-        {
-            if (GetFlag(state, State::ACTIVE))
-                return activeColor_hovered;
-            else
-                return inactiveColor_hovered;
-        }
-        else
-        {
-            if (GetFlag(state, State::ACTIVE))
-                return activeColor;
-            else
-                return inactiveColor;
-        }
-    }
+    if (GetFlag(state, State::DISABLED))     return disabledColor;
+    else if (GetFlag(state, State::ACTIVE))  return activeColor;
+    else if (GetFlag(state, State::HOVERED)) return inactiveColor_hovered;
+    else                                     return inactiveColor;
 }
 
 #pragma endregion
@@ -181,13 +166,11 @@ Color Button::GetColor_Disabled() { return m_colors.disabledColor; }
 Color Button::GetColor_Inactive() { return m_colors.inactiveColor; }
 Color Button::GetColor_Active() { return m_colors.activeColor; }
 Color Button::GetColor_Inactive_Hovered() { return m_colors.inactiveColor_hovered; }
-Color Button::GetColor_Active_Hovered() { return m_colors.activeColor_hovered; }
 
 void Button::SetColor_Disabled(Color color) { m_colors.disabledColor = color; }
 void Button::SetColor_Inactive(Color color) { m_colors.inactiveColor = color; }
 void Button::SetColor_Active(Color color) { m_colors.activeColor = color; }
 void Button::SetColor_Inactive_Hovered(Color color) { m_colors.inactiveColor_hovered = color; }
-void Button::SetColor_Active_Hovered(Color color) { m_colors.activeColor_hovered = color; }
 
 #pragma endregion
 

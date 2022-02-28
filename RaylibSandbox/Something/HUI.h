@@ -34,7 +34,6 @@ public:
         Color inactiveColor = BLUE;
         Color activeColor = SKYBLUE;
         Color inactiveColor_hovered = DARKBLUE;
-        Color activeColor_hovered = WHITE;
 
         // Determine color of state
         Color GetStateColor(Button::State state) const;
