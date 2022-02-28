@@ -154,7 +154,8 @@ public:
     // How many buttons to reserve space for (accounts for existing space, you don't need to add that)
     void Expect(size_t newButtons);
 
-    // For when you're certain the button being added is new
+    // For when you're certain the button being added is not already in the handler
+    // (skips check; faster but might create duplicate references if careless)
     void AddButton_New(Button* button);
     void AddButton(Button* button);
 

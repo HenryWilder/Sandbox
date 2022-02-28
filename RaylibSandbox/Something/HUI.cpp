@@ -187,6 +187,20 @@ void Button::SetColor_Active_Hovered(Color color) { m_colors.activeColor_hovered
 
 #pragma endregion
 
+#pragma region RadioButtonHandler
+
+void RadioButtonHandler::Activate(Button* selection)
+{
+    for (Button* button : m_children)
+    {
+        button->MarkChanged();
+        button->SetActive(false);
+    }
+    selection->SetActive(true);
+}
+
+#pragma endregion
+
 #pragma region UIHandler
 
 UIHandler::UIHandler()
