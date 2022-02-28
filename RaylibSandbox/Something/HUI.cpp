@@ -78,8 +78,8 @@ Button::Button(
     const std::string& displayName, const std::string& toolTip,
     Rectangle shape,
     bool isToggle, bool startActive, bool startDisabled,
-    ColorScheme colors = ColorScheme(),
-    RadioButtonHandler* group = nullptr)
+    ColorScheme colors,
+    RadioButtonHandler* group)
     :
     m_displayName(displayName), m_tooltip(toolTip),
     m_rect{ shape.x, shape.y, shape.width, shape.height },
@@ -421,7 +421,7 @@ void UIHandler::Draw()
     for (const Button* button : m_buttons)
     {
         DrawRectangleRec(button->GetRect(), button->GetColor()); // Rectangle
-        DrawText(button->GetDisplayName().c_str(), button->GetRect().x + 2, button->GetRect().y + 2, 8, BLACK); // Name
+        DrawText(button->GetDisplayName().c_str(), (int)lroundf(button->GetRect().x) + 2, (int)lroundf(button->GetRect().y) + 2, 8, BLACK); // Name
     }
 
     // Draw tooltip
