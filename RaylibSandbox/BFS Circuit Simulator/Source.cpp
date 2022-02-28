@@ -11,7 +11,7 @@
 #include "Node.h"
 #include "Component.h"
 #include "Graph.h"
-#include "Tool.h"
+#include "HUI.h"
 
 int Snap(int x, int gridsize)
 {
