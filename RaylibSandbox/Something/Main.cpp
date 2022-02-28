@@ -88,7 +88,7 @@ bool MenuScreen()
 
         BeginDrawing(); {
 
-            ClearBackground(BLACK);
+            ClearBackground(RAYWHITE);
 
             UIHandler::Global().Draw();
 
@@ -194,7 +194,7 @@ bool GameScreen()
 
         BeginDrawing(); {
 
-            ClearBackground(BLACK);
+            ClearBackground(RAYWHITE);
 
             UIHandler::Global().Draw();
 

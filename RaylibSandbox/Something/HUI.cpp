@@ -448,6 +448,18 @@ void UIHandler::Draw()
     // Draw buttons
     for (const Button* button : m_buttons)
     {
+        if (!button->IsActive())
+        {
+            BeginBlendMode(BLEND_MULTIPLIED); {
+
+                Rectangle rec = button->GetRect();
+                rec.x++;
+                rec.y++;
+                DrawRectangleRec(rec, LIGHTGRAY); // Shadow
+
+            } EndBlendMode();
+        }
+
         DrawRectangleRec(button->GetRect(), button->GetColor()); // Rectangle
         DrawText(button->GetDisplayName().c_str(), (int)lroundf(button->GetRect().x) + 2, (int)lroundf(button->GetRect().y) + 2, 8, BLACK); // Name
     }
@@ -455,7 +467,23 @@ void UIHandler::Draw()
     // Draw tooltip
     if (!!m_tooltipButton)
     {
-        Rectangle rec = { m_cursor.x, m_cursor.y + 25, (float)m_tooltipButton->GetToolTip().width, (float)m_tooltipButton->GetToolTip().height };
+        Rectangle rec = { m_cursor.x, m_cursor.y + 28, (float)m_tooltipButton->GetToolTip().width, (float)m_tooltipButton->GetToolTip().height };
+        
+        BeginBlendMode(BLEND_MULTIPLIED); {
+
+            Rectangle rec1 = ExpandRec(rec, 3);
+
+            rec1.x++; rec1.y++;
+            rec1.width--; rec1.height--;
+            rec1.x++; rec1.y++;
+            DrawRectangleRec(rec1, LIGHTGRAY);
+            rec1.x++; rec1.y++;
+            DrawRectangleRec(rec1, LIGHTGRAY);
+            rec1.x++; rec1.y++;
+            DrawRectangleRec(rec1, LIGHTGRAY);
+
+        } EndBlendMode();
+
         DrawRectangleRec(ExpandRec(rec,3), GRAY);
         DrawRectangleRec(ExpandRec(rec,2), WHITE);
         DrawTextRec(GetFontDefault(), m_tooltipButton->GetToolTip().text.c_str(), rec, 10, 1, true, BLACK);
