@@ -195,6 +195,7 @@ void Button::SetColor_Active_Hovered(Color color) { m_colors.activeColor_hovered
 
 void RadioButtonHandler::Activate(Button* selection)
 {
+    _ASSERT_EXPR(!!selection, "Activate was passed a nullptr.");
     for (Button* button : m_children)
     {
         button->MarkChanged();
@@ -252,12 +253,12 @@ void UIHandler::CreateButtonGroup_FromExisting(RadioButtonHandler* group, const 
     _ASSERT_EXPR(!!group, "The RadioButtonHandler* parameter passed to CreateButtonGroup_FromExisting() cannot be nullptr.");
     _ASSERT_EXPR(std::find(m_groups.begin(), m_groups.end(), group) == m_groups.end(), "The RadioButtonHandler* parameter passed to CreateButtonGroup_FromExisting() is expected not to pre-exist in the UIHandler.");
     m_groups.push_back(group);
-    m_groups.back()->m_children.reserve(buttons.size());
+    group->m_children.reserve(buttons.size());
     for (Button* button : buttons)
     {
         _ASSERT_EXPR(std::find(m_buttons.begin(), m_buttons.end(), button) != m_buttons.end(), "CreateButtonGroup_FromExisting() was passed a button that did not exist in the UIHandler.");
-        button->SetGroup(m_groups.back());
-        m_groups.back()->m_children.push_back(button);
+        button->SetGroup(group);
+        group->m_children.push_back(button);
     }
 }
 // All buttons being supplied are NOT already in the handler
@@ -266,13 +267,13 @@ void UIHandler::CreateButtonGroup_FromNew(RadioButtonHandler* group, const std::
     _ASSERT_EXPR(!!group, "The RadioButtonHandler* parameter passed to CreateButtonGroup_FromNew() cannot be nullptr.");
     _ASSERT_EXPR(std::find(m_groups.begin(), m_groups.end(), group) == m_groups.end(), "The RadioButtonHandler* parameter passed to CreateButtonGroup_FromNew() is expected not to pre-exist in the UIHandler.");
     m_groups.push_back(group);
-    m_groups.back()->m_children.reserve(buttons.size());
+    group->m_children.reserve(buttons.size());
     for (Button* button : buttons)
     {
         _ASSERT_EXPR(std::find(m_buttons.begin(), m_buttons.end(), button) == m_buttons.end(), "CreateButtonGroup_FromNew() was passed a button already existing in the UIHandler.");
         AddButton_New(button);
-        button->SetGroup(m_groups.back());
-        m_groups.back()->m_children.push_back(button);
+        button->SetGroup(group);
+        group->m_children.push_back(button);
     }
 }
 void UIHandler::CreateButtonGroup(RadioButtonHandler* group, const std::vector<Button*>& buttons)
@@ -280,12 +281,12 @@ void UIHandler::CreateButtonGroup(RadioButtonHandler* group, const std::vector<B
     _ASSERT_EXPR(!!group, "The RadioButtonHandler* parameter passed to CreateButtonGroup() cannot be nullptr.");
     _ASSERT_EXPR(std::find(m_groups.begin(), m_groups.end(), group) == m_groups.end(), "The RadioButtonHandler* parameter passed to CreateButtonGroup() is expected not to pre-exist in the UIHandler.");
     m_groups.push_back(group);
-    m_groups.back()->m_children.reserve(buttons.size());
+    group->m_children.reserve(buttons.size());
     for (Button* button : buttons)
     {
         AddButton(button);
-        button->SetGroup(m_groups.back());
-        m_groups.back()->m_children.push_back(button);
+        button->SetGroup(group);
+        group->m_children.push_back(button);
     }
 }
 
@@ -300,8 +301,16 @@ void UIHandler::UpdateCursorPos(Vector2 newPosition)
     m_cursor = newPosition;
 }
 
+#ifdef _DEBUG
+bool g_debugAssertUpdate = false;
+#endif
+
 void UIHandler::UpdateButtons()
 {
+#ifdef _DEBUG
+    g_debugAssertUpdate = true;
+#endif
+
     // Cleanup from last frame
     for (Button* button : m_buttons)
     {
@@ -399,6 +408,11 @@ void UIHandler::UpdateButtons()
 
 void UIHandler::Draw()
 {
+#ifdef _DEBUG
+    _ASSERT_EXPR(g_debugAssertUpdate, "UIHandler::Draw() was called without a corrosponding update.");
+    g_debugAssertUpdate = false;
+#endif
+
     // Draw buttons
     for (const Button* button : m_buttons)
     {
