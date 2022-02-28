@@ -294,7 +294,10 @@ void UIHandler::UpdateCursorPos(Vector2 newPosition)
 {
     // Update mouse hold still time
     if (m_cursor.x != newPosition.x || m_cursor.y != newPosition.y || IsMouseButtonDown(MOUSE_LEFT_BUTTON))
+    {
+        m_tooltipButton = nullptr;
         m_timeSinceMouseMove = 0.0f;
+    }
     else if (m_timeSinceMouseMove <= m_toolTipHoverTime) // I am irrationally afraid of floating point imprecision
         m_timeSinceMouseMove += GetFrameTime();
 
@@ -365,8 +368,7 @@ void UIHandler::UpdateButtons()
     }
 
     // Get tooltip
-    m_tooltipButton = nullptr;
-    if (m_timeSinceMouseMove > m_toolTipHoverTime)
+    if (m_timeSinceMouseMove > m_toolTipHoverTime && !m_tooltipButton)
     {
         for (Button* button : m_buttons)
         {
@@ -376,6 +378,8 @@ void UIHandler::UpdateButtons()
                 break;
             }
         }
+        if (!m_tooltipButton) // No tooltip found. Lock m_timeSinceMouseMove so that the UI isn't searched every frame that the mouse hasn't moved when it is certain there is no tooltip to display.
+            m_timeSinceMouseMove = -INFINITY;
     }
 
     // Highlight grouped buttons together
