@@ -127,7 +127,7 @@ bool GameScreen()
 
     Button button_DragH;
     button_DragH.SetDisplayName("DragH");
-    button_DragH.SetToolTip(button_DragH.GetToolTip());
+    button_DragH.SetToolTip("Able to be dragged while held.");
     button_DragH.CopyShape(button_Hold);
     button_DragH.OffsetFrom(button_DragV, Spacing::OVERLAP, 0, Spacing::PAD, 10);
 
@@ -149,7 +149,7 @@ bool GameScreen()
 
     Button button_C;
     button_C.SetDisplayName("C");
-    button_C.SetToolTip(button_A.GetToolTip() + " Also, this one moves with the one on its left!");
+    button_C.SetToolTip(button_A.GetToolTip().text + " Also, this one moves with the one on its left!");
     button_C.SetToggle(true);
     button_C.CopyShape(button_A);
     button_C.OffsetFrom(button_B, Spacing::OVERLAP, 0, Spacing::PAD, 10);

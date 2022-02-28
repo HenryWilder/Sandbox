@@ -12,6 +12,18 @@ enum class Spacing
     PAD, // Space between the edges
 };
 
+struct Tooltip
+{
+    Tooltip(const std::string& text);
+
+    static constexpr int s_maxWidth = 200;
+    static constexpr int s_spacingWidth = 2;
+    static constexpr int s_fontSize = 10;
+    int width;
+    int height;
+    std::string text;
+};
+
 class Button
 {
 public:
@@ -41,7 +53,7 @@ public:
 
 private:
     std::string m_displayName;
-    std::string m_tooltip;
+    Tooltip m_tooltip;
     Rectangle m_rect;
     bool m_isToggle;
     State m_state;
@@ -97,9 +109,10 @@ public:
     void SetHovered(bool hovered);
     void SetDisabled(bool disabled);
 
-    const std::string& GetToolTip() const;
+    const Tooltip& GetToolTip() const;
     const std::string& GetDisplayName() const;
     void SetToolTip(const std::string& toolTip);
+    void SetToolTip(const Tooltip& toolTip);
     void SetDisplayName(const std::string& displayName);
 
     bool IsChanged() const;

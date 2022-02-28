@@ -12,8 +12,8 @@ Rectangle ExpandRec(Rectangle rec, float amt)
 {
     rec.x -= amt;
     rec.y -= amt;
-    rec.width += amt;
-    rec.height += amt;
+    rec.width += 2.0f * amt;
+    rec.height += 2.0f * amt;
     return rec;
 }
 void ExpandRec(Rectangle* rec, float amt)
@@ -24,6 +24,45 @@ void ExpandRec(Rectangle* rec, float amt)
     rec->width += amt;
     rec->height += amt;
 }
+
+
+#pragma region Tooltip
+
+Tooltip::Tooltip(const std::string& text)
+{
+    int spaceWidth = MeasureText(" ", s_fontSize) + s_spacingWidth;
+    this->text = text;
+    int chunkCount;
+    const char** chunks = TextSplit(text.c_str(), ' ', &chunkCount);
+
+    int lines = 1;
+    int lineWidth = 0;
+    width = 0;
+    for (size_t i = 0; i < chunkCount; ++i)
+    {
+        int chunkWidth = MeasureText(chunks[i], s_fontSize) + spaceWidth;
+        if (lineWidth + chunkWidth > s_maxWidth)
+        {
+            lines++;
+            if (lineWidth > width)
+                width = lineWidth - s_spacingWidth;
+            lineWidth = chunkWidth;
+        }
+        else
+        {
+            lineWidth += chunkWidth;
+        }
+    }
+    if (lineWidth > width)
+        width = lineWidth;
+
+    if (lines == 1)
+        height = s_fontSize + s_spacingWidth;
+    else
+        height = (s_fontSize + 2 * s_spacingWidth) * lines;
+}
+
+#pragma endregion
 
 #pragma region Button
 
@@ -52,7 +91,7 @@ Color Button::ColorScheme::GetStateColor(Button::State state) const
 Button::Button()
     :
     m_displayName(),
-    m_tooltip(),
+    m_tooltip(""),
     m_rect{ 0, 0, 0, 0 },
     m_isToggle(false),
     m_state(State::NONE),
@@ -149,9 +188,10 @@ void Button::SetActive(bool isActive)   { SetFlag(m_state, State::ACTIVE, isActi
 void Button::SetHovered(bool hovered)   { SetFlag(m_state, State::HOVERED, hovered); }
 void Button::SetDisabled(bool disabled) { SetFlag(m_state, State::DISABLED, disabled); }
 
-const std::string& Button::GetToolTip() const { return m_tooltip; }
+const Tooltip& Button::GetToolTip() const { return m_tooltip; }
 const std::string& Button::GetDisplayName() const { return m_displayName; }
-void Button::SetToolTip(const std::string & toolTip) { m_tooltip = toolTip; }
+void Button::SetToolTip(const std::string& toolTip) { m_tooltip = Tooltip(toolTip); }
+void Button::SetToolTip(const Tooltip& toolTip) { m_tooltip = toolTip; }
 void Button::SetDisplayName(const std::string & displayName) { m_displayName = displayName; }
 
 bool Button::IsChanged() const { return m_callbackDirty; }
@@ -360,7 +400,7 @@ void UIHandler::UpdateButtons()
     {
         for (Button* button : m_buttons)
         {
-            if (!button->GetToolTip().empty() && button->IsOverlapping(m_cursor))
+            if (!button->GetToolTip().text.empty() && button->IsOverlapping(m_cursor))
             {
                 m_tooltipButton = button;
                 break;
@@ -415,9 +455,10 @@ void UIHandler::Draw()
     // Draw tooltip
     if (!!m_tooltipButton)
     {
-        Rectangle rec = { m_cursor.x, m_cursor.y + 25, 200, 100 };
-        DrawRectangleRec(rec, WHITE);
-        DrawTextRec(GetFontDefault(), m_tooltipButton->GetToolTip().c_str(), ExpandRec(rec, -2.0f), 10, 1, true, BLACK);
+        Rectangle rec = { m_cursor.x, m_cursor.y + 25, (float)m_tooltipButton->GetToolTip().width, (float)m_tooltipButton->GetToolTip().height };
+        DrawRectangleRec(ExpandRec(rec,3), GRAY);
+        DrawRectangleRec(ExpandRec(rec,2), WHITE);
+        DrawTextRec(GetFontDefault(), m_tooltipButton->GetToolTip().text.c_str(), rec, 10, 1, true, BLACK);
     }
 }
 
