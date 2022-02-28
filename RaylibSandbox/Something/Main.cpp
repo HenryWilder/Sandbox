@@ -121,7 +121,7 @@ bool GameScreen()
 
     Button button_DragV;
     button_DragV.SetDisplayName("DragV");
-    button_DragV.SetToolTip("Shows the ability to drag a button while it is held.");
+    button_DragV.SetToolTip("Able to be dragged while held.");
     button_DragV.CopyShape(button_Hold);
     button_DragV.OffsetFrom(button_Toggle, Spacing::OVERLAP, 0, Spacing::PAD, 10);
 
@@ -135,7 +135,7 @@ bool GameScreen()
 
     Button button_A;
     button_A.SetDisplayName("A");
-    button_A.SetToolTip("Only one of these two can be active at a time.");
+    button_A.SetToolTip("Only one of these three can be active at a time.");
     button_A.SetToggle(true);
     button_A.SetShape(20,20);
     button_A.OffsetFrom(button_Hold, Spacing::PAD, 10, Spacing::OVERLAP, 0);
