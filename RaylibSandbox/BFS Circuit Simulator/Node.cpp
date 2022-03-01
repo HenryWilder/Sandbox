@@ -335,3 +335,25 @@ void ListWireRelativeIndices(const std::vector<Node*>& source, std::vector<WireR
         }
     }
 }
+
+Connector::Connector(const Connector& base)
+{
+    b_node = base.b_node;
+    if (b_node) n = base.n;
+    else c = base.c;
+}
+
+bool Connector::IsNode() const
+{
+    return b_node;
+}
+
+Node* Connector::GetAsNode() const
+{
+    return n;
+}
+
+CompIO* Connector::GetAsCompIO() const
+{
+    return c;
+}
