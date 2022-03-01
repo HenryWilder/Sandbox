@@ -17,16 +17,6 @@ uniform vec2 cursor = vec2(0);
 uniform float gridSpacing = 12;
 uniform float gridRadius = 8 * 12;
 
-//float Sigmoid(float x, float hardness)
-//{
-//	const float e = 2.71828;
-//	return 1.0 / (1.0 + pow(e,-(x)));
-//}
-//float SCurve(float x)
-//{
-//	return (cos(radians(0.5 * (clamp(x,0,1) + 1))) + 1) * 0.5;
-//}
-
 void main()
 {
 	float x = 1.0/resolution.x;
@@ -36,11 +26,12 @@ void main()
 
 	// Code here
 
-	float xGrid = clamp(1 - mod(fragTexCoord.x * resolution.x, gridSpacing), 0, 1);
-	float yGrid = clamp(1 - mod(fragTexCoord.y * resolution.y, gridSpacing), 0, 1);
-	float gridLine = xGrid + yGrid;
-	float gridPoint = xGrid * yGrid;
+	vec2 grid = max(1 - mod(fragTexCoord * resolution, gridSpacing), 0);
+	float gridLine = min(grid.x + grid.y, 1);
+	float gridPoint = grid.x * grid.y;
 	float mouseDistance = 1 - clamp(distance(cursor, fragPixCoord) / gridRadius, 0, 1);
-	float crosshare = (floor(cursor.x) == floor(fragPixCoord.x) ? 1 : 0) + (floor(cursor.y) == floor(fragPixCoord.y) ? 1 : 0); 
-	finalColor = vec4(vec3(gridLine * 0.1 + crosshare * 0.2 + gridPoint * mouseDistance * 4), 1.0);
+	vec2 crosshare = vec2((floor(cursor.x) == floor(fragPixCoord.x) ? 1 : 0), (floor(cursor.y) == floor(fragPixCoord.y) ? 1 : 0)); 
+	vec2 glow = (cos(radians(fragPixCoord * gridSpacing * 2.5)) + 1) * 0.5;
+
+	finalColor = vec4(vec3(0.025 * (glow.x + glow.y) * mouseDistance * 2 + 0.2 * (crosshare.x + crosshare.y) + gridLine * 0.1 + gridPoint * mouseDistance * 4), 1.0);
 }
