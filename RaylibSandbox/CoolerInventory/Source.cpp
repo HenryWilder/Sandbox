@@ -98,14 +98,14 @@ private:
     ItemID m_item;
     uint16_t m_count;
     uint8_t m_x;
-    uint8_t m_y;
+    int8_t m_y;
     bool b_rotated;
 
 public:
-    ItemSlot(const ItemID& item, uint16_t count, uint8_t x, uint8_t y, bool rotated) :
+    ItemSlot(const ItemID& item, uint16_t count, uint8_t x, int8_t y, bool rotated) :
         m_item(item), m_count(count), m_x(x), m_y(y), b_rotated(rotated) {}
 
-    ItemSlot(const ItemName& name, uint16_t count, uint8_t x, uint8_t y, bool rotated) :
+    ItemSlot(const ItemName& name, uint16_t count, uint8_t x, int8_t y, bool rotated) :
         m_item(name), m_count(count), m_x(x), m_y(y), b_rotated(rotated) {}
 
     ItemID Item() const
@@ -122,11 +122,11 @@ public:
         m_x = x;
     }
 
-    uint8_t Y() const
+    int8_t Y() const
     {
         return m_y;
     }
-    void SetY(uint8_t y)
+    void SetY(int8_t y)
     {
         m_y = y;
     }
@@ -183,7 +183,10 @@ int main()
 
     slots.push_back(new ItemSlot(ItemName::Plate, 1, 0, 0, false));
 
-    ItemSlot*;
+    ItemSlot* hoveredSlot = nullptr;
+    bool selected = false;
+    int mouseDragOffsetX = 0;
+    int mouseDragOffsetY = 0;
 
     while (!WindowShouldClose())
     {
@@ -191,14 +194,52 @@ int main()
         *   Simulate frame and update variables   *
         ******************************************/
 
-        for (ItemSlot* slot : slots)
+        if (!selected)
         {
-            int start_x = invX + slot->X() * gridSize;
-            int start_y = invY + slot->Y() * gridSize;
-            int end_x = start_x + slot->Item()->width * gridSize;
-            int end_y = start_y + slot->Item()->width * gridSize;
-            if ();
+            hoveredSlot = nullptr;
+            if (GetMouseX() >= invX &&
+                GetMouseX() <= invX + invWidth &&
+                GetMouseY() <= invY + invHeight)
+            {
+                for (ItemSlot* slot : slots)
+                {
+                    int start_x = invX + slot->X() * gridSize;
+                    int start_y = invY + slot->Y() * gridSize;
+                    int end_x = start_x + slot->Item()->width * gridSize;
+                    int end_y = start_y + slot->Item()->width * gridSize;
+                    if (GetMouseX() >= start_x &&
+                        GetMouseY() >= start_y &&
+                        GetMouseX() <= end_x &&
+                        GetMouseY() <= end_y)
+                    {
+                        hoveredSlot = slot;
+                        break;
+                    }
+                }
+            }
+        }
 
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !!hoveredSlot)
+        {
+            selected = true;
+            mouseDragOffsetX = GetMouseX() - hoveredSlot->X() * gridSize;
+            mouseDragOffsetY = GetMouseY() - hoveredSlot->Y() * gridSize;
+        }
+
+        if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+            selected = false;
+
+        if (selected)
+        {
+            int newX = (GetMouseX() - mouseDragOffsetX) / gridSize;
+            int newY = (GetMouseY() - mouseDragOffsetY) / gridSize;
+            if (newX < 0) newX = 0;
+            if ((newX + hoveredSlot->Item()->width) > gridWidth) newX = (gridWidth - hoveredSlot->Item()->width);
+            int itemHalfHeight = hoveredSlot->Item()->height / 2;
+            if (newY + itemHalfHeight < 0) newY = -itemHalfHeight;
+            if ((newY + hoveredSlot->Item()->height) > gridHeight) newY = (gridHeight - hoveredSlot->Item()->height);
+            hoveredSlot->SetX(newX);
+            hoveredSlot->SetY(newY);
         }
 
         /******************************************
@@ -225,9 +266,17 @@ int main()
             {
                 int x = invX + slot->X() * gridSize;
                 int y = invY + slot->Y() * gridSize;
-                DrawRectangle(x, y, slot->Item()->width * gridSize, slot->Item()->height * gridSize, LIGHTGRAY);
-                DrawRectangleLines(x, y, slot->Item()->width * gridSize, slot->Item()->height * gridSize, GRAY);
+                int width = slot->Item()->width * gridSize;
+                int height = slot->Item()->height * gridSize;
+                DrawRectangle(x, y, width, height, LIGHTGRAY);
+                DrawRectangleLines(x, y, width, height, GRAY);
                 DrawText(TextFormat("%i", slot->Count()), x + 4, y + 4, 8, GRAY);
+            }
+            if (!!hoveredSlot)
+            {
+                int x = invX + hoveredSlot->X() * gridSize;
+                int y = invY + hoveredSlot->Y() * gridSize;
+                DrawRectangleLines(x, y, hoveredSlot->Item()->width * gridSize, hoveredSlot->Item()->height * gridSize, YELLOW);
             }
 
         } EndDrawing();
