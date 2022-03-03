@@ -135,14 +135,14 @@ public:
     {
         if (b_rotated)
            return m_item->width;
-	else
+	    else
            return m_item->height;
     }
     uint8_t Height() const
     {
         if (b_rotated)
            return m_item->height;
-	else
+	    else
            return m_item->width;
     }
 	
@@ -210,6 +210,9 @@ int main()
         *   Simulate frame and update variables   *
         ******************************************/
 
+        int gridCursorX = GetMouseX() / gridSize;
+        int gridCursorY = GetMouseY() / gridSize;
+
         if (!selected)
         {
             hoveredSlot = nullptr;
@@ -239,8 +242,8 @@ int main()
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !!hoveredSlot)
         {
             selected = true;
-            mouseDragOffsetX = GetMouseX() - hoveredSlot->X() * gridSize;
-            mouseDragOffsetY = GetMouseY() - hoveredSlot->Y() * gridSize;
+            mouseDragOffsetX = gridCursorX - hoveredSlot->X();
+            mouseDragOffsetY = gridCursorY - hoveredSlot->Y();
         }
 
         if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
@@ -248,8 +251,11 @@ int main()
 
         if (selected)
         {
-            int newX = (GetMouseX() - mouseDragOffsetX) / gridSize;
-            int newY = (GetMouseY() - mouseDragOffsetY) / gridSize;
+            if (IsKeyPressed(KEY_R))
+                hoveredSlot->Rotate();
+
+            int newX = gridCursorX - mouseDragOffsetX;
+            int newY = gridCursorY - mouseDragOffsetY;
             if (newX < 0) newX = 0;
             if ((newX + hoveredSlot->Width()) > gridWidth) newX = (gridWidth - hoveredSlot->Width());
             int itemHalfHeight = hoveredSlot->Height() / 2;
@@ -295,6 +301,7 @@ int main()
                 int y = invY + hoveredSlot->Y() * gridSize;
                 DrawRectangleLines(x, y, hoveredSlot->Width() * gridSize, hoveredSlot->Height() * gridSize, YELLOW);
             }
+            DrawRectangleLines(invX - 1, invY - 1, invWidth + 2, invHeight + 2, GRAY);
 
         } EndDrawing();
     }
