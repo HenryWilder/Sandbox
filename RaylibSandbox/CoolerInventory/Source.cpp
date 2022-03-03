@@ -290,8 +290,23 @@ int main()
                     hoveredSlot->X(), hoveredSlot->Y(), hoveredSlot->Width(), hoveredSlot->Height(),
                           other->X(),       other->Y(),       other->Width(),       other->Height()))
                 {
-                    hoveredSlot->SetX(other->X() + other->Width());
-                    hoveredSlot->SetY(other->Y() + other->Height());
+                    int xDist = hoveredSlot->X() - (other->X() + other->Width() / 2);
+                    int yDist = hoveredSlot->Y() - (other->Y() + other->Height() / 2);
+
+                    if (abs(xDist) > abs(yDist))
+                    {
+                        if (xDist > 0)
+                            hoveredSlot->SetX(other->X() + other->Width());
+                        else
+                            hoveredSlot->SetX(other->X() - hoveredSlot->Width());
+                    }
+                    else
+                    {
+                        if (yDist > 0)
+                            hoveredSlot->SetY(other->Y() + other->Height());
+                        else
+                            hoveredSlot->SetY(other->Y() - hoveredSlot->Height());
+                    }
                 }
             }
         }
