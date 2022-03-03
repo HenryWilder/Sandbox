@@ -58,13 +58,13 @@ bool CheckCollisionIntRecs(
     int x2, int y2, int w2, int h2)
 {
     bool xCollision;
-    if (x1 <= x2) xCollision = -(x1 - x2) <= w1;
-    else          xCollision = -(x2 - x1) <= w2;
+    if (x1 <= x2) xCollision = -(x1 - x2) < w1;
+    else          xCollision = -(x2 - x1) < w2;
     if (!xCollision) return false;
 
     bool yCollision;
-    if (y1 <= y2) yCollision = -(y1 - y2) <= h1;
-    else          yCollision = -(y2 - y1) <= h2;
+    if (y1 <= y2) yCollision = -(y1 - y2) < h1;
+    else          yCollision = -(y2 - y1) < h2;
     return yCollision;
 }
 
@@ -290,7 +290,8 @@ int main()
                     hoveredSlot->X(), hoveredSlot->Y(), hoveredSlot->Width(), hoveredSlot->Height(),
                           other->X(),       other->Y(),       other->Width(),       other->Height()))
                 {
-
+                    hoveredSlot->SetX(other->X() + other->Width());
+                    hoveredSlot->SetY(other->Y() + other->Height());
                 }
             }
         }
