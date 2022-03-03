@@ -63,7 +63,7 @@ constexpr ItemBase g_pureItems[] =
     ItemBase{ 1, 1, 1, "Screw", "[@todo]" },
     ItemBase{ 1, 1, 1, "Rivet", "[@todo]" },
     ItemBase{ 8, 8, 1, "Plate", "[@todo]" },
-    ItemBase{ 8, 2, 2, "Pole", "[@todo]" },
+    ItemBase{ 8, 2, 2, "Rod", "[@todo]" },
     ItemBase{ 10, 4, 4, "Beam", "[@todo]" },
 };
 
@@ -74,7 +74,7 @@ enum class ItemName : uint8_t
     Screw,
     Rivet,
     Plate,
-    Pole,
+    Rod,
     Beam,
 };
 
@@ -182,6 +182,7 @@ int main()
     std::vector<ItemSlot*> slots;
 
     slots.push_back(new ItemSlot(ItemName::Plate, 1, 0, 0, false));
+    slots.push_back(new ItemSlot(ItemName::Rod, 1, 0, 0, false));
 
     ItemSlot* hoveredSlot = nullptr;
     bool selected = false;
@@ -201,8 +202,9 @@ int main()
                 GetMouseX() <= invX + invWidth &&
                 GetMouseY() <= invY + invHeight)
             {
-                for (ItemSlot* slot : slots)
+                for (int i = slots.size() - 1; i >= 0; i--)
                 {
+                    ItemSlot* slot = slots[i];
                     int start_x = invX + slot->X() * gridSize;
                     int start_y = invY + slot->Y() * gridSize;
                     int end_x = start_x + slot->Item()->width * gridSize;
