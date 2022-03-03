@@ -2,6 +2,13 @@
 #include <raylib.h>
 #include <raymath.h>
 
+template<typename T>
+T TClamp(T value, T min, T max)
+{
+    const T res = value < min ? min : value;
+    return res > max ? max : res;
+}
+
 #define sign(x) (((x) > (decltype(x))(0)) - ((x) < (decltype(x))(0)))
 
 using Vector1 = float;
@@ -254,15 +261,8 @@ int main()
             if (IsKeyPressed(KEY_R))
                 hoveredSlot->Rotate();
 
-            int newX = gridCursorX - mouseDragOffsetX;
-            int newY = gridCursorY - mouseDragOffsetY;
-            if (newX < 0) newX = 0;
-            if ((newX + hoveredSlot->Width()) > gridWidth) newX = (gridWidth - hoveredSlot->Width());
-            int itemHalfHeight = hoveredSlot->Height() / 2;
-            if (newY + itemHalfHeight < 0) newY = -itemHalfHeight;
-            if ((newY + hoveredSlot->Height()) > gridHeight) newY = (gridHeight - hoveredSlot->Height());
-            hoveredSlot->SetX(newX);
-            hoveredSlot->SetY(newY);
+            hoveredSlot->SetX(TClamp(gridCursorX - mouseDragOffsetX, 0, gridWidth - hoveredSlot->Width()));
+            hoveredSlot->SetY(TClamp(gridCursorY - mouseDragOffsetY, -(hoveredSlot->Height() / 2), gridHeight - hoveredSlot->Height()));
         }
 
         /******************************************
