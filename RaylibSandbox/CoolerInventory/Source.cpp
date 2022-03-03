@@ -53,6 +53,21 @@ inline Vector3& operator/=(Vector3& a, float div) { return (a = Vector3Scale(a, 
 
 #pragma endregion
 
+bool CheckCollisionIntRecs(
+    int x1, int y1, int w1, int h1,
+    int x2, int y2, int w2, int h2)
+{
+    bool xCollision;
+    if (x1 <= x2) xCollision = -(x1 - x2) <= w1;
+    else          xCollision = -(x2 - x1) <= w2;
+    if (!xCollision) return false;
+
+    bool yCollision;
+    if (y1 <= y2) yCollision = -(y1 - y2) <= h1;
+    else          yCollision = -(y2 - y1) <= h2;
+    return yCollision;
+}
+
 struct ItemBase
 {
     uint8_t width;
@@ -261,8 +276,23 @@ int main()
             if (IsKeyPressed(KEY_R))
                 hoveredSlot->Rotate();
 
-            hoveredSlot->SetX(TClamp(gridCursorX - mouseDragOffsetX, 0, gridWidth - hoveredSlot->Width()));
-            hoveredSlot->SetY(TClamp(gridCursorY - mouseDragOffsetY, -(hoveredSlot->Height() / 2), gridHeight - hoveredSlot->Height()));
+            // Collision with walls of inventory
+            hoveredSlot->SetX(TClamp(gridCursorX - mouseDragOffsetX,                          0, gridWidth  - hoveredSlot->Width ()));
+            hoveredSlot->SetY(TClamp(gridCursorY - mouseDragOffsetY, -hoveredSlot->Height() / 2, gridHeight - hoveredSlot->Height()));
+
+            // Collision with other items in inventory
+            for (ItemSlot* other : slots)
+            {
+                if (other == hoveredSlot)
+                    continue;
+
+                if (CheckCollisionIntRecs(
+                    hoveredSlot->X(), hoveredSlot->Y(), hoveredSlot->Width(), hoveredSlot->Height(),
+                          other->X(),       other->Y(),       other->Width(),       other->Height()))
+                {
+
+                }
+            }
         }
 
         /******************************************
