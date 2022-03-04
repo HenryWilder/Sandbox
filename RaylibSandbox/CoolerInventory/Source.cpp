@@ -225,6 +225,10 @@ int main()
     bool selected = false;
     int mouseDragOffsetX = 0;
     int mouseDragOffsetY = 0;
+	
+	int selectedLastSafeX = 0;
+	int selectedLastSafeY = 0;
+	bool unsafePosition = false;
 
     while (!WindowShouldClose())
     {
@@ -264,12 +268,22 @@ int main()
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !!hoveredSlot)
         {
             selected = true;
+		selectedLastSafeX = hoveredSlot->X();
+		selectedLastSafeY = hoveredSlot->Y();
             mouseDragOffsetX = gridCursorX - hoveredSlot->X();
             mouseDragOffsetY = gridCursorY - hoveredSlot->Y();
         }
 
-        if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+        if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON) && selected)
+	{
+		if (unsafePosition)
+		{
+			hoveredSlot->SetX(selectedLastSafeX);
+			hoveredSlot->SetY(selectedLastSafeY);
+			unsafePosition = false;
+		}
             selected = false;
+	}
 
         if (selected)
         {
@@ -281,6 +295,7 @@ int main()
             hoveredSlot->SetY(TClamp(gridCursorY - mouseDragOffsetY, -hoveredSlot->Height() / 2, gridHeight - hoveredSlot->Height()));
 
             // Collision with other items in inventory
+		unsafePosition = false;
             for (ItemSlot* other : slots)
             {
                 if (other == hoveredSlot)
@@ -290,23 +305,8 @@ int main()
                     hoveredSlot->X(), hoveredSlot->Y(), hoveredSlot->Width(), hoveredSlot->Height(),
                           other->X(),       other->Y(),       other->Width(),       other->Height()))
                 {
-                    int xDist = hoveredSlot->X() - (other->X() + other->Width() / 2);
-                    int yDist = hoveredSlot->Y() - (other->Y() + other->Height() / 2);
-
-                    if (abs(xDist) > abs(yDist))
-                    {
-                        if (xDist > 0)
-                            hoveredSlot->SetX(other->X() + other->Width());
-                        else
-                            hoveredSlot->SetX(other->X() - hoveredSlot->Width());
-                    }
-                    else
-                    {
-                        if (yDist > 0)
-                            hoveredSlot->SetY(other->Y() + other->Height());
-                        else
-                            hoveredSlot->SetY(other->Y() - hoveredSlot->Height());
-                    }
+                    unsafePosition = true;
+			break;
                 }
             }
         }
@@ -345,7 +345,13 @@ int main()
             {
                 int x = invX + hoveredSlot->X() * gridSize;
                 int y = invY + hoveredSlot->Y() * gridSize;
-                DrawRectangleLines(x, y, hoveredSlot->Width() * gridSize, hoveredSlot->Height() * gridSize, YELLOW);
+		    Color color;
+		    if (unsafePosition)
+			    color = RED;
+		    else
+			    color = YELLOW;
+		    DrawRectangleLines(selectedLastSafeX, selectedLastSafeY, hoveredSlot->Width() * gridSize, hoveredSlot->Height() * gridSize, DARKGRAY);
+                DrawRectangleLines(x, y, hoveredSlot->Width() * gridSize, hoveredSlot->Height() * gridSize, color);
             }
             DrawRectangleLines(invX - 1, invY - 1, invWidth + 2, invHeight + 2, GRAY);
 
