@@ -218,8 +218,11 @@ int main()
 
     std::vector<ItemSlot*> slots;
 
-    slots.push_back(new ItemSlot(ItemName::Plate, 1, 0, 0, false));
     slots.push_back(new ItemSlot(ItemName::Rod, 1, 0, 0, false));
+    slots.push_back(new ItemSlot(ItemName::Plate, 4, 2, 0, false));
+    slots.push_back(new ItemSlot(ItemName::Rivet, 8, 6, 0, false));
+    slots.push_back(new ItemSlot(ItemName::Beam, 9, 1, 0, false));
+    slots.push_back(new ItemSlot(ItemName::Bolt, 10, 6, 0, false));
 
     ItemSlot* hoveredSlot = nullptr;
     bool selected = false;
@@ -268,8 +271,8 @@ int main()
         if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !!hoveredSlot)
         {
             selected = true;
-		selectedLastSafeX = hoveredSlot->X();
-		selectedLastSafeY = hoveredSlot->Y();
+		    selectedLastSafeX = hoveredSlot->X();
+		    selectedLastSafeY = hoveredSlot->Y();
             mouseDragOffsetX = gridCursorX - hoveredSlot->X();
             mouseDragOffsetY = gridCursorY - hoveredSlot->Y();
         }
@@ -282,7 +285,7 @@ int main()
 			hoveredSlot->SetY(selectedLastSafeY);
 			unsafePosition = false;
 		}
-            selected = false;
+        selected = false;
 	}
 
         if (selected)
@@ -295,7 +298,7 @@ int main()
             hoveredSlot->SetY(TClamp(gridCursorY - mouseDragOffsetY, -hoveredSlot->Height() / 2, gridHeight - hoveredSlot->Height()));
 
             // Collision with other items in inventory
-		unsafePosition = false;
+		    unsafePosition = false;
             for (ItemSlot* other : slots)
             {
                 if (other == hoveredSlot)
@@ -306,7 +309,7 @@ int main()
                           other->X(),       other->Y(),       other->Width(),       other->Height()))
                 {
                     unsafePosition = true;
-			break;
+			        break;
                 }
             }
         }
@@ -331,6 +334,8 @@ int main()
                 DrawLine(invX, _y, invX + invWidth, _y, RAYWHITE);
             }
 
+            if (selected)
+                DrawRectangleLines(invX + selectedLastSafeX * gridSize, invY + selectedLastSafeY * gridSize, hoveredSlot->Width() * gridSize, hoveredSlot->Height() * gridSize, DARKBLUE);
             for (ItemSlot* slot : slots)
             {
                 int x = invX + slot->X() * gridSize;
@@ -345,13 +350,16 @@ int main()
             {
                 int x = invX + hoveredSlot->X() * gridSize;
                 int y = invY + hoveredSlot->Y() * gridSize;
-		    Color color;
-		    if (unsafePosition)
-			    color = RED;
-		    else
-			    color = YELLOW;
-		    DrawRectangleLines(selectedLastSafeX, selectedLastSafeY, hoveredSlot->Width() * gridSize, hoveredSlot->Height() * gridSize, DARKGRAY);
-                DrawRectangleLines(x, y, hoveredSlot->Width() * gridSize, hoveredSlot->Height() * gridSize, color);
+                int width = hoveredSlot->Width() * gridSize;
+                int height = hoveredSlot->Height() * gridSize;
+                Color color;
+                if (unsafePosition)
+                    color = RED;
+                else
+                    color = YELLOW;
+                DrawRectangle(x, y, width, height, LIGHTGRAY);
+                DrawRectangleLines(x, y, width, height, color);
+                DrawText(TextFormat("%i", hoveredSlot->Count()), x + 4, y + 4, 8, GRAY);
             }
             DrawRectangleLines(invX - 1, invY - 1, invWidth + 2, invHeight + 2, GRAY);
 
