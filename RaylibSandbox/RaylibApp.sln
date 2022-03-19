@@ -107,6 +107,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "BG Material", "BG Material\
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CoolerInventory", "CoolerInventory\CoolerInventory.vcxproj", "{57BDA1CE-EE80-4057-BF6F-7DC462D3E2CF}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Electron Architect 3", "Electron Architect 3\Electron Architect 3.vcxproj", "{4A0EB673-D24C-4E97-9FBC-130C9D4773C0}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -738,6 +740,18 @@ Global
 		{57BDA1CE-EE80-4057-BF6F-7DC462D3E2CF}.Release|x64.Build.0 = Release|x64
 		{57BDA1CE-EE80-4057-BF6F-7DC462D3E2CF}.Release|x86.ActiveCfg = Release|Win32
 		{57BDA1CE-EE80-4057-BF6F-7DC462D3E2CF}.Release|x86.Build.0 = Release|Win32
+		{4A0EB673-D24C-4E97-9FBC-130C9D4773C0}.Debug|x64.ActiveCfg = Debug|x64
+		{4A0EB673-D24C-4E97-9FBC-130C9D4773C0}.Debug|x64.Build.0 = Debug|x64
+		{4A0EB673-D24C-4E97-9FBC-130C9D4773C0}.Debug|x86.ActiveCfg = Debug|Win32
+		{4A0EB673-D24C-4E97-9FBC-130C9D4773C0}.Debug|x86.Build.0 = Debug|Win32
+		{4A0EB673-D24C-4E97-9FBC-130C9D4773C0}.Development|x64.ActiveCfg = Debug|x64
+		{4A0EB673-D24C-4E97-9FBC-130C9D4773C0}.Development|x64.Build.0 = Debug|x64
+		{4A0EB673-D24C-4E97-9FBC-130C9D4773C0}.Development|x86.ActiveCfg = Debug|Win32
+		{4A0EB673-D24C-4E97-9FBC-130C9D4773C0}.Development|x86.Build.0 = Debug|Win32
+		{4A0EB673-D24C-4E97-9FBC-130C9D4773C0}.Release|x64.ActiveCfg = Release|x64
+		{4A0EB673-D24C-4E97-9FBC-130C9D4773C0}.Release|x64.Build.0 = Release|x64
+		{4A0EB673-D24C-4E97-9FBC-130C9D4773C0}.Release|x86.ActiveCfg = Release|Win32
+		{4A0EB673-D24C-4E97-9FBC-130C9D4773C0}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
