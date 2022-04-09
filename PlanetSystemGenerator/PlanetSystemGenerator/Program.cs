@@ -20,14 +20,18 @@ namespace PlanetSystemGenerator
     class AnchorBody
     {
         /// <summary>Explicitly generates the body.</summary>
-        public AnchorBody(float radius, Ring[] rings)
+        public AnchorBody(float radius, Color color, Ring[] rings)
         {
             Radius = radius;
+            Color = color;
             Rings = rings;
         }
 
         /// <summary>Size of body when rendering.</summary>
         public float Radius { get; init; }
+
+        /// <summary>Color of body when rendering.</summary>
+        public Color Color { get; init; }
 
         /// <summary>Data for optional ring system.</summary>
         public Ring[] Rings { get; init; }
@@ -37,14 +41,13 @@ namespace PlanetSystemGenerator
     class MajorBody : AnchorBody
     {
         /// <summary>Explicitly generates the body.</summary>
-        public MajorBody(float radius, Ring[] rings, float orbit, float period, float startingT)
-            : base(radius, rings)
+        public MajorBody(float radius, Color color, Ring[] rings, float orbit, float period, float startingT)
+            : base(radius, color, rings)
         {
             Orbit = orbit;
             Period = period;
-            T = startingT;
-            position = new Vector3(0);
-            UpdatePosition();
+            t = startingT;
+            position = Vector3.Zero;
         }
 
         /// <summary>Size of orbit.</summary>
@@ -54,35 +57,44 @@ namespace PlanetSystemGenerator
         public float Period { get; init; }
 
         /// <summary>"Time" along orbit path.</summary>
-        public float T { get; set; }
+        public float T { get { return t; } }
+        protected float t;
 
         /// <summary>Storage of this frame's position. (to minimize redundant calculation)</summary>
         public Vector3 Position { get { return position; } } 
-        Vector3 position;
+        protected Vector3 position;
 
         /// <summary>Call this only once per tick.</summary>
-        public void UpdatePosition()
+        public virtual void Step(float dt)
         {
-            const float pi2 = 2.0f * MathF.PI;
-            float _t = pi2 * T / Period;
-            position.X = MathF.Sin(_t) * Orbit;
-            position.Y = MathF.Cos(_t) * Orbit;
+            t += dt / Period;
+            const float pi2 = MathF.PI * 2;
+            float radianT = pi2 * t;
+            position.X = MathF.Sin(radianT) * Orbit;
+            position.Y = MathF.Cos(radianT) * Orbit;
             position.Z = 0.0f;
-        }
+        }        
     }
 
     /// <summary>A body whose position is dependent on that of a parent.</summary>
     class MinorBody : MajorBody
     {
         /// <summary>Explicitly generates the body.</summary>
-        public MinorBody(float radius, Ring[] rings, float orbit, float period, float startingT, MajorBody parent)
-            : base(radius, rings, orbit, period, startingT)
+        public MinorBody(float radius, Color color, Ring[] rings, float orbit, float period, float startingT, MajorBody parent)
+            : base(radius, color, rings, orbit, period, startingT)
         {
             Parent = parent;
         }
 
         /// <summary>Reference to the parent body whose position this body orbits.</summary>
         public MajorBody Parent { get; init; }
+
+        /// <summary>Call this only once per tick.</summary>
+        public override void Step(float dt)
+        {
+            base.Step(dt);
+            position += Parent.Position;
+        }
     }
 
     public class Program
@@ -94,8 +106,7 @@ namespace PlanetSystemGenerator
         {
             return (float)rnd.NextDouble() * (max - min) + min;
         }
-
-#if false // Set to true if this ends up being helpful
+        
         public static Vector3 RandPointInSphere(Vector3 center, Vector3 radii)
         {
             Vector3 offset = new Vector3(
@@ -104,11 +115,19 @@ namespace PlanetSystemGenerator
                 RandFlt(-1.0f, 1.0f));
             return center + Vector3.Normalize(offset) * radii;
         }
-#endif
+
+        public static Color RandColor()
+        {
+            return new(rnd.Next(256), rnd.Next(256), rnd.Next(256), a: 255);
+        }
 
         public static void Main()
         {
-            AnchorBody anchor = new(radius: RandFlt(50, 70), rings: new Ring[1]); // Star
+            // Star
+            AnchorBody anchor = new(
+                radius: RandFlt(50, 70),
+                color: RandColor(),
+                rings: new Ring[rnd.Next(3)]);
             MajorBody[] major; // Planets
             MinorBody[] minor; // Moons
 
@@ -117,11 +136,59 @@ namespace PlanetSystemGenerator
             {
                 major[i] = new(
                     radius: RandFlt(10, 20),
-                    rings: new Ring[rnd.Next(6)],
+                    color: RandColor(),
+                    rings: new Ring[rnd.Next(7)],
                     orbit: anchor.Radius + RandFlt(20, 200),
                     period: RandFlt(0.1f, 30),
                     startingT: RandFlt(0.0f, 1.0f)); // 0...1
             }
+
+            InitWindow(1280,720,"Planet System Generator");
+            SetTargetFPS(60);
+            SetExitKey(0); // Don't close when esc is pressed
+
+            // !! We are using the Z axis for UP !! 
+
+            Camera3D camera;
+            camera.position = Vector3.UnitZ * 200;
+            camera.target = Vector3.Zero;
+            camera.up = Vector3.UnitY;
+            camera.fovy = 70;
+            camera.projection = CameraProjection.CAMERA_PERSPECTIVE;
+
+            while (!WindowShouldClose())
+            {
+                float dt = GetFrameTime();
+                foreach (MajorBody body in major)
+                {
+                    body.Step(dt);
+                }
+
+                BeginDrawing();
+                {
+                    ClearBackground(Color.BLACK);
+
+                    BeginMode3D(camera);
+                    {
+                        DrawSphere(
+                            centerPos: Vector3.Zero,
+                            radius: anchor.Radius,
+                            color: Color.YELLOW);
+
+                        foreach (MajorBody body in major)
+                        {
+                            DrawSphere(
+                                centerPos: body.Position,
+                                radius: body.Radius,
+                                color: Color.ORANGE);
+                        }
+                    }
+                    EndMode3D();
+                }
+                EndDrawing();
+            }
+
+            CloseWindow();
         }
     }
 }
