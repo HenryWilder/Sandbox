@@ -22,9 +22,18 @@ void Node::SetPosition(Vector2 position)
     m_position = position;
 }
 
+IVec2 Node::GetPos() const
+{
+    return pos;
+}
+
 Gate Node::GetGate() const
 {
     return m_type;
+}
+void Node::SetPos(IVec2 pos)
+{
+
 }
 void Node::SetGate(Gate type)
 {

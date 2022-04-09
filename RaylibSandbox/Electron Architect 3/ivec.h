@@ -4,10 +4,14 @@ using IVecInt_t = int;
 
 struct IVec2
 {
+	IVec2() = default;
 	IVec2(IVecInt_t x, IVecInt_t y) : x(x), y(y) {}
 
 	IVecInt_t x;
 	IVecInt_t y;
+
+	bool operator==(IVec2 b) const;
+	bool operator!=(IVec2 b) const;
 };
 
 IVec2 IVec2Zero();

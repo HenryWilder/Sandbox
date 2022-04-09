@@ -31,3 +31,13 @@ IVec2 IVec2Scale_i(IVec2 a, int b)
 {
 	return IVec2(a.x * b, a.y * b);
 }
+
+bool IVec2::operator==(IVec2 b) const
+{
+	return x == b.x && y == b.y;
+}
+
+bool IVec2::operator!=(IVec2 b) const
+{
+	return x != b.x || y != b.y;
+}
