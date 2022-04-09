@@ -6,14 +6,14 @@ using static Raylib_cs.Raymath;
 
 namespace PlanetSystemGenerator
 {
-    /// <summary>Data for a single ring.</summary>
+    /// <summary>Stores the data for a single ring.</summary>
     struct Ring
     {
-        /// <summary>Inner radius.</summary>
+        /// <summary>Inner radius of the ring.</summary>
         public float iRad;
-        /// <summary>Outer radius.</summary>
+        /// <summary>Outer radius of the ring.</summary>
         public float oRad;
-        /// <summary>Color of ring when rendering</summary>
+        /// <summary>Color of ring when rendering.</summary>
         public Color color;
     }
 
@@ -21,17 +21,24 @@ namespace PlanetSystemGenerator
     class AnchorBody
     {
         /// <summary>Explicitly generates the body.</summary>
-        public AnchorBody(float radius, Color color, Ring[] rings)
+        /// <param name="radius">The size of the body when rendered.</param>
+        /// <param name="color">The <see cref="Raylib_cs.Color"/> of the body.</param>
+        /// <param name="rings">The (optional) system of <see cref="Ring"/>s around the body.</param>
+        public AnchorBody(float radius, Color color, Ring[] rings = null)
         {
             Radius = radius;
             Color = color;
-            Rings = rings;
-            if (Rings.Length > 0)
+            if (rings == null)
+                Rings = Array.Empty<Ring>();
+            else
+                Rings = rings;
+
+            if (Rings.Length > 0) // Kept separate in case an empty array is passed in instead of defaulted.
             {
-                RingTex = LoadRenderTexture(256, 256);
-                BeginTextureMode(RingTex);
+                RingRenderTex = LoadRenderTexture(256, 256);
+                BeginTextureMode(RingRenderTex);
                 {
-                    Vector2 center = new Vector2(RingTex.texture.width, RingTex.texture.height) / 2;
+                    Vector2 center = new Vector2(RingTex.width, RingTex.height) / 2;
                     foreach (Ring ring in Rings)
                     {
                         DrawRing(
@@ -40,17 +47,18 @@ namespace PlanetSystemGenerator
                             outerRadius: ring.oRad,
                             startAngle: 0,
                             endAngle: 360,
-                            segments: 64,
+                            segments: 32,
                             color: ring.color);
                     }
                 }
                 EndTextureMode();
             }
         }
+        /// <summary>Unloads the render texture used for drawing rings.</summary>
         ~AnchorBody()
         {
             if (Rings.Length > 0)
-                UnloadRenderTexture(RingTex);
+                UnloadRenderTexture(RingRenderTex);
         }
 
         /// <summary>Size of body when rendering.</summary>
@@ -61,13 +69,23 @@ namespace PlanetSystemGenerator
 
         /// <summary>Data for optional ring system.</summary>
         public Ring[] Rings { get; init; }
-        public RenderTexture2D RingTex { get; init; }
+
+        /// <summary>The drawable ring texture.</summary>
+        protected RenderTexture2D RingRenderTex { get; init; }
+        /// <summary>
+        /// The stored 256x256 texture of the <see cref="Ring"/> system, <see cref="Rings">Rings</see>.<br/>
+        /// Readonly.
+        /// </summary>
+        public Texture2D RingTex { get { return RingRenderTex.texture; } }
     }
 
-    /// <summary>Body whose position is calculated relative to the anchor.</summary>
+    /// <summary>A body whose position is calculated relative to the anchor.<br/>Inherits from <see cref="AnchorBody"/>.</summary>
     class MajorBody : AnchorBody
     {
-        /// <summary>Explicitly generates the body.</summary>
+        /// <inheritdoc cref="AnchorBody(float, Color, Ring[])"/>
+        /// <param name="orbit">The radius of the orbit.<br/>or<br/>The distance from <paramref name="parent"/> this body orbits at.<br/>(See <see cref="Orbit">Orbit</see>)</param>
+        /// <param name="period">Length of a full orbit.<br/>(See <see cref="Period">Period</see>)</param>
+        /// <param name="startingT">The initial value of <see cref="T">T</see>.</param>
         public MajorBody(float radius, Color color, Ring[] rings, float orbit, float period, float startingT)
             : base(radius, color, rings)
         {
@@ -78,20 +96,29 @@ namespace PlanetSystemGenerator
         }
 
         /// <summary>Size of orbit.</summary>
+        /// <value>The distance between the body and its parent.</value>
         public float Orbit { get; init; }
 
         /// <summary>Length of a full orbit.</summary>
+        /// <value>A scalar value (which must be greater than 0) used in the calculation of the body's <see cref="Position">Position</see>.</value>
         public float Period { get; init; }
 
-        /// <summary>"Time" along orbit path.</summary>
+        /// <summary>How far along its orbit this body is on a percent scale.</summary>
+        /// <remarks>Intended for use in a position calculated with <see cref="MathF.Sin(float)"/> and <see cref="MathF.Cos(float)"/>.</remarks>
+        /// <value>The Time along the path of the body's orbit, between 0 and 1 inclusively.</value>
         public float T { get { return t; } }
         protected float t;
 
-        /// <summary>Storage of this frame's position. (to minimize redundant calculation)</summary>
+        /// <summary>Storage of this tick's position to minimize redundant calculation.</summary>
+        /// <value>The final <typeparamref name="Vector3"/> position of the body this tick.</value>
         public Vector3 Position { get { return position; } } 
         protected Vector3 position;
 
-        /// <summary>Call this only once per tick.</summary>
+        /// <summary>
+        /// Updates the <see cref="Position">position</see> and <see cref="T">time along path</see> of the body for this frame.
+        /// </summary>
+        /// <remarks>Call this only once per tick.</remarks>
+        /// <param name="dt">The delta time since the last tick (time between <see cref="Step"/> calls).</param>
         public virtual void Step(float dt)
         {
             t += dt / Period;
@@ -100,23 +127,25 @@ namespace PlanetSystemGenerator
             position.X = MathF.Sin(radianT) * Orbit;
             position.Y = MathF.Cos(radianT) * Orbit;
             position.Z = 0.0f;
-        }        
+        }
     }
 
-    /// <summary>A body whose position is dependent on that of a parent.</summary>
+    /// <summary>A body whose position is dependent on that of a parent.<br/>Inherits from <see cref="MajorBody"/>.</summary>
     class MinorBody : MajorBody
     {
-        /// <summary>Explicitly generates the body.</summary>
+        /// <inheritdoc cref="MajorBody(float, Color, Ring[], float, float, float)"/>
+        /// <param name="parent">The <typeparamref name="MajorBody"/> parent of this body.<br/>(See <see cref="Parent">Parent</see>)</param>
         public MinorBody(float radius, Color color, Ring[] rings, float orbit, float period, float startingT, MajorBody parent)
             : base(radius, color, rings, orbit, period, startingT)
         {
             Parent = parent;
         }
 
-        /// <summary>Reference to the parent body whose position this body orbits.</summary>
+        /// <summary>To whome this body is a satellite of.</summary>
+        /// <value>Reference to the <typeparamref name="MajorBody"/> parent whose position this body orbits at a distance of this body's <see cref="MajorBody.Orbit">Orbit</see>.</value>
         public MajorBody Parent { get; init; }
 
-        /// <summary>Call this only once per tick.</summary>
+        /// <inheritdoc cref="MajorBody.Step(float)"/>
         public override void Step(float dt)
         {
             base.Step(dt / (MathF.Sqrt(Parent.Radius) * 2));
@@ -126,6 +155,32 @@ namespace PlanetSystemGenerator
 
     public class Program
     {
+        /// <summary>
+        /// Turns a <paramref name="fraction"/> into a value between <paramref name="min"/> and <paramref name="max"/> inclusively.<br/>
+        /// Equivalent to "<c>Raylib_cs.Lerp(<paramref name="min"/>, <paramref name="max"/>, <paramref name="fraction"/>)</c>".
+        /// </summary>
+        /// <param name="fraction">A value between 0 and 1 inclusively. Exceeding these bounds is entirely permitted.</param>
+        /// <param name="min">The value returned when <paramref name="fraction"/> is 0.</param>
+        /// <param name="max">The value returned when <paramref name="fraction"/> is 1.</param>
+        /// <returns>A <typeparamref name="float"/> greater than or equal to <paramref name="min"/> and less than or equal to <paramref name="max"/>, proportional to <paramref name="fraction"/>.</returns>
+        public static float DecimalToRange(float fraction, float min, float max)
+        {
+            return fraction * (max - min) + min;
+        }
+
+        /// <summary>
+        /// Scales a <paramref name="value"/> into a value between 0.0f and 1.0f in proportion to <paramref name="min"/> and <paramref name="max"/>.<br/>
+        /// The reverse of "<c>DecimalToRange(<paramref name="value"/>, <paramref name="min"/>, <paramref name="max"/>)</c>".
+        /// </summary>
+        /// <param name="value">A value between 0 and 1 inclusively. Exceeding these bounds is entirely permitted.</param>
+        /// <param name="min">The value returned when <paramref name="value"/> is 0.</param>
+        /// <param name="max">The value returned when <paramref name="value"/> is 1.</param>
+        /// <returns>A <typeparamref name="float"/> greater than or equal to <paramref name="min"/> and less than or equal to <paramref name="max"/>, proportional to <paramref name="value"/>.</returns>
+        public static float RangeToDecimal(float value, float min, float max)
+        {
+            return (value - min) / (max - min);
+        }
+
         readonly static Random rnd = new();
 
         /// <summary>Returns a random floating-point precision number that is within the specified range.</summary>
@@ -246,6 +301,11 @@ namespace PlanetSystemGenerator
                 }
             }
 
+            Mesh mesh = GenMeshPlane(1, 1, 1, 1);
+            /// <summary>A generic plane model for drawing ring textures in 3D space.</summary>
+            Model ringPlane_generic = LoadModelFromMesh(mesh);
+            ringPlane_generic.materials;
+
             // !! We are using the Z axis for UP !! 
 
             Camera3D camera;
@@ -255,7 +315,7 @@ namespace PlanetSystemGenerator
             camera.fovy = 70;
             camera.projection = CameraProjection.CAMERA_PERSPECTIVE;
 
-            SetCameraMode(camera, CameraMode.CAMERA_ORBITAL);
+            SetCameraMode(camera, CameraMode.CAMERA_FIRST_PERSON);
 
             while (!WindowShouldClose())
             {
@@ -277,6 +337,7 @@ namespace PlanetSystemGenerator
 
                     BeginMode3D(camera);
                     {
+                        // Body
                         DrawSphere(
                             centerPos: Vector3.Zero,
                             radius: anchor.Radius,
@@ -284,25 +345,33 @@ namespace PlanetSystemGenerator
 
                         foreach (MajorBody body in major)
                         {
+                            // Orbit
                             DrawCircle3D(
                                 center: Vector3.Zero,
                                 radius: body.Orbit,
                                 rotationAxis: Vector3.UnitZ,
                                 rotationAngle: 0.0f,
                                 color: Color.BROWN);
+
+                            // Body
                             DrawSphere(
                                 centerPos: body.Position,
                                 radius: body.Radius,
                                 color: body.Color);
+
+                            DrawModel();
                         }
                         foreach (MinorBody body in minor)
                         {
+                            // Orbit
                             DrawCircle3D(
                                 center: body.Parent.Position,
                                 radius: body.Orbit,
                                 rotationAxis: Vector3.UnitZ,
                                 rotationAngle: 0.0f,
                                 color: Color.DARKGRAY);
+
+                            // Body
                             DrawSphere(
                                 centerPos: body.Position,
                                 radius: body.Radius,
