@@ -1,18 +1,10 @@
 ﻿using System;
 using System.Numerics;
-
-
+using Raylib_cs;
+using static Raylib_cs.Raylib;
 
 namespace PlanetSystemGenerator
 {
-    struct Color
-    {
-        public byte r;
-        public byte g;
-        public byte b;
-        public byte a;
-    }
-
     /// <summary>Data for a single ring.</summary>
     struct Ring
     {
@@ -123,7 +115,12 @@ namespace PlanetSystemGenerator
             major = new MajorBody[rnd.Next(3, 25)];
             for (int i = 0; i < major.Length; ++i)
             {
-                major[i] = new(radius: RandFlt(10, 20), rings: new Ring[rnd.Next(6)], orbit: anchor.Radius + RandFlt(20, 200), period: RandFlt(0.1f, 30), startingT: RandFlt(0.0f, 1.0f));
+                major[i] = new(
+                    radius: RandFlt(10, 20),
+                    rings: new Ring[rnd.Next(6)],
+                    orbit: anchor.Radius + RandFlt(20, 200),
+                    period: RandFlt(0.1f, 30),
+                    startingT: RandFlt(0.0f, 1.0f)); // 0...1
             }
         }
     }
