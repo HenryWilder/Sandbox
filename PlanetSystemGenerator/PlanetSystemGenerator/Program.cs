@@ -25,6 +25,15 @@ namespace PlanetSystemGenerator
             Radius = radius;
             Color = color;
             Rings = rings;
+            if (Rings.Length != 0)
+            {
+                RingTex = LoadRenderTexture(256, 256);
+            }
+        }
+        ~AnchorBody()
+        {
+            if (Rings.Length != 0)
+                UnloadRenderTexture(RingTex);
         }
 
         /// <summary>Size of body when rendering.</summary>
@@ -35,6 +44,7 @@ namespace PlanetSystemGenerator
 
         /// <summary>Data for optional ring system.</summary>
         public Ring[] Rings { get; init; }
+        public RenderTexture2D RingTex { get; init; }
     }
 
     /// <summary>Body whose position is calculated relative to the anchor.</summary>
@@ -92,7 +102,7 @@ namespace PlanetSystemGenerator
         /// <summary>Call this only once per tick.</summary>
         public override void Step(float dt)
         {
-            base.Step(dt);
+            base.Step(dt / (MathF.Sqrt(Parent.Radius) * 2));
             position += Parent.Position;
         }
     }
@@ -153,8 +163,9 @@ namespace PlanetSystemGenerator
                 minor = new MinorBody[rnd.Next(3, 25)];
                 for (int i = 0; i < minor.Length; ++i)
                 {
-                    float bodyRadius = RandFlt(2, 10);
                     MajorBody parentBody = major[rnd.Next(major.Length)];
+                    float bodyRadius = RandFlt(2, 6);
+                    float orbitRadius = parentBody.Radius + bodyRadius + RandFlt(0.1f, 3) * parentBody.Radius;
                     minor[i] = new(
                         radius: bodyRadius,
                         color: RandColor(),
@@ -162,7 +173,7 @@ namespace PlanetSystemGenerator
                         orbit: orbitRadius,
                         period: MathF.Pow(orbitRadius, 2) / 5000,
                         startingT: RandFlt(0.0f, 1.0f),
-                        parent: parent);
+                        parent: parentBody);
                 }
             }
 
@@ -173,11 +184,13 @@ namespace PlanetSystemGenerator
             // !! We are using the Z axis for UP !! 
 
             Camera3D camera;
-            camera.position = Vector3.UnitZ * 1000;
+            camera.position = Vector3.UnitZ * 100;
             camera.target = Vector3.Zero;
             camera.up = Vector3.UnitY;
             camera.fovy = 70;
             camera.projection = CameraProjection.CAMERA_PERSPECTIVE;
+
+            SetCameraMode(camera, CameraMode.CAMERA_ORBITAL);
 
             while (!WindowShouldClose())
             {
@@ -186,6 +199,12 @@ namespace PlanetSystemGenerator
                 {
                     body.Step(dt);
                 }
+                foreach (MajorBody body in minor)
+                {
+                    body.Step(dt);
+                }
+
+                UpdateCamera(ref camera);
 
                 BeginDrawing();
                 {
@@ -200,10 +219,29 @@ namespace PlanetSystemGenerator
 
                         foreach (MajorBody body in major)
                         {
+                            DrawCircle3D(
+                                center: Vector3.Zero,
+                                radius: body.Orbit,
+                                rotationAxis: Vector3.UnitZ,
+                                rotationAngle: 0.0f,
+                                color: Color.BROWN);
                             DrawSphere(
                                 centerPos: body.Position,
                                 radius: body.Radius,
                                 color: Color.ORANGE);
+                        }
+                        foreach (MinorBody body in minor)
+                        {
+                            DrawCircle3D(
+                                center: body.Parent.Position,
+                                radius: body.Orbit,
+                                rotationAxis: Vector3.UnitZ,
+                                rotationAngle: 0.0f,
+                                color: Color.DARKGRAY);
+                            DrawSphere(
+                                centerPos: body.Position,
+                                radius: body.Radius,
+                                color: Color.GRAY);
                         }
                     }
                     EndMode3D();
