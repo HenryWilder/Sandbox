@@ -1,4 +1,5 @@
-                                                                                                                                                                                                                                                                                                                                                              using System;
+using System;
+using System.Runtime.InteropServices;
 using System.Numerics;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
@@ -17,6 +18,79 @@ namespace PlanetSystemGenerator
         public Color color;
     }
 
+    class RingSystem
+    {
+        static RingSystem()
+        {
+            g_RingModel = LoadModelFromMesh(GenMeshPlane(1, 1, 1, 1));
+        }
+
+        public RingSystem()
+        {
+            const int textureWidth = 1024;
+            RingRenderTex = LoadRenderTexture(textureWidth, textureWidth);
+
+            float maxRingRad = 0;
+            foreach (Ring ring in RingData)
+            {
+                if (ring.oRad > maxRingRad)
+                    maxRingRad = ring.oRad;
+            }
+
+            BeginTextureMode(RingRenderTex);
+            {
+                Color clear;
+                clear.r = 0;
+                clear.g = 0;
+                clear.b = 0;
+                clear.a = 0;
+
+                ClearBackground(clear);
+                Vector2 center = new Vector2(RingTex.width, RingTex.height) / 2;
+                foreach (Ring ring in RingData)
+                {
+                    DrawRing(
+                        center: center,
+                        innerRadius: ring.iRad / maxRingRad * (textureWidth / 2),
+                        outerRadius: ring.oRad / maxRingRad * (textureWidth / 2),
+                        startAngle: 0,
+                        endAngle: 360,
+                        segments: 32,
+                        color: ring.color);
+                }
+            }
+            EndTextureMode();
+        }
+
+        /// <summary>Called at the end of the program to clean up.</summary>
+        public static void OkImDoneNow()
+        {
+            UnloadModel(g_RingModel);
+        }
+
+        /// <summary>The plane used for drawing the ring texture.</summary>
+        public static Model g_RingModel;
+
+        /// <summary>Data for optional ring system.</summary>
+        public Ring[] RingData { get; init; }
+
+        public float RingRadiusMax { get; init; }
+
+        /// <summary>The drawable ring texture.</summary>
+        public RenderTexture2D RingRenderTex { get; init; }
+
+        /// <summary>
+        /// The stored 256x256 texture of the <see cref="Ring"/> system, <see cref="Rings">Rings</see>.<br/>
+        /// Readonly.
+        /// </summary>
+        public Texture2D RingTex { get { return RingRenderTex.texture; } }
+
+        /// <summary>
+        /// For storing the ring's material
+        /// </summary>
+        public Material RingMat;
+    }
+
     /// <summary>Body whose position is static and unchanging.</summary>
     class AnchorBody
     {
@@ -24,34 +98,14 @@ namespace PlanetSystemGenerator
         /// <param name="radius">The size of the body when rendered.</param>
         /// <param name="color">The <see cref="Raylib_cs.Color"/> of the body.</param>
         /// <param name="rings">The (optional) system of <see cref="Ring"/>s around the body.</param>
-        public AnchorBody(float radius, Color color, Ring[] rings = null)
+        public AnchorBody(float radius, Color color, RingSystem rings = null)
         {
             Radius = radius;
             Color = color;
-            if (rings == null)
-                Rings = Array.Empty<Ring>();
-            else
-                Rings = rings;
-
-            if (Rings.Length > 0) // Kept separate in case an empty array is passed in instead of defaulted.
+            Rings = rings;
+            if (Rings != null) // Kept separate in case an empty array is passed in instead of defaulted.
             {
-                RingRenderTex = LoadRenderTexture(256, 256);
-                BeginTextureMode(RingRenderTex);
-                {
-                    Vector2 center = new Vector2(RingTex.width, RingTex.height) / 2;
-                    foreach (Ring ring in Rings)
-                    {
-                        DrawRing(
-                            center: center,
-                            innerRadius: ring.iRad,
-                            outerRadius: ring.oRad,
-                            startAngle: 0,
-                            endAngle: 360,
-                            segments: 32,
-                            color: ring.color);
-                    }
-                }
-                EndTextureMode();
+                
             }
         }
         /// <summary>Unloads the render texture used for drawing rings.</summary>
@@ -61,22 +115,66 @@ namespace PlanetSystemGenerator
                 UnloadRenderTexture(RingRenderTex);
         }
 
+        public virtual Vector3 Position { get { return Vector3.Zero; } }
+
         /// <summary>Size of body when rendering.</summary>
         public float Radius { get; init; }
 
         /// <summary>Color of body when rendering.</summary>
         public Color Color { get; init; }
 
-        /// <summary>Data for optional ring system.</summary>
-        public Ring[] Rings { get; init; }
+        public RingSystem Rings { get; init; }
 
-        /// <summary>The drawable ring texture.</summary>
-        protected RenderTexture2D RingRenderTex { get; init; }
-        /// <summary>
-        /// The stored 256x256 texture of the <see cref="Ring"/> system, <see cref="Rings">Rings</see>.<br/>
-        /// Readonly.
-        /// </summary>
-        public Texture2D RingTex { get { return RingRenderTex.texture; } }
+        public void DrawRings()
+        {
+            // Skip rings if there are none
+            if (Rings.Length == 0)
+                return;
+
+            float maxRingRadius = 0;
+            foreach (Ring ring in Rings)
+            {
+                if (ring.oRad > maxRingRadius)
+                    maxRingRadius = ring.oRad;
+            }
+            float ringSystemWidth = maxRingRadius * 2; // Convert from circle radius to rectangle width
+
+            unsafe
+            {
+                SetMaterialTexture(
+                    material: ref RingModel.materials[0],
+                    mapType: MaterialMapIndex.MATERIAL_MAP_DIFFUSE,
+                    texture: RingTex);
+            }
+
+            DrawModelEx(
+                model: RingModel,
+                position: Position,
+                rotationAxis: Vector3.UnitX,
+                rotationAngle: 90,
+                scale: Vector3.One * ringSystemWidth,
+                tint: Color.WHITE); // No color effects
+
+            DrawModelEx(
+                model: RingModel,
+                position: Position,
+                rotationAxis: Vector3.UnitX,
+                rotationAngle: -90,
+                scale: Vector3.One * ringSystemWidth,
+                tint: Color.WHITE); // No color effects
+        }
+
+        /// <summary>Draws the body</summary>
+        public virtual void Draw()
+        {
+            // Body
+            DrawSphere(
+                centerPos: Position,
+                radius: Radius,
+                color: Color);
+
+            DrawRings();
+        }
     }
 
     /// <summary>A body whose position is calculated relative to the anchor.<br/>Inherits from <see cref="AnchorBody"/>.</summary>
@@ -111,7 +209,7 @@ namespace PlanetSystemGenerator
 
         /// <summary>Storage of this tick's position to minimize redundant calculation.</summary>
         /// <value>The final <typeparamref name="Vector3"/> position of the body this tick.</value>
-        public Vector3 Position { get { return position; } } 
+        public override Vector3 Position { get { return position; } } 
         protected Vector3 position;
 
         /// <summary>
@@ -127,6 +225,17 @@ namespace PlanetSystemGenerator
             position.X = MathF.Sin(radianT) * Orbit;
             position.Y = MathF.Cos(radianT) * Orbit;
             position.Z = 0.0f;
+        }
+
+        /// <summary>Draws the path of the body's orbit.</summary>
+        public virtual void DrawOrbit()
+        {
+            DrawCircle3D(
+                center: Vector3.Zero,
+                radius: Orbit,
+                rotationAxis: Vector3.UnitZ,
+                rotationAngle: 0.0f,
+                color: Color.GRAY);
         }
     }
 
@@ -150,6 +259,17 @@ namespace PlanetSystemGenerator
         {
             base.Step(dt / (MathF.Sqrt(Parent.Radius) * 2));
             position += Parent.Position;
+        }
+
+        /// <inheritdoc cref="MajorBody.DrawOrbit()"/>
+        public override void DrawOrbit()
+        {
+            DrawCircle3D(
+                center: Parent.Position,
+                radius: Orbit,
+                rotationAxis: Vector3.UnitZ,
+                rotationAngle: 0.0f,
+                color: Color.DARKGRAY);
         }
     }
 
@@ -197,7 +317,7 @@ namespace PlanetSystemGenerator
         /// <returns>A Numerics.Vector3 in a 3D ellipsoid around a specified point.</returns>
         public static Vector3 RandPointInSphere(Vector3 center, Vector3 radii)
         {
-            Vector3 offset = new Vector3(
+            Vector3 offset = new(
                 RandFlt(-1.0f, 1.0f),
                 RandFlt(-1.0f, 1.0f),
                 RandFlt(-1.0f, 1.0f));
@@ -236,17 +356,9 @@ namespace PlanetSystemGenerator
         /// Generates a completely random color with random opacity.
         /// </summary>
         /// <returns>An instance of Raylib_cs.Color.</returns>
-        public static Color RandColor_Transparent()
+        public static Color RandColor_Transparent(int minAlpha = 0, int maxAlpha = 256)
         {
-            return new(rnd.Next(256), rnd.Next(256), rnd.Next(256), rnd.Next(256));
-        }
-
-        public static void SetTexture(ref Model model, Texture2D texture)
-        {
-            Material mat = LoadMaterialDefault();
-            mat.maps[0] = new MaterialMap { color = Color.WHITE, texture = texture, value = 1.0f };
-            model.materials = new Material[] { LoadMaterialDefault() };
-            model.materials[0] = LoadMaterialDefault();
+            return new(rnd.Next(256), rnd.Next(256), rnd.Next(256), rnd.Next(minAlpha, maxAlpha));
         }
 
         public static void Main()
@@ -254,25 +366,33 @@ namespace PlanetSystemGenerator
             InitWindow(1280, 720, "Planet System Generator");
             SetTargetFPS(60);
 
-            float anchorRadius = RandFlt(35, 100);
-            int anchorRingCount = rnd.Next(3);
-            Ring[] anchorRingSystem = new Ring[anchorRingCount];
-            for (int i = 0; i < anchorRingCount; ++i)
-            {
-                anchorRingSystem[i].iRad = anchorRadius + RandFlt(50, 400);
-                anchorRingSystem[i].oRad = anchorRingSystem[i].iRad + RandFlt(10, 100);
-                anchorRingSystem[i].color = RandColor_Transparent();
-            }
-            float anchorAvgTemperature = (anchorRadius - 35) / 100;
-
             // Star
-            AnchorBody anchor = new(
-                radius: anchorRadius,
-                color: RandColor_Blackbody(Lerp(500, 10000, anchorAvgTemperature), Lerp(700, 12000, anchorAvgTemperature)),
-                rings: anchorRingSystem);
+            AnchorBody anchor;
             MajorBody[] major; // Planets
             MinorBody[] minor; // Moons
 
+            // Anchor
+            {
+                float bodyRadius = RandFlt(35, 100);
+
+                // Ring gen
+                int ringCount = rnd.Next(3);
+                Ring[] ringSystem = new Ring[ringCount];
+                for (int i = 0; i < ringCount; ++i)
+                {
+                    ringSystem[i].iRad = bodyRadius + RandFlt(50, 400);
+                    ringSystem[i].oRad = ringSystem[i].iRad + RandFlt(10, 100);
+                    ringSystem[i].color = RandColor_Transparent(minAlpha: 128);
+                }
+
+                float anchorAvgTemperature = (bodyRadius - 35) / 100;
+                anchor = new(
+                    radius: bodyRadius,
+                    color: RandColor_Blackbody(Lerp(500, 10000, anchorAvgTemperature), Lerp(700, 12000, anchorAvgTemperature)),
+                    rings: ringSystem);
+            }
+
+            // Major bodies
             {
                 major = new MajorBody[rnd.Next(3, 25)];
                 float lastOrbit = anchor.Radius + RandFlt(50, 200);
@@ -281,16 +401,29 @@ namespace PlanetSystemGenerator
                     float bodyRadius = RandFlt(10, 20);
                     float orbitRadius = lastOrbit + RandFlt(10, 80) + bodyRadius;
                     lastOrbit = orbitRadius + bodyRadius;
+
+                    // Ring gen
+                    int ringCount = rnd.Next(3);
+                    Ring[] ringSystem = new Ring[ringCount];
+                    for (int j = 0; j < ringCount; ++j)
+                    {
+                        ringSystem[j].iRad = bodyRadius + RandFlt(1, 20);
+                        ringSystem[j].oRad = ringSystem[j].iRad + RandFlt(1, 10);
+                        ringSystem[j].color = RandColor_Transparent(minAlpha: 128);
+                        ringSystem[j].color.b = ringSystem[j].color.g = ringSystem[j].color.r; // Grayscale asteroid belts
+                    }
+
                     major[i] = new(
                         radius: bodyRadius,
                         color: RandColor_Solid(),
-                        rings: new Ring[rnd.Next(7)],
+                        rings: ringSystem,
                         orbit: orbitRadius,
                         period: MathF.Pow(orbitRadius, 2) / 5000,
                         startingT: RandFlt(0.0f, 1.0f));
                 }
             }
 
+            // Minor bodies
             {
                 minor = new MinorBody[rnd.Next(3, 25)];
                 for (int i = 0; i < minor.Length; ++i)
@@ -298,10 +431,21 @@ namespace PlanetSystemGenerator
                     MajorBody parentBody = major[rnd.Next(major.Length)];
                     float bodyRadius = RandFlt(2, 6);
                     float orbitRadius = parentBody.Radius + bodyRadius + RandFlt(0.1f, 3) * parentBody.Radius;
+
+                    // Ring gen
+                    int ringCount = rnd.Next(3);
+                    Ring[] ringSystem = new Ring[ringCount];
+                    for (int j = 0; j < ringCount; ++j)
+                    {
+                        ringSystem[j].iRad = bodyRadius + RandFlt(0.3f, 5);
+                        ringSystem[j].oRad = ringSystem[j].iRad + RandFlt(0.5f, 7);
+                        ringSystem[j].color = RandColor_Transparent(minAlpha: 128);
+                    }
+
                     minor[i] = new(
                         radius: bodyRadius,
                         color: RandColor_Solid(),
-                        rings: new Ring[rnd.Next(7)],
+                        rings: ringSystem,
                         orbit: orbitRadius,
                         period: MathF.Pow(orbitRadius, 2) / 5000,
                         startingT: RandFlt(0.0f, 1.0f),
@@ -309,21 +453,16 @@ namespace PlanetSystemGenerator
                 }
             }
 
-            Mesh mesh = GenMeshPlane(1, 1, 1, 1);
-            /// <summary>A generic plane model for drawing ring textures in 3D space.</summary>
-            Model ringPlane_generic = LoadModelFromMesh(mesh);
-            ringPlane_generic.materials;
-
             // !! We are using the Z axis for UP !! 
 
             Camera3D camera;
             camera.position = Vector3.UnitZ * 100;
             camera.target = Vector3.Zero;
             camera.up = Vector3.UnitY;
-            camera.fovy = 70;
+            camera.fovy = 1000;
             camera.projection = CameraProjection.CAMERA_PERSPECTIVE;
 
-            SetCameraMode(camera, CameraMode.CAMERA_FIRST_PERSON);
+            SetCameraMode(camera, CameraMode.CAMERA_ORBITAL);
 
             while (!WindowShouldClose())
             {
@@ -346,50 +485,31 @@ namespace PlanetSystemGenerator
                     BeginMode3D(camera);
                     {
                         // Body
-                        DrawSphere(
-                            centerPos: Vector3.Zero,
-                            radius: anchor.Radius,
-                            color: anchor.Color);
+                        anchor.Draw();
 
                         foreach (MajorBody body in major)
                         {
                             // Orbit
-                            DrawCircle3D(
-                                center: Vector3.Zero,
-                                radius: body.Orbit,
-                                rotationAxis: Vector3.UnitZ,
-                                rotationAngle: 0.0f,
-                                color: Color.BROWN);
+                            body.DrawOrbit();
 
                             // Body
-                            DrawSphere(
-                                centerPos: body.Position,
-                                radius: body.Radius,
-                                color: body.Color);
-
-                            DrawModel();
+                            body.Draw();
                         }
                         foreach (MinorBody body in minor)
                         {
                             // Orbit
-                            DrawCircle3D(
-                                center: body.Parent.Position,
-                                radius: body.Orbit,
-                                rotationAxis: Vector3.UnitZ,
-                                rotationAngle: 0.0f,
-                                color: Color.DARKGRAY);
+                            body.DrawOrbit();
 
                             // Body
-                            DrawSphere(
-                                centerPos: body.Position,
-                                radius: body.Radius,
-                                color: body.Color);
+                            body.Draw();
                         }
                     }
                     EndMode3D();
                 }
                 EndDrawing();
             }
+
+            AnchorBody.OkImDoneNow();
 
             CloseWindow();
         }
