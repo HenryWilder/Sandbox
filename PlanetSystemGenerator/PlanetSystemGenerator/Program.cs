@@ -5,6 +5,20 @@ using static Raylib_cs.Raylib;
 
 namespace PlanetSystemGenerator
 {
+    class RingGenerator
+    {
+        public static RingGenerator()
+        {
+            ringShader = LoadShader(0, ""); // TODO
+        }
+        public static void Unload()
+        {
+            UnloadShader(ringShader);
+        }
+        public static Shader RingShader { get; }
+        static Shader ringShader;
+    }
+
     /// <summary>Data for a single ring.</summary>
     struct Ring
     {
