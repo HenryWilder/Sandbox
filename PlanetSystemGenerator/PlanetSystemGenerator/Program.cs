@@ -2,6 +2,7 @@
 using System.Numerics;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
+using static Raylib_cs.Raymath;
 
 namespace PlanetSystemGenerator
 {
@@ -148,15 +149,25 @@ namespace PlanetSystemGenerator
             return center + Vector3.Normalize(offset) * radii;
         }
 
+
         /// <summary>
         /// Returns a color based on blackbody radiation with a temperature (inclusively) between <paramref name="minTemp"/> and <paramref name="maxTemp"/>.
         /// </summary>
         /// <param name="minTemp">The (inclusive) minimum temperature that can be generated randomly, measured in Kelvin.</param>
         /// <param name="maxTemp">The (inclusive) maximum temperature that can be generated randomly, measured in Kelvin.</param>
         /// <returns>An instance of Raylib_cs.Color, on the blackbody scale.</returns>
-        public static Color RandColor_Blackbody(float minTemp = 0, float maxTemp = 50000)
+        public static Color RandColor_Blackbody(float minTemp = 500, float maxTemp = 12000)
         {
-            return new(); // TODO
+            float temperature = RandFlt(minTemp, maxTemp);
+            float amount = (temperature - 500) / (12000 - 500);
+            Color color;
+            // Uses cubic bezier curves to calculate blackbody color.
+            // I completely made up these numbers btw; they are not scientifically accurate.
+            color.r = (byte)Lerp(Lerp(255, 255, amount), Lerp(255, 175, amount), amount);
+            color.g = (byte)Lerp(Lerp(55, 250, amount), Lerp(250, 200, amount), amount);
+            color.b = (byte)Lerp(Lerp(0, 200, amount), Lerp(200, 255, amount), amount);
+            color.a = 255;
+            return color;
         }
         /// <summary>
         /// Generates a completely random color with full opacity.
@@ -177,6 +188,9 @@ namespace PlanetSystemGenerator
 
         public static void Main()
         {
+            InitWindow(1280, 720, "Planet System Generator");
+            SetTargetFPS(60);
+
             float anchorRadius = RandFlt(35, 100);
             int anchorRingCount = rnd.Next(3);
             Ring[] anchorRingSystem = new Ring[anchorRingCount];
@@ -186,11 +200,12 @@ namespace PlanetSystemGenerator
                 anchorRingSystem[i].oRad = anchorRingSystem[i].iRad + RandFlt(10, 100);
                 anchorRingSystem[i].color = RandColor_Transparent();
             }
+            float anchorAvgTemperature = (anchorRadius - 35) / 100;
 
             // Star
             AnchorBody anchor = new(
                 radius: anchorRadius,
-                color: RandColor_Solid(),
+                color: RandColor_Blackbody(Lerp(500, 10000, anchorAvgTemperature), Lerp(700, 12000, anchorAvgTemperature)),
                 rings: anchorRingSystem);
             MajorBody[] major; // Planets
             MinorBody[] minor; // Moons
@@ -231,10 +246,6 @@ namespace PlanetSystemGenerator
                 }
             }
 
-            InitWindow(1280,720,"Planet System Generator");
-            SetTargetFPS(60);
-            SetExitKey(0); // Don't close when esc is pressed
-
             // !! We are using the Z axis for UP !! 
 
             Camera3D camera;
@@ -269,7 +280,7 @@ namespace PlanetSystemGenerator
                         DrawSphere(
                             centerPos: Vector3.Zero,
                             radius: anchor.Radius,
-                            color: Color.YELLOW);
+                            color: anchor.Color);
 
                         foreach (MajorBody body in major)
                         {
@@ -282,7 +293,7 @@ namespace PlanetSystemGenerator
                             DrawSphere(
                                 centerPos: body.Position,
                                 radius: body.Radius,
-                                color: Color.ORANGE);
+                                color: body.Color);
                         }
                         foreach (MinorBody body in minor)
                         {
@@ -295,7 +306,7 @@ namespace PlanetSystemGenerator
                             DrawSphere(
                                 centerPos: body.Position,
                                 radius: body.Radius,
-                                color: Color.GRAY);
+                                color: body.Color);
                         }
                     }
                     EndMode3D();
