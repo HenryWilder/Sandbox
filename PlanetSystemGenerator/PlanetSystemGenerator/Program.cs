@@ -1,4 +1,4 @@
-﻿using System;
+                                                                                                                                                                                                                                                                                                                                                              using System;
 using System.Numerics;
 using Raylib_cs;
 using static Raylib_cs.Raylib;
@@ -125,22 +125,45 @@ namespace PlanetSystemGenerator
         {
             // Star
             AnchorBody anchor = new(
-                radius: RandFlt(50, 70),
+                radius: RandFlt(35, 100),
                 color: RandColor(),
                 rings: new Ring[rnd.Next(3)]);
             MajorBody[] major; // Planets
             MinorBody[] minor; // Moons
 
-            major = new MajorBody[rnd.Next(3, 25)];
-            for (int i = 0; i < major.Length; ++i)
             {
-                major[i] = new(
-                    radius: RandFlt(10, 20),
-                    color: RandColor(),
-                    rings: new Ring[rnd.Next(7)],
-                    orbit: anchor.Radius + RandFlt(20, 200),
-                    period: RandFlt(0.1f, 30),
-                    startingT: RandFlt(0.0f, 1.0f)); // 0...1
+                major = new MajorBody[rnd.Next(3, 25)];
+                float lastOrbit = anchor.Radius + RandFlt(50, 200);
+                for (int i = 0; i < major.Length; ++i)
+                {
+                    float bodyRadius = RandFlt(10, 20);
+                    float orbitRadius = lastOrbit + RandFlt(10, 80) + bodyRadius;
+                    lastOrbit = orbitRadius + bodyRadius;
+                    major[i] = new(
+                        radius: bodyRadius,
+                        color: RandColor(),
+                        rings: new Ring[rnd.Next(7)],
+                        orbit: orbitRadius,
+                        period: MathF.Pow(orbitRadius, 2) / 5000,
+                        startingT: RandFlt(0.0f, 1.0f));
+                }
+            }
+
+            {
+                minor = new MinorBody[rnd.Next(3, 25)];
+                for (int i = 0; i < minor.Length; ++i)
+                {
+                    float bodyRadius = RandFlt(2, 10);
+                    MajorBody parentBody = major[rnd.Next(major.Length)];
+                    minor[i] = new(
+                        radius: bodyRadius,
+                        color: RandColor(),
+                        rings: new Ring[rnd.Next(7)],
+                        orbit: orbitRadius,
+                        period: MathF.Pow(orbitRadius, 2) / 5000,
+                        startingT: RandFlt(0.0f, 1.0f),
+                        parent: parent);
+                }
             }
 
             InitWindow(1280,720,"Planet System Generator");
@@ -150,7 +173,7 @@ namespace PlanetSystemGenerator
             // !! We are using the Z axis for UP !! 
 
             Camera3D camera;
-            camera.position = Vector3.UnitZ * 200;
+            camera.position = Vector3.UnitZ * 1000;
             camera.target = Vector3.Zero;
             camera.up = Vector3.UnitY;
             camera.fovy = 70;
@@ -192,3 +215,4 @@ namespace PlanetSystemGenerator
         }
     }
 }
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              
