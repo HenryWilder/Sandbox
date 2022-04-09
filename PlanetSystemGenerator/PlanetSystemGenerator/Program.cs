@@ -5,20 +5,6 @@ using static Raylib_cs.Raylib;
 
 namespace PlanetSystemGenerator
 {
-    class RingGenerator
-    {
-        public static RingGenerator()
-        {
-            ringShader = LoadShader(0, ""); // TODO
-        }
-        public static void Unload()
-        {
-            UnloadShader(ringShader);
-        }
-        public static Shader RingShader { get; }
-        static Shader ringShader;
-    }
-
     /// <summary>Data for a single ring.</summary>
     struct Ring
     {
@@ -39,14 +25,30 @@ namespace PlanetSystemGenerator
             Radius = radius;
             Color = color;
             Rings = rings;
-            if (Rings.Length != 0)
+            if (Rings.Length > 0)
             {
                 RingTex = LoadRenderTexture(256, 256);
+                BeginTextureMode(RingTex);
+                {
+                    Vector2 center = new Vector2(RingTex.texture.width, RingTex.texture.height) / 2;
+                    foreach (Ring ring in Rings)
+                    {
+                        DrawRing(
+                            center: center,
+                            innerRadius: ring.iRad,
+                            outerRadius: ring.oRad,
+                            startAngle: 0,
+                            endAngle: 360,
+                            segments: 64,
+                            color: ring.color);
+                    }
+                }
+                EndTextureMode();
             }
         }
         ~AnchorBody()
         {
-            if (Rings.Length != 0)
+            if (Rings.Length > 0)
                 UnloadRenderTexture(RingTex);
         }
 
@@ -131,6 +133,12 @@ namespace PlanetSystemGenerator
             return (float)rnd.NextDouble() * (max - min) + min;
         }
         
+        /// <summary>
+        /// Generates a random point in a 3D ellipsoid (with X, Y, and Z widths defined by <paramref name="radii"/>) around the <paramref name="center"/>.
+        /// </summary>
+        /// <param name="center">The point around which the return will be randomly generated (within specified <paramref name="radii"/>).</param>
+        /// <param name="radii">The 3D radii around <paramref name="center"/> inside of which the point will be generated.</param>
+        /// <returns>A Numerics.Vector3 in a 3D ellipsoid around a specified point.</returns>
         public static Vector3 RandPointInSphere(Vector3 center, Vector3 radii)
         {
             Vector3 offset = new Vector3(
@@ -140,18 +148,50 @@ namespace PlanetSystemGenerator
             return center + Vector3.Normalize(offset) * radii;
         }
 
-        public static Color RandColor()
+        /// <summary>
+        /// Returns a color based on blackbody radiation with a temperature (inclusively) between <paramref name="minTemp"/> and <paramref name="maxTemp"/>.
+        /// </summary>
+        /// <param name="minTemp">The (inclusive) minimum temperature that can be generated randomly, measured in Kelvin.</param>
+        /// <param name="maxTemp">The (inclusive) maximum temperature that can be generated randomly, measured in Kelvin.</param>
+        /// <returns>An instance of Raylib_cs.Color, on the blackbody scale.</returns>
+        public static Color RandColor_Blackbody(float minTemp = 0, float maxTemp = 50000)
+        {
+            return new(); // TODO
+        }
+        /// <summary>
+        /// Generates a completely random color with full opacity.
+        /// </summary>
+        /// <returns>An instance of Raylib_cs.Color with an alpha of 255.</returns>
+        public static Color RandColor_Solid()
         {
             return new(rnd.Next(256), rnd.Next(256), rnd.Next(256), a: 255);
+        }
+        /// <summary>
+        /// Generates a completely random color with random opacity.
+        /// </summary>
+        /// <returns>An instance of Raylib_cs.Color.</returns>
+        public static Color RandColor_Transparent()
+        {
+            return new(rnd.Next(256), rnd.Next(256), rnd.Next(256), rnd.Next(256));
         }
 
         public static void Main()
         {
+            float anchorRadius = RandFlt(35, 100);
+            int anchorRingCount = rnd.Next(3);
+            Ring[] anchorRingSystem = new Ring[anchorRingCount];
+            for (int i = 0; i < anchorRingCount; ++i)
+            {
+                anchorRingSystem[i].iRad = anchorRadius + RandFlt(50, 400);
+                anchorRingSystem[i].oRad = anchorRingSystem[i].iRad + RandFlt(10, 100);
+                anchorRingSystem[i].color = RandColor_Transparent();
+            }
+
             // Star
             AnchorBody anchor = new(
-                radius: RandFlt(35, 100),
-                color: RandColor(),
-                rings: new Ring[rnd.Next(3)]);
+                radius: anchorRadius,
+                color: RandColor_Solid(),
+                rings: anchorRingSystem);
             MajorBody[] major; // Planets
             MinorBody[] minor; // Moons
 
@@ -165,7 +205,7 @@ namespace PlanetSystemGenerator
                     lastOrbit = orbitRadius + bodyRadius;
                     major[i] = new(
                         radius: bodyRadius,
-                        color: RandColor(),
+                        color: RandColor_Solid(),
                         rings: new Ring[rnd.Next(7)],
                         orbit: orbitRadius,
                         period: MathF.Pow(orbitRadius, 2) / 5000,
@@ -182,7 +222,7 @@ namespace PlanetSystemGenerator
                     float orbitRadius = parentBody.Radius + bodyRadius + RandFlt(0.1f, 3) * parentBody.Radius;
                     minor[i] = new(
                         radius: bodyRadius,
-                        color: RandColor(),
+                        color: RandColor_Solid(),
                         rings: new Ring[rnd.Next(7)],
                         orbit: orbitRadius,
                         period: MathF.Pow(orbitRadius, 2) / 5000,
