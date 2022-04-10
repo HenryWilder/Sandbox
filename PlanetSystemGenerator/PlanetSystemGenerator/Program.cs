@@ -20,64 +20,141 @@ namespace PlanetSystemGenerator
 
     class RingSystem
     {
+        static readonly string RingMaskVS =
+      @"#version 330
+        // Input vertex attributes
+        in vec3 vertexPosition;
+        in vec2 vertexTexCoord;
+        in vec3 vertexNormal;
+        in vec4 vertexColor;
+
+        // Input uniform values
+        uniform mat4 mvp;
+
+        // Output vertex attributes (to fragment shader)
+        out vec2 fragTexCoord;
+        out vec4 fragColor;
+
+        // NOTE: Add here your custom variables
+
+        void main()
+        {
+            // Send vertex attributes to fragment shader
+            fragTexCoord = vertexTexCoord;
+            fragColor = vertexColor;
+
+            // Calculate final vertex position
+            gl_Position = mvp * vec4(vertexPosition, 1.0);
+        }";
+
+        static readonly string RingMaskFS =
+      @"#version 330
+
+        // Input vertex attributes (from vertex shader)
+        in vec2 fragTexCoord;
+        in vec4 fragColor;
+
+        // Input uniform values
+        uniform sampler2D texture0;
+        uniform sampler2D mask;
+
+        // Output fragment color
+        out vec4 finalColor;
+
+        void main()
+        {
+            vec4 texelColor = texture(texture0, fragTexCoord);
+            if ((texelColor.r + texelColor.g + texelColor.b) < 0.75) discard;
+
+            finalColor = texelColor;
+        }";
+
+        /// <summary>Initializes static members.</summary>
         static RingSystem()
         {
-            g_RingModel = LoadModelFromMesh(GenMeshPlane(1, 1, 1, 1));
+            g_RingModel = LoadModelFromMesh(GenMeshPlane(2, 2, 1, 1));
+            //g_RingModel.transform = MatrixRotateXYZ(Vector3.UnitZ);
+
+            unsafe
+            {
+                g_RingMaskShader = LoadShaderFromMemory(RingMaskVS, RingMaskFS);
+                g_RingMaskShader.locs[(int)ShaderLocationIndex.SHADER_LOC_MAP_EMISSION] = GetShaderLocation(g_RingMaskShader, "mask");
+            }
         }
 
-        public RingSystem()
-        {
-            const int textureWidth = 1024;
-            RingRenderTex = LoadRenderTexture(textureWidth, textureWidth);
-
-            float maxRingRad = 0;
-            foreach (Ring ring in RingData)
-            {
-                if (ring.oRad > maxRingRad)
-                    maxRingRad = ring.oRad;
-            }
-
-            BeginTextureMode(RingRenderTex);
-            {
-                Color clear;
-                clear.r = 0;
-                clear.g = 0;
-                clear.b = 0;
-                clear.a = 0;
-
-                ClearBackground(clear);
-                Vector2 center = new Vector2(RingTex.width, RingTex.height) / 2;
-                foreach (Ring ring in RingData)
-                {
-                    DrawRing(
-                        center: center,
-                        innerRadius: ring.iRad / maxRingRad * (textureWidth / 2),
-                        outerRadius: ring.oRad / maxRingRad * (textureWidth / 2),
-                        startAngle: 0,
-                        endAngle: 360,
-                        segments: 32,
-                        color: ring.color);
-                }
-            }
-            EndTextureMode();
-        }
-
-        /// <summary>Called at the end of the program to clean up.</summary>
+        /// <summary>Call at the end of the program to clean up.</summary>
         public static void OkImDoneNow()
         {
             UnloadModel(g_RingModel);
+            UnloadShader(g_RingMaskShader);
+        }
+
+        /// <summary>Constructs the ring system.</summary>
+        /// <param name="rings">Array of <see cref="Ring"/>s.</param>
+        /// <exception cref="Exception">Cannot pass Ring[0].</exception>
+        public RingSystem(Ring[] rings)
+        {
+            {
+                if (rings.Length == 0)
+                    throw new Exception("Passed 0-length array to RingSystem constructor.");
+
+                Rings = rings;
+            }
+
+            {
+                float maxRingRad = 0;
+                foreach (Ring ring in Rings)
+                {
+                    if (ring.oRad > maxRingRad)
+                        maxRingRad = ring.oRad;
+                }
+                RingRadiusMax = maxRingRad;
+            }
+
+            {
+                const int textureWidth = 1024;
+                RingRenderTex = LoadRenderTexture(textureWidth, textureWidth);
+
+                const int textureHalfWidth = textureWidth / 2;
+                Vector2 center = new(textureHalfWidth);
+
+                BeginTextureMode(RingRenderTex);
+                {
+                    ClearBackground(new(0, 0, 0, 0));
+
+                    foreach (Ring ring in Rings)
+                    {
+                        DrawRing(
+                            center: center,
+                            innerRadius: ring.iRad / RingRadiusMax * textureHalfWidth,
+                            outerRadius: ring.oRad / RingRadiusMax * textureHalfWidth,
+                            startAngle: 0,
+                            endAngle: 360,
+                            segments: 32,
+                            color: ring.color);
+                    }
+                }
+                EndTextureMode();
+            }
+        }
+
+        /// <summary>Unloads the render texture used for drawing rings.</summary>
+        ~RingSystem()
+        {
+            UnloadRenderTexture(RingRenderTex);
         }
 
         /// <summary>The plane used for drawing the ring texture.</summary>
         public static Model g_RingModel;
+        public static Shader g_RingMaskShader;
 
         /// <summary>Data for optional ring system.</summary>
-        public Ring[] RingData { get; init; }
+        public Ring[] Rings { get; init; }
 
         public float RingRadiusMax { get; init; }
 
         /// <summary>The drawable ring texture.</summary>
-        public RenderTexture2D RingRenderTex { get; init; }
+        private RenderTexture2D RingRenderTex { get; init; }
 
         /// <summary>
         /// The stored 256x256 texture of the <see cref="Ring"/> system, <see cref="Rings">Rings</see>.<br/>
@@ -85,10 +162,36 @@ namespace PlanetSystemGenerator
         /// </summary>
         public Texture2D RingTex { get { return RingRenderTex.texture; } }
 
-        /// <summary>
-        /// For storing the ring's material
-        /// </summary>
-        public Material RingMat;
+        public void Draw(Vector3 position)
+        {
+            unsafe
+            {
+                const int materialIndex = 0;
+
+                SetMaterialTexture(
+                    material: ref g_RingModel.materials[materialIndex],
+                    mapType: MaterialMapIndex.MATERIAL_MAP_DIFFUSE,
+                    texture: RingTex);
+
+                SetMaterialShader(
+                    model: ref g_RingModel,
+                    materialIndex: materialIndex,
+                    shader: ref g_RingMaskShader);
+            }
+
+            {
+                for (int angle = -90; angle <= 90; angle += 180) // Draw 2-sided
+                {
+                    DrawModelEx(
+                        model: g_RingModel,
+                        position: position,
+                        rotationAxis: Vector3.UnitX,
+                        rotationAngle: angle,
+                        scale: Vector3.One * RingRadiusMax,
+                        tint: Color.WHITE); // No color effects
+                }
+            }
+        }
     }
 
     /// <summary>Body whose position is static and unchanging.</summary>
@@ -103,16 +206,6 @@ namespace PlanetSystemGenerator
             Radius = radius;
             Color = color;
             Rings = rings;
-            if (Rings != null) // Kept separate in case an empty array is passed in instead of defaulted.
-            {
-                
-            }
-        }
-        /// <summary>Unloads the render texture used for drawing rings.</summary>
-        ~AnchorBody()
-        {
-            if (Rings.Length > 0)
-                UnloadRenderTexture(RingRenderTex);
         }
 
         public virtual Vector3 Position { get { return Vector3.Zero; } }
@@ -127,41 +220,8 @@ namespace PlanetSystemGenerator
 
         public void DrawRings()
         {
-            // Skip rings if there are none
-            if (Rings.Length == 0)
-                return;
-
-            float maxRingRadius = 0;
-            foreach (Ring ring in Rings)
-            {
-                if (ring.oRad > maxRingRadius)
-                    maxRingRadius = ring.oRad;
-            }
-            float ringSystemWidth = maxRingRadius * 2; // Convert from circle radius to rectangle width
-
-            unsafe
-            {
-                SetMaterialTexture(
-                    material: ref RingModel.materials[0],
-                    mapType: MaterialMapIndex.MATERIAL_MAP_DIFFUSE,
-                    texture: RingTex);
-            }
-
-            DrawModelEx(
-                model: RingModel,
-                position: Position,
-                rotationAxis: Vector3.UnitX,
-                rotationAngle: 90,
-                scale: Vector3.One * ringSystemWidth,
-                tint: Color.WHITE); // No color effects
-
-            DrawModelEx(
-                model: RingModel,
-                position: Position,
-                rotationAxis: Vector3.UnitX,
-                rotationAngle: -90,
-                scale: Vector3.One * ringSystemWidth,
-                tint: Color.WHITE); // No color effects
+            if (Rings != null)
+                Rings.Draw(Position);
         }
 
         /// <summary>Draws the body</summary>
@@ -184,7 +244,7 @@ namespace PlanetSystemGenerator
         /// <param name="orbit">The radius of the orbit.<br/>or<br/>The distance from <paramref name="parent"/> this body orbits at.<br/>(See <see cref="Orbit">Orbit</see>)</param>
         /// <param name="period">Length of a full orbit.<br/>(See <see cref="Period">Period</see>)</param>
         /// <param name="startingT">The initial value of <see cref="T">T</see>.</param>
-        public MajorBody(float radius, Color color, Ring[] rings, float orbit, float period, float startingT)
+        public MajorBody(float radius, Color color, RingSystem rings, float orbit, float period, float startingT)
             : base(radius, color, rings)
         {
             Orbit = orbit;
@@ -235,7 +295,7 @@ namespace PlanetSystemGenerator
                 radius: Orbit,
                 rotationAxis: Vector3.UnitZ,
                 rotationAngle: 0.0f,
-                color: Color.GRAY);
+                color: ColorAlpha(Color.GRAY, 0.5f));
         }
     }
 
@@ -244,7 +304,7 @@ namespace PlanetSystemGenerator
     {
         /// <inheritdoc cref="MajorBody(float, Color, Ring[], float, float, float)"/>
         /// <param name="parent">The <typeparamref name="MajorBody"/> parent of this body.<br/>(See <see cref="Parent">Parent</see>)</param>
-        public MinorBody(float radius, Color color, Ring[] rings, float orbit, float period, float startingT, MajorBody parent)
+        public MinorBody(float radius, Color color, RingSystem rings, float orbit, float period, float startingT, MajorBody parent)
             : base(radius, color, rings, orbit, period, startingT)
         {
             Parent = parent;
@@ -269,7 +329,7 @@ namespace PlanetSystemGenerator
                 radius: Orbit,
                 rotationAxis: Vector3.UnitZ,
                 rotationAngle: 0.0f,
-                color: Color.DARKGRAY);
+                color: ColorAlpha(Color.DARKGRAY, 0.5f));
         }
     }
 
@@ -307,6 +367,22 @@ namespace PlanetSystemGenerator
         public static float RandFlt(float min = 0.0f, float max = 1.0f)
         {
             return (float)rnd.NextDouble() * (max - min) + min;
+        }
+
+        /// <summary>Returns a random int that is within the specified range. Inclusive for both min and max.</summary>
+        public static int RandInt()
+        {
+            return rnd.Next();
+        }
+        /// <summary>Returns a random int that is within the specified range. Inclusive for both min and max.</summary>
+        public static int RandInt(int max)
+        {
+            return rnd.Next(max + 1);
+        }
+        /// <summary>Returns a random int that is within the specified range. Inclusive for both min and max.</summary>
+        public static int RandInt(int min, int max)
+        {
+            return rnd.Next(min, max + 1);
         }
         
         /// <summary>
@@ -361,6 +437,31 @@ namespace PlanetSystemGenerator
             return new(rnd.Next(256), rnd.Next(256), rnd.Next(256), rnd.Next(minAlpha, maxAlpha));
         }
 
+        static readonly float AnchorRadiusMin = 35, AnchorRadiusMax = 100;
+        static readonly float SmallStarTemperatureMin = 500, SmallStarTemperatureMax = 700;
+        static readonly float LargeStarTemperatureMin = 10000, LargeStarTemperatureMax = 12000;
+
+            static readonly int AsteroidBeltCountMax = 3;
+            static readonly float AsteroidBeltDistanceMin = 50, AsteroidBeltDistanceMax = 400;
+            static readonly float AsteroidBeltWidthMin = 10, AsteroidBeltWidthMax = 100;
+
+        static readonly int MajorBodyCountMin = 3, MajorBodyCountMax = 25;
+        static readonly float MajorBodyRadiusMin = 10, MajorBodyRadiusMax = 20;
+        static readonly float ClosestMajorBodyOrbitRadiusMin = 50, ClosestMajorBodyOrbitRadiusMax = 200;
+        static readonly float MajorBodyOrbitalSeparationMin = 10, MajorBodyOrbitalSeparationMax = 80;
+
+            static readonly int MajorBodyRingCountMax = 5;
+            static readonly float MajorBodyRingDistanceMin = 1, MajorBodyRingDistanceMax = 20;
+            static readonly float MajorBodyRingWidthMin = 1, MajorBodyRingWidthMax = 10;
+
+        static readonly int MinorBodyCountMin = 6, MinorBodyCountMax = 64;
+        static readonly float MinorBodyRadiusMin = 2, MinorBodyRadiusMax = 6;
+        static readonly float MinorBodyOrbitRadiusMin = 0.1f, MinorBodyOrbitRadiusMax = 3;
+
+            static readonly int MinorBodyRingCountMax = 3;
+            static readonly float MinorBodyRingDistanceMin = 0.3f, MinorBodyRingDistanceMax = 5;
+            static readonly float MinorBodyRingWidthMin = 0.5f, MinorBodyRingWidthMax = 7;
+
         public static void Main()
         {
             InitWindow(1280, 720, "Planet System Generator");
@@ -373,82 +474,83 @@ namespace PlanetSystemGenerator
 
             // Anchor
             {
-                float bodyRadius = RandFlt(35, 100);
+                float bodyRadius = RandFlt(AnchorRadiusMin, AnchorRadiusMax);
 
                 // Ring gen
-                int ringCount = rnd.Next(3);
+                int ringCount = RandInt(AsteroidBeltCountMax);
                 Ring[] ringSystem = new Ring[ringCount];
                 for (int i = 0; i < ringCount; ++i)
                 {
-                    ringSystem[i].iRad = bodyRadius + RandFlt(50, 400);
-                    ringSystem[i].oRad = ringSystem[i].iRad + RandFlt(10, 100);
+                    ringSystem[i].iRad = bodyRadius + RandFlt(AsteroidBeltDistanceMin, AsteroidBeltDistanceMax);
+                    ringSystem[i].oRad = ringSystem[i].iRad + RandFlt(AsteroidBeltWidthMin, AsteroidBeltWidthMax);
                     ringSystem[i].color = RandColor_Transparent(minAlpha: 128);
                 }
 
-                float anchorAvgTemperature = (bodyRadius - 35) / 100;
+                float anchorDecimalRadius = RangeToDecimal(bodyRadius, AnchorRadiusMin, AnchorRadiusMax);
                 anchor = new(
                     radius: bodyRadius,
-                    color: RandColor_Blackbody(Lerp(500, 10000, anchorAvgTemperature), Lerp(700, 12000, anchorAvgTemperature)),
-                    rings: ringSystem);
+                    rings: (ringCount > 0) ? new RingSystem(ringSystem) : null,
+                    color: RandColor_Blackbody(
+                        minTemp: DecimalToRange(anchorDecimalRadius, SmallStarTemperatureMin, SmallStarTemperatureMax),
+                        maxTemp: DecimalToRange(anchorDecimalRadius, LargeStarTemperatureMin, LargeStarTemperatureMax)));
             }
 
             // Major bodies
             {
-                major = new MajorBody[rnd.Next(3, 25)];
-                float lastOrbit = anchor.Radius + RandFlt(50, 200);
+                major = new MajorBody[RandInt(MajorBodyCountMin, MajorBodyCountMax)];
+                float lastOrbit = anchor.Radius + RandFlt(ClosestMajorBodyOrbitRadiusMin, ClosestMajorBodyOrbitRadiusMax);
                 for (int i = 0; i < major.Length; ++i)
                 {
-                    float bodyRadius = RandFlt(10, 20);
-                    float orbitRadius = lastOrbit + RandFlt(10, 80) + bodyRadius;
+                    float bodyRadius = RandFlt(MajorBodyRadiusMin, MajorBodyRadiusMax);
+                    float orbitRadius = lastOrbit + RandFlt(MajorBodyOrbitalSeparationMin, MajorBodyOrbitalSeparationMax) + bodyRadius;
                     lastOrbit = orbitRadius + bodyRadius;
 
                     // Ring gen
-                    int ringCount = rnd.Next(3);
+                    int ringCount = RandInt(MajorBodyRingCountMax);
                     Ring[] ringSystem = new Ring[ringCount];
                     for (int j = 0; j < ringCount; ++j)
                     {
-                        ringSystem[j].iRad = bodyRadius + RandFlt(1, 20);
-                        ringSystem[j].oRad = ringSystem[j].iRad + RandFlt(1, 10);
+                        ringSystem[j].iRad = bodyRadius + RandFlt(MajorBodyRingDistanceMin, MajorBodyRingDistanceMax);
+                        ringSystem[j].oRad = ringSystem[j].iRad + RandFlt(MajorBodyRingWidthMin, MajorBodyRingWidthMax);
                         ringSystem[j].color = RandColor_Transparent(minAlpha: 128);
-                        ringSystem[j].color.b = ringSystem[j].color.g = ringSystem[j].color.r; // Grayscale asteroid belts
                     }
 
                     major[i] = new(
                         radius: bodyRadius,
                         color: RandColor_Solid(),
-                        rings: ringSystem,
+                        rings: (ringCount > 0) ? new RingSystem(ringSystem) : null,
                         orbit: orbitRadius,
                         period: MathF.Pow(orbitRadius, 2) / 5000,
-                        startingT: RandFlt(0.0f, 1.0f));
+                        startingT: RandFlt()); // 0..1
                 }
             }
 
             // Minor bodies
             {
-                minor = new MinorBody[rnd.Next(3, 25)];
+                minor = new MinorBody[RandInt(MinorBodyCountMin, MinorBodyCountMax)];
                 for (int i = 0; i < minor.Length; ++i)
                 {
-                    MajorBody parentBody = major[rnd.Next(major.Length)];
-                    float bodyRadius = RandFlt(2, 6);
-                    float orbitRadius = parentBody.Radius + bodyRadius + RandFlt(0.1f, 3) * parentBody.Radius;
+                    MajorBody parentBody = major[rnd.Next(major.Length)]; // Select a major body randomly
+                    float bodyRadius = RandFlt(MinorBodyRadiusMin, MinorBodyRadiusMax);
+                    float orbitRadius = parentBody.Radius + bodyRadius + RandFlt(MinorBodyOrbitRadiusMin, MinorBodyOrbitRadiusMax) * parentBody.Radius;
 
                     // Ring gen
-                    int ringCount = rnd.Next(3);
+                    int ringCount = rnd.Next(MinorBodyRingCountMax);
                     Ring[] ringSystem = new Ring[ringCount];
                     for (int j = 0; j < ringCount; ++j)
                     {
-                        ringSystem[j].iRad = bodyRadius + RandFlt(0.3f, 5);
-                        ringSystem[j].oRad = ringSystem[j].iRad + RandFlt(0.5f, 7);
+                        ringSystem[j].iRad = bodyRadius + RandFlt(MinorBodyRingDistanceMin, MinorBodyRingDistanceMax);
+                        ringSystem[j].oRad = ringSystem[j].iRad + RandFlt(MinorBodyRingWidthMin, MinorBodyRingWidthMax);
                         ringSystem[j].color = RandColor_Transparent(minAlpha: 128);
                     }
 
                     minor[i] = new(
                         radius: bodyRadius,
                         color: RandColor_Solid(),
-                        rings: ringSystem,
+                        rings: (ringCount > 0) ? new RingSystem(ringSystem) : null,
                         orbit: orbitRadius,
                         period: MathF.Pow(orbitRadius, 2) / 5000,
-                        startingT: RandFlt(0.0f, 1.0f),
+                        startingT: RandFlt(), // 0..1
                         parent: parentBody);
                 }
             }
@@ -456,10 +558,10 @@ namespace PlanetSystemGenerator
             // !! We are using the Z axis for UP !! 
 
             Camera3D camera;
-            camera.position = Vector3.UnitZ * 100;
+            camera.position = Vector3.UnitZ * AnchorRadiusMax;
             camera.target = Vector3.Zero;
             camera.up = Vector3.UnitY;
-            camera.fovy = 1000;
+            camera.fovy = 45;
             camera.projection = CameraProjection.CAMERA_PERSPECTIVE;
 
             SetCameraMode(camera, CameraMode.CAMERA_ORBITAL);
@@ -509,7 +611,7 @@ namespace PlanetSystemGenerator
                 EndDrawing();
             }
 
-            AnchorBody.OkImDoneNow();
+            RingSystem.OkImDoneNow();
 
             CloseWindow();
         }
