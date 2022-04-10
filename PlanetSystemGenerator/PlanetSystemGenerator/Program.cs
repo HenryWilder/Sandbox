@@ -92,7 +92,7 @@ namespace PlanetSystemGenerator
         /// <summary>Constructs the ring system.</summary>
         /// <param name="rings">Array of <see cref="Ring"/>s.</param>
         /// <exception cref="Exception">Cannot pass Ring[0].</exception>
-        public RingSystem(Ring[] rings)
+        public RingSystem(Ring[] rings, float angle)
         {
             {
                 if (rings.Length == 0)
@@ -136,6 +136,8 @@ namespace PlanetSystemGenerator
                 }
                 EndTextureMode();
             }
+
+            Angle = angle;
         }
 
         /// <summary>Unloads the render texture used for drawing rings.</summary>
@@ -162,6 +164,8 @@ namespace PlanetSystemGenerator
         /// </summary>
         public Texture2D RingTex { get { return RingRenderTex.texture; } }
 
+        public float Angle { get; init; }
+
         public void Draw(Vector3 position)
         {
             unsafe
@@ -186,7 +190,7 @@ namespace PlanetSystemGenerator
                         model: g_RingModel,
                         position: position,
                         rotationAxis: Vector3.UnitX,
-                        rotationAngle: angle,
+                        rotationAngle: angle + Angle,
                         scale: Vector3.One * RingRadiusMax,
                         tint: Color.WHITE); // No color effects
                 }
@@ -194,8 +198,14 @@ namespace PlanetSystemGenerator
         }
     }
 
+    interface IHoverable
+    {
+        bool Hovered(Ray ray);
+        void Highlight(Color highlight, float scale = 1);
+    }
+
     /// <summary>Body whose position is static and unchanging.</summary>
-    class AnchorBody
+    class AnchorBody : IHoverable
     {
         /// <summary>Explicitly generates the body.</summary>
         /// <param name="radius">The size of the body when rendered.</param>
@@ -225,15 +235,23 @@ namespace PlanetSystemGenerator
         }
 
         /// <summary>Draws the body</summary>
-        public virtual void Draw()
+        public void Draw()
         {
             // Body
-            DrawSphere(
-                centerPos: Position,
-                radius: Radius,
-                color: Color);
+            DrawSphere(Position, Radius, Color);
 
             DrawRings();
+        }
+
+        public bool Hovered(Ray ray)
+        {
+            CBool result = GetRayCollisionSphere(ray, Position, Radius);
+            return result;
+        }
+
+        public void Highlight(Color highlight, float Scale = 1)
+        {
+            DrawSphere(Position, Radius * Scale, highlight);
         }
     }
 
@@ -297,6 +315,11 @@ namespace PlanetSystemGenerator
                 rotationAngle: 0.0f,
                 color: ColorAlpha(Color.GRAY, 0.5f));
         }
+        /// <summary>Draws a line from the body to its parent.</summary>
+        public virtual void DrawParentLine()
+        {
+            DrawLine3D(Position, Vector3.Zero, ColorAlpha(Color.GRAY, 0.5f));
+        }
     }
 
     /// <summary>A body whose position is dependent on that of a parent.<br/>Inherits from <see cref="MajorBody"/>.</summary>
@@ -330,6 +353,11 @@ namespace PlanetSystemGenerator
                 rotationAxis: Vector3.UnitZ,
                 rotationAngle: 0.0f,
                 color: ColorAlpha(Color.DARKGRAY, 0.5f));
+        }
+        /// <inheritdoc cref="MajorBody.DrawParentLine()"/>
+        public override void DrawParentLine()
+        {
+            DrawLine3D(Position, Parent.Position, ColorAlpha(Color.DARKGRAY, 0.5f));
         }
     }
 
@@ -437,261 +465,249 @@ namespace PlanetSystemGenerator
             return new(rnd.Next(256), rnd.Next(256), rnd.Next(256), rnd.Next(minAlpha, maxAlpha));
         }
 
-        const float AnchorRadiusMin = 3.5f, AnchorRadiusMax = 10;
-        const float SmallStarTemperatureMin = 500, SmallStarTemperatureMax = 700;
-        const float LargeStarTemperatureMin = 10000, LargeStarTemperatureMax = 12000;
+        /// <summary>Returns true with a one out of <paramref name="x"/> chance.</summary>
+        public static bool OneIn(int x)
+        {
+            return rnd.Next(x) == 0;
+        }
 
-            const int AsteroidBeltCountMax = 3;
-            const float AsteroidBeltDistanceMin = 5, AsteroidBeltDistanceMax = 40;
-            const float AsteroidBeltWidthMin = 1, AsteroidBeltWidthMax = 10;
+        #region Universal constants
+        const float UnitScale = 0.25f;
+        #endregion // Universal constants
 
-        const int MajorBodyCountMin = 3, MajorBodyCountMax = 25;
-        const float MajorBodyRadiusMin = 1f, MajorBodyRadiusMax = 2;
-        const float ClosestMajorBodyOrbitRadiusMin = 5, ClosestMajorBodyOrbitRadiusMax = 20;
-        const float MajorBodyOrbitalSeparationMin = 1, MajorBodyOrbitalSeparationMax = 8;
+        #region Anchor constants
+        const float
+            AnchorRadiusMin = 3.5f * UnitScale,
+            AnchorRadiusMax = 10 * UnitScale;
+        const float
+            SmallStarTemperatureMin = 500 * UnitScale,
+            SmallStarTemperatureMax = 700 * UnitScale;
+        const float
+            LargeStarTemperatureMin = 10000 * UnitScale,
+            LargeStarTemperatureMax = 12000 * UnitScale;
 
-            const int MajorBodyRingCountMax = 5;
-            const float MajorBodyRingDistanceMin = 0.1f, MajorBodyRingDistanceMax = 2;
-            const float MajorBodyRingWidthMin = 0.1f, MajorBodyRingWidthMax = 1;
+            #region Asteroid belt constants
+            const int
+                AsteroidBeltCountMax = 3;
+            const float
+                AsteroidBeltDistanceMin = 5 * UnitScale,
+                AsteroidBeltDistanceMax = 40 * UnitScale;
+            const float 
+                AsteroidBeltWidthMin = 1 * UnitScale,
+                AsteroidBeltWidthMax = 10 * UnitScale;
+            #endregion // Asteroid belt constants
 
-        const int MinorBodyCountMin = 6, MinorBodyCountMax = 64;
-        const float MinorBodyRadiusMin = 0.2f, MinorBodyRadiusMax = 0.6f;
-        const float MinorBodyOrbitRadiusMin = 0.01f, MinorBodyOrbitRadiusMax = 0.3f;
+        #endregion // Anchor constants
 
-            const int MinorBodyRingCountMax = 3;
-            const float MinorBodyRingDistanceMin = 0.03f, MinorBodyRingDistanceMax = 0.5f;
-            const float MinorBodyRingWidthMin = 0.05f, MinorBodyRingWidthMax = 0.7f;
+        #region Major body constants
+        const int
+            MajorBodyCountMin = 3,
+            MajorBodyCountMax = 25;
+        const float
+            MajorBodyRadiusMin = 1 * UnitScale,
+            MajorBodyRadiusMax = 2 * UnitScale;
+        const float
+            ClosestMajorBodyOrbitRadiusMin = 5 * UnitScale,
+            ClosestMajorBodyOrbitRadiusMax = 20 * UnitScale;
+        const float
+            MajorBodyOrbitalSeparationMin = 1 * UnitScale,
+            MajorBodyOrbitalSeparationMax = 8 * UnitScale;
+
+            #region Major body ring constants
+            const int
+                MajorBodyRingCountMax = 5;
+            const float
+                MajorBodyRingDistanceMin = 0.1f * UnitScale,
+                MajorBodyRingDistanceMax = 2 * UnitScale;
+            const float
+                MajorBodyRingWidthMin = 0.1f * UnitScale,
+                MajorBodyRingWidthMax = 1 * UnitScale;
+            #endregion // Major body ring constants
+
+        #endregion // Major body constants
+
+        #region Minor body constants
+        const int
+            MinorBodyCountMin = 6,
+            MinorBodyCountMax = 64;
+        const float
+            MinorBodyRadiusMin = 0.2f * UnitScale,
+            MinorBodyRadiusMax = 0.6f * UnitScale;
+        const float
+            MinorBodyOrbitRadiusMin = 0.01f * UnitScale,
+            MinorBodyOrbitRadiusMax = 0.3f * UnitScale;
+
+            #region Minor body ring constants
+            const int
+                MinorBodyRingCountMax = 3;
+            const float
+                MinorBodyRingDistanceMin = 0.03f * UnitScale,
+                MinorBodyRingDistanceMax = 0.5f * UnitScale;
+            const float
+                MinorBodyRingWidthMin = 0.05f * UnitScale,
+                MinorBodyRingWidthMax = 0.7f * UnitScale;
+            #endregion // Minor body ring constants
+
+        #endregion // Minor body constants
+
+        enum AnchorType
+        {
+            DwarfStar,
+            NormalStar,
+            NeutronStar,
+            Pulsar,
+            BlackHole,
+            ProtoStar,
+        }
+        enum PlanetType
+        {
+            GasGiant,
+            Rocky,
+            Icey, // Far from the star
+            Scorched, // Close to the star
+        }
+        enum MoonType
+        {
+            Rocky,
+            GasTiny, // I made this one up
+        }
 
         public static void Main()
         {
+            #region Setup phase
+
             InitWindow(1280, 720, "Planet System Generator");
             SetTargetFPS(60);
 
-            // Star
-            AnchorBody anchor; // Sun
+            #region Body Generation
+
+            AnchorBody anchor; // Star
             MajorBody[] major; // Planets
             MinorBody[] minor; // Moons
-
-#if false // All max
-            // Anchor
+            #region Anchor
             {
-                float bodyRadius = AnchorRadiusMax;
+                AnchorType anchorType = AnchorType.NormalStar;
+#if false
+            {
+                double roll = rnd.NextDouble();
 
-                // Ring gen
-                int ringCount = 1;
-                Ring[] ringSystem = new Ring[ringCount];
-                for (int i = 0; i < ringCount; ++i)
-                {
-                    ringSystem[i].iRad = bodyRadius + AsteroidBeltDistanceMax;
-                    ringSystem[i].oRad = ringSystem[i].iRad + AsteroidBeltWidthMax;
-                    ringSystem[i].color = RandColor_Transparent(minAlpha: 128);
-                    ringSystem[i].color.b = ringSystem[i].color.g = ringSystem[i].color.r; // Yellowish asteroid belts
-                }
-
-                anchor = new(
-                    radius: bodyRadius,
-                    color: RandColor_Blackbody(LargeStarTemperatureMax, LargeStarTemperatureMax),
-                    rings: (ringCount > 0) ? new RingSystem(ringSystem) : null);
+                if (roll <= 0.0001)
+                    anchorType = AnchorType.ProtoStar;
+                else if (roll <= 0.001)
+                    anchorType = AnchorType.BlackHole;
+                else if (roll <= 0.05)
+                    anchorType = AnchorType.Pulsar;
+                else if (roll <= 0.1)
+                    anchorType = AnchorType.NeutronStar;
+                else if (roll <= 0.5)
+                    anchorType = AnchorType.DwarfStar;
+                else
+                    anchorType = AnchorType.NormalStar;
             }
-
-            // Major bodies
-            {
-                major = new MajorBody[MajorBodyCountMax];
-                float lastOrbit = anchor.Radius + ClosestMajorBodyOrbitRadiusMax;
-                for (int i = 0; i < major.Length; ++i)
+#endif
+                switch (anchorType)
                 {
-                    float bodyRadius = MajorBodyRadiusMax;
-                    float orbitRadius = lastOrbit + MajorBodyOrbitalSeparationMax + bodyRadius;
-                    lastOrbit = orbitRadius + bodyRadius;
+                    case AnchorType.ProtoStar:
+                        {
+                            // Todo
+                            anchor = new(
+                                radius: AnchorRadiusMin,
+                                color: Color.MAGENTA,
+                                rings: null);
+                        }
+                        break;
 
-                    // Ring gen
-                    int ringCount = 1;
-                    Ring[] ringSystem = new Ring[ringCount];
-                    for (int j = 0; j < ringCount; ++j)
-                    {
-                        ringSystem[j].iRad = bodyRadius + MajorBodyRingDistanceMax;
-                        ringSystem[j].oRad = ringSystem[j].iRad + MajorBodyRingWidthMax;
-                        ringSystem[j].color = RandColor_Transparent(minAlpha: 128);
-                    }
+                    case AnchorType.BlackHole:
+                        {
+                            float bodyRadius = MajorBodyRadiusMin;
 
-                    major[i] = new(
-                        radius: bodyRadius,
-                        color: RandColor_Solid(),
-                        rings: (ringCount > 0) ? new RingSystem(ringSystem) : null,
-                        orbit: orbitRadius,
-                        period: MathF.Pow(orbitRadius, 3) / 20000,
-                        startingT: RandFlt()); // 0..1
-                }
-            }
+                            // Ring gen
+                            int ringCount = 10;
+                            Ring[] ringSystem = new Ring[ringCount];
+                            float lastEnd = bodyRadius;
+                            for (int i = 0; i < ringCount; ++i)
+                            {
+                                float dist = RandFlt();
+                                ringSystem[i].iRad = lastEnd;
+                                lastEnd = ringSystem[i].oRad = ringSystem[i].iRad + DecimalToRange(dist, MajorBodyRingWidthMin, MajorBodyRingWidthMax);
+                                float amount = i / 10.0f;
+                                Vector3 colorVec;
+                                if (i == 0)
+                                    colorVec = Vector3.One;
+                                else
+                                    colorVec = Vector3Lerp(Vector3.UnitX + Vector3.UnitY, Vector3.UnitX, amount);
+                                ringSystem[i].color = new Color((int)(colorVec.X * 255), (int)(colorVec.Y * 255), (int)(colorVec.Z * 255), (int)DecimalToRange(1 - amount, 190, 255));
+                            }
 
-            // Minor bodies
-            {
-                minor = new MinorBody[MinorBodyCountMax];
-                for (int i = 0; i < minor.Length; ++i)
-                {
-                    MajorBody parentBody = major[rnd.Next(major.Length)]; // Select a major body randomly
-                    float bodyRadius = MinorBodyRadiusMax;
-                    float orbitRadius = parentBody.Radius + bodyRadius + MinorBodyOrbitRadiusMax + parentBody.Radius;
+                            anchor = new(
+                                radius: bodyRadius,
+                                color: Color.BLACK,
+                                rings: new RingSystem(ringSystem, 0));
+                        }
+                        break;
 
-                    // Ring gen
-                    int ringCount = 1;
-                    Ring[] ringSystem = new Ring[ringCount];
-                    for (int j = 0; j < ringCount; ++j)
-                    {
-                        ringSystem[j].iRad = bodyRadius + MinorBodyRingDistanceMax;
-                        ringSystem[j].oRad = ringSystem[j].iRad + MinorBodyRingWidthMax;
-                        ringSystem[j].color = RandColor_Transparent(minAlpha: 128);
-                    }
+                    case AnchorType.Pulsar:
+                        {
+                            // Todo
+                            anchor = new(
+                                radius: AnchorRadiusMin,
+                                color: Color.MAGENTA,
+                                rings: null);
+                        }
+                        break;
 
-                    minor[i] = new(
-                        radius: bodyRadius,
-                        color: RandColor_Solid(),
-                        rings: (ringCount > 0) ? new RingSystem(ringSystem) : null,
-                        orbit: orbitRadius,
-                        period: MathF.Pow(orbitRadius, 3) / 10000,
-                        startingT: RandFlt(), // 0..1
-                        parent: parentBody);
-                }
-            }
-#elif false // All min
-            // Anchor
-            {
-                float bodyRadius = AnchorRadiusMin;
+                    case AnchorType.NeutronStar:
+                        {
+                            // Todo
+                            anchor = new(
+                                radius: AnchorRadiusMin,
+                                color: Color.MAGENTA,
+                                rings: null);
+                        }
+                        break;
 
-                // Ring gen
-                int ringCount = 1;
-                Ring[] ringSystem = new Ring[ringCount];
-                for (int i = 0; i < ringCount; ++i)
-                {
-                    ringSystem[i].iRad = bodyRadius + AsteroidBeltDistanceMin;
-                    ringSystem[i].oRad = ringSystem[i].iRad + AsteroidBeltWidthMin;
-                    ringSystem[i].color = RandColor_Transparent(minAlpha: 128);
-                    ringSystem[i].color.b = ringSystem[i].color.g = ringSystem[i].color.r; // Yellowish asteroid belts
-                }
+                    case AnchorType.DwarfStar:
+                        {
+                            // Todo
+                            anchor = new(
+                                radius: AnchorRadiusMin,
+                                color: Color.MAGENTA,
+                                rings: null);
+                        }
+                        break;
 
-                anchor = new(
-                    radius: bodyRadius,
-                    color: RandColor_Blackbody(SmallStarTemperatureMin, SmallStarTemperatureMin),
-                    rings: (ringCount > 0) ? new RingSystem(ringSystem) : null);
-            }
+                    default:
+                    case AnchorType.NormalStar:
+                        {
+                            float bodyRadius = RandFlt(AnchorRadiusMin, AnchorRadiusMax);
 
-            // Major bodies
-            {
-                major = new MajorBody[MajorBodyCountMin];
-                float lastOrbit = anchor.Radius + ClosestMajorBodyOrbitRadiusMin;
-                for (int i = 0; i < major.Length; ++i)
-                {
-                    float bodyRadius = MajorBodyRadiusMin;
-                    float orbitRadius = lastOrbit + MajorBodyOrbitalSeparationMin + bodyRadius;
-                    lastOrbit = orbitRadius + bodyRadius;
+                            // Ring gen
+                            int ringCount = RandInt(AsteroidBeltCountMax);
+                            Ring[] ringSystem = new Ring[ringCount];
+                            for (int i = 0; i < ringCount; ++i)
+                            {
+                                ringSystem[i].iRad = bodyRadius + RandFlt(AsteroidBeltDistanceMin, AsteroidBeltDistanceMax);
+                                ringSystem[i].oRad = ringSystem[i].iRad + RandFlt(AsteroidBeltWidthMin, AsteroidBeltWidthMax);
+                                ringSystem[i].color = RandColor_Transparent(minAlpha: 128);
+                                ringSystem[i].color.b = ringSystem[i].color.g = ringSystem[i].color.r; // Yellowish asteroid belts
+                            }
 
-                    // Ring gen
-                    int ringCount = 1;
-                    Ring[] ringSystem = new Ring[1];
-                    for (int j = 0; j < ringCount; ++j)
-                    {
-                        ringSystem[j].iRad = bodyRadius * 2 + MajorBodyRingDistanceMin;
-                        ringSystem[j].oRad = ringSystem[j].iRad + MajorBodyRingWidthMin;
-                        ringSystem[j].color = RandColor_Transparent(minAlpha: 128);
-                    }
+                            float anchorDecimalRadius = RangeToDecimal(bodyRadius, AnchorRadiusMin, AnchorRadiusMax);
+                            Color color = RandColor_Blackbody(
+                                    minTemp: DecimalToRange(anchorDecimalRadius, SmallStarTemperatureMin, SmallStarTemperatureMax),
+                                    maxTemp: DecimalToRange(anchorDecimalRadius, LargeStarTemperatureMin, LargeStarTemperatureMax));
 
-                    major[i] = new(
-                        radius: bodyRadius,
-                        color: RandColor_Solid(),
-                        rings: (ringCount > 0) ? new RingSystem(ringSystem) : null,
-                        orbit: orbitRadius,
-                        period: orbitRadius,
-                        startingT: RandFlt()); // 0..1
+                            anchor = new(
+                                radius: bodyRadius,
+                                color: color,
+                                rings: (ringCount > 0) ? new RingSystem(ringSystem, RandFlt(-5,5)) : null);
+                        }
+                        break;
                 }
             }
+#endregion // Anchor
 
-            // Minor bodies
-            {
-                minor = new MinorBody[MinorBodyCountMin];
-                for (int i = 0; i < minor.Length; ++i)
-                {
-                    MajorBody parentBody = major[rnd.Next(major.Length)]; // Select a major body randomly
-                    float bodyRadius = MinorBodyRadiusMin;
-                    float orbitRadius = parentBody.Radius + bodyRadius + MinorBodyOrbitRadiusMin + parentBody.Radius * 2;
-
-                    // Ring gen
-                    int ringCount = 1;
-                    Ring[] ringSystem = new Ring[ringCount];
-                    for (int j = 0; j < ringCount; ++j)
-                    {
-                        ringSystem[j].iRad = bodyRadius + MinorBodyRingDistanceMin;
-                        ringSystem[j].oRad = ringSystem[j].iRad + MinorBodyRingWidthMin;
-                        ringSystem[j].color = RandColor_Transparent(minAlpha: 128);
-                    }
-
-                    minor[i] = new(
-                        radius: bodyRadius,
-                        color: RandColor_Solid(),
-                        rings: (ringCount > 0) ? new RingSystem(ringSystem) : null,
-                        orbit: orbitRadius,
-                        period: orbitRadius,
-                        startingT: RandFlt(), // 0..1
-                        parent: parentBody);
-                }
-            }
-#else
-            // Anchor
-            {
-                if (true) // Black hole
-                {
-                    float bodyRadius = MajorBodyRadiusMin;
-
-                    // Ring gen
-                    int ringCount = 10;
-                    Ring[] ringSystem = new Ring[ringCount];
-                    float lastEnd = bodyRadius;
-                    for (int i = 0; i < ringCount; ++i)
-                    {
-                        float dist = RandFlt();
-                        ringSystem[i].iRad = lastEnd;
-                        lastEnd = ringSystem[i].oRad = ringSystem[i].iRad + DecimalToRange(dist, AsteroidBeltWidthMin, AsteroidBeltWidthMax);
-                        float amount = i / 10.0f;
-                        Vector3 colorVec;
-                        if (i == 0)
-                            colorVec = Vector3.One;
-                        else
-                            colorVec = Vector3Lerp(Vector3.UnitX + Vector3.UnitY, Vector3.UnitX, amount);
-                        ringSystem[i].color = new Color((int)(colorVec.X * 255), (int)(colorVec.Y * 255), (int)(colorVec.Z * 255), (int)DecimalToRange(1-amount, 190, 255));
-                    }
-
-                    anchor = new(
-                        radius: bodyRadius,
-                        color: Color.BLACK,
-                        rings: (ringCount > 0) ? new RingSystem(ringSystem) : null);
-                }
-                else // Star
-                {
-                    float bodyRadius = RandFlt(AnchorRadiusMin, AnchorRadiusMax);
-
-                    // Ring gen
-                    int ringCount = RandInt(AsteroidBeltCountMax);
-                    Ring[] ringSystem = new Ring[ringCount];
-                    for (int i = 0; i < ringCount; ++i)
-                    {
-                        ringSystem[i].iRad = bodyRadius + RandFlt(AsteroidBeltDistanceMin, AsteroidBeltDistanceMax);
-                        ringSystem[i].oRad = ringSystem[i].iRad + RandFlt(AsteroidBeltWidthMin, AsteroidBeltWidthMax);
-                        ringSystem[i].color = RandColor_Transparent(minAlpha: 128);
-                        ringSystem[i].color.b = ringSystem[i].color.g = ringSystem[i].color.r; // Yellowish asteroid belts
-                    }
-
-                    float anchorDecimalRadius = RangeToDecimal(bodyRadius, AnchorRadiusMin, AnchorRadiusMax);
-                    Color color = RandColor_Blackbody(
-                            minTemp: DecimalToRange(anchorDecimalRadius, SmallStarTemperatureMin, SmallStarTemperatureMax),
-                            maxTemp: DecimalToRange(anchorDecimalRadius, LargeStarTemperatureMin, LargeStarTemperatureMax));
-
-                    anchor = new(
-                        radius: bodyRadius,
-                        color: color,
-                        rings: (ringCount > 0) ? new RingSystem(ringSystem) : null);
-                }
-            }
-
-            // Major bodies
+#region Major bodies
             {
                 major = new MajorBody[RandInt(MajorBodyCountMin, MajorBodyCountMax)];
                 float lastOrbit = anchor.Radius + RandFlt(ClosestMajorBodyOrbitRadiusMin, ClosestMajorBodyOrbitRadiusMax);
@@ -702,7 +718,13 @@ namespace PlanetSystemGenerator
                     lastOrbit = orbitRadius + bodyRadius;
 
                     // Ring gen
-                    int ringCount = RandInt(MajorBodyRingCountMax);
+                    int[] chanceOfRings = { 3, 2, 4, 6, 8 }; // Lower number = higher probability
+                    int ringCount = 0;
+                    for (int ring = 0; ring < MajorBodyRingCountMax; ++ring)
+                    {
+                        if (OneIn(chanceOfRings[ring]))
+                            ringCount++;
+                    }
                     Ring[] ringSystem = new Ring[ringCount];
                     for (int j = 0; j < ringCount; ++j)
                     {
@@ -714,14 +736,15 @@ namespace PlanetSystemGenerator
                     major[i] = new(
                         radius: bodyRadius,
                         color: RandColor_Solid(),
-                        rings: (ringCount > 0) ? new RingSystem(ringSystem) : null,
+                        rings: (ringCount > 0) ? new RingSystem(ringSystem, MathF.Pow(RandFlt(-1,1),10) * 90) : null,
                         orbit: orbitRadius,
-                        period: MathF.Pow(orbitRadius, 2) / 5000,
+                        period: orbitRadius / UnitScale,
                         startingT: RandFlt()); // 0..1
                 }
             }
+#endregion // Major bodies
 
-            // Minor bodies
+#region Minor bodies
             {
                 minor = new MinorBody[RandInt(MinorBodyCountMin, MinorBodyCountMax)];
                 for (int i = 0; i < minor.Length; ++i)
@@ -731,7 +754,7 @@ namespace PlanetSystemGenerator
                     float orbitRadius = parentBody.Radius + bodyRadius + RandFlt(MinorBodyOrbitRadiusMin, MinorBodyOrbitRadiusMax) + parentBody.Radius;
 
                     // Ring gen
-                    int ringCount = rnd.Next(MinorBodyRingCountMax);
+                    int ringCount = OneIn(50) ? RandInt(MinorBodyRingCountMax) : 0;
                     Ring[] ringSystem = new Ring[ringCount];
                     for (int j = 0; j < ringCount; ++j)
                     {
@@ -743,28 +766,50 @@ namespace PlanetSystemGenerator
                     minor[i] = new(
                         radius: bodyRadius,
                         color: RandColor_Solid(),
-                        rings: (ringCount > 0) ? new RingSystem(ringSystem) : null,
+                        rings: (ringCount > 0) ? new RingSystem(ringSystem, RandFlt(-45,45)) : null,
                         orbit: orbitRadius,
-                        period: MathF.Pow(orbitRadius, 2) / 5000,
+                        period: orbitRadius / UnitScale,
                         startingT: RandFlt(), // 0..1
                         parent: parentBody);
                 }
             }
-#endif
+            #endregion // Minor bodies
 
-            // !! We are using the Z axis for UP !! 
+            #endregion // Body generation
 
-            Camera3D camera;
-            camera.position = Vector3.UnitZ * AnchorRadiusMax * 2;
-            camera.target = Vector3.Zero;
-            camera.up = Vector3.UnitY;
-            camera.fovy = 45;
-            camera.projection = CameraProjection.CAMERA_PERSPECTIVE;
+            IHoverable[] hoverable = new IHoverable[1 + major.Length + minor.Length];
+            {
+                int i = 0;
+                hoverable[i++] = anchor;
+                foreach (MajorBody body in major)
+                {
+                    hoverable[i++] = body;
+                }
+                foreach (MinorBody body in minor)
+                {
+                    hoverable[i++] = body;
+                }
+            }
+            IHoverable hovered;
 
+            // !! We are using the Z axis for UP !!
+            // Note: by "up", I mean the up axis of the system (perpendicular to orbits), not the screen.
+
+            Camera3D camera; {
+                camera.position = Vector3.UnitZ * AnchorRadiusMax * 2;
+                camera.target = Vector3.Zero;
+                camera.up = Vector3.UnitY;
+                camera.fovy = 45;
+                camera.projection = CameraProjection.CAMERA_PERSPECTIVE;
+            }
             SetCameraMode(camera, CameraMode.CAMERA_ORBITAL);
 
+#endregion // Setup phase
+
+            #region Game loop
             while (!WindowShouldClose())
             {
+                #region Simulation phase
                 float dt = GetFrameTime();
                 foreach (MajorBody body in major)
                 {
@@ -777,6 +822,21 @@ namespace PlanetSystemGenerator
 
                 UpdateCamera(ref camera);
 
+                Ray mouseRay = GetMouseRay(GetMousePosition(), camera);
+
+                hovered = null;
+                foreach (IHoverable body in hoverable)
+                {
+                    if (body.Hovered(mouseRay))
+                    {
+                        hovered = body;
+                        break;
+                    }
+                }
+
+                #endregion // Simulation phase
+
+                #region Draw phase
                 BeginDrawing();
                 {
                     ClearBackground(Color.BLACK);
@@ -789,7 +849,8 @@ namespace PlanetSystemGenerator
                         foreach (MajorBody body in major)
                         {
                             // Orbit
-                            body.DrawOrbit();
+                            //body.DrawOrbit();
+                            body.DrawParentLine();
 
                             // Body
                             body.Draw();
@@ -797,20 +858,36 @@ namespace PlanetSystemGenerator
                         foreach (MinorBody body in minor)
                         {
                             // Orbit
-                            body.DrawOrbit();
+                            //body.DrawOrbit();
+                            body.DrawParentLine();
 
                             // Body
                             body.Draw();
                         }
+
+                        if (hovered != null)
+                            hovered.Highlight(Color.YELLOW, 1.1f);
+
+                        DrawRay(mouseRay, Color.RED);
                     }
                     EndMode3D();
                 }
                 EndDrawing();
+                #endregion // Draw phase
             }
+            #endregion // Game loop
 
-            RingSystem.OkImDoneNow();
+            #region Cleanup phase
+
+            hovered = null;
+            hoverable = Array.Empty<IHoverable>();
+
+            RingSystem.OkImDoneNow(); // Release static RingSystem members
 
             CloseWindow();
+
+            #endregion // Cleanup phase
         }
+        // Exception happens here
     }
 }
