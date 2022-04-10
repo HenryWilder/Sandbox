@@ -130,7 +130,7 @@ namespace PlanetSystemGenerator
                             outerRadius: ring.oRad / RingRadiusMax * textureHalfWidth,
                             startAngle: 0,
                             endAngle: 360,
-                            segments: 32,
+                            segments: 128,
                             color: ring.color);
                     }
                 }
@@ -484,15 +484,16 @@ namespace PlanetSystemGenerator
                     ringSystem[i].iRad = bodyRadius + RandFlt(AsteroidBeltDistanceMin, AsteroidBeltDistanceMax);
                     ringSystem[i].oRad = ringSystem[i].iRad + RandFlt(AsteroidBeltWidthMin, AsteroidBeltWidthMax);
                     ringSystem[i].color = RandColor_Transparent(minAlpha: 128);
+                    ringSystem[i].color.b = ringSystem[i].color.g = ringSystem[i].color.r; // Yellowish asteroid belts
                 }
 
                 float anchorDecimalRadius = RangeToDecimal(bodyRadius, AnchorRadiusMin, AnchorRadiusMax);
                 anchor = new(
                     radius: bodyRadius,
-                    rings: (ringCount > 0) ? new RingSystem(ringSystem) : null,
                     color: RandColor_Blackbody(
                         minTemp: DecimalToRange(anchorDecimalRadius, SmallStarTemperatureMin, SmallStarTemperatureMax),
-                        maxTemp: DecimalToRange(anchorDecimalRadius, LargeStarTemperatureMin, LargeStarTemperatureMax)));
+                        maxTemp: DecimalToRange(anchorDecimalRadius, LargeStarTemperatureMin, LargeStarTemperatureMax)),
+                    rings: (ringCount > 0) ? new RingSystem(ringSystem) : null);
             }
 
             // Major bodies
