@@ -2,6 +2,7 @@
 #include <raymath.h>
 #include <algorithm>
 #include <time.h>
+#include <string>
 
 #define sign(x) (((x) > (decltype(x))(0)) - ((x) < (decltype(x))(0)))
 
@@ -61,6 +62,70 @@ float RandomFloatInRange(float min, float max)
     return ((float)rand() / (float)RAND_MAX) * (max - min) + min;
 }
 
+constexpr int g_ballCount = 7;
+
+const std::string vertShader = R"TXT(
+#version 330
+
+// Input vertex attributes
+in vec3 vertexPosition;
+in vec2 vertexTexCoord;
+in vec3 vertexNormal;
+in vec4 vertexColor;
+
+// Input uniform values
+uniform mat4 mvp;
+
+// Output vertex attributes (to fragment shader)
+out vec2 fragTexCoord;
+out vec4 fragColor;
+
+// NOTE: Add here your custom variables
+
+void main()
+{
+    // Send vertex attributes to fragment shader
+    fragTexCoord = vertexTexCoord;
+    fragColor = vertexColor;
+
+    // Calculate final vertex position
+    gl_Position = mvp*vec4(vertexPosition, 1.0);
+}
+)TXT";
+
+const std::string g_fragShader = R"TXT(
+#version 330
+
+// Input vertex attributes (from vertex shader)
+in vec2 fragTexCoord;
+in vec4 fragColor;
+
+// Input uniform heights
+uniform sampler2D texture0;
+uniform vec4 colDiffuse;
+
+const int numBalls = )TXT" + std::to_string(g_ballCount) + R"TXT(;
+uniform vec2 p[numBalls];
+uniform float r[numBalls];
+
+// Output fragment color
+out vec4 finalColor;
+
+// NOTE: Add here your custom variables
+uniform vec2 resolution = vec2(720, 720);
+
+void main()
+{
+	float activity = 0.0;
+	for (int i = 0; i < numBalls; ++i)
+	{
+		activity += ((r[i] / resolution.x) / distance(fragTexCoord, p[i] / resolution));
+	}
+
+	finalColor = vec4((activity >= 1.0 ? mix(vec3(129,21,206)/255,vec3(29,25,40)/255, clamp(pow(activity - 1.0, 0.25),0.0,1.0)) : vec3(1.0)), 1.0);
+}
+)TXT";
+
 int main()
 {
     int windowWidth = 720;
@@ -72,48 +137,31 @@ int main()
     *   Load textures, shaders, and meshes    *
     ******************************************/
 
-    Shader metaballShader = LoadShader(0,"Metaball.frag");
+    Shader metaballShader = LoadShaderCode(vertShader.c_str(), g_fragShader.c_str());
     RenderTexture2D screen = LoadRenderTexture(windowWidth, windowHeight);
     BeginTextureMode(screen);
     ClearBackground(WHITE);
     EndTextureMode();
 
     int metaCursorLoc = GetShaderLocation(metaballShader, "cursor");
-    int metaPtLoc[4];
-    int metaRadLoc[4];
-    for (int i = 0; i < 4; ++i)
-    {
-        char name[3] = { 'p', '0' + i, 0 };
-        metaPtLoc[i] = GetShaderLocation(metaballShader, name);
-        name[0] = 'r';
-        metaRadLoc[i] = GetShaderLocation(metaballShader, name);
-    }
+    int metaPtLoc = GetShaderLocation(metaballShader, "p");
+    int metaRadLoc = GetShaderLocation(metaballShader, "r");
 
     srand(time(nullptr));
 
-    Vector2 points[4] = {
-        { RandomFloatInRange(0,(float)windowWidth), RandomFloatInRange(0,(float)windowHeight) },
-        { RandomFloatInRange(0,(float)windowWidth), RandomFloatInRange(0,(float)windowHeight) },
-        { RandomFloatInRange(0,(float)windowWidth), RandomFloatInRange(0,(float)windowHeight) },
-        { RandomFloatInRange(0,(float)windowWidth), RandomFloatInRange(0,(float)windowHeight) },
-    };
-    float radius[4] = {
-        RandomFloatInRange(20,50),
-        RandomFloatInRange(20,50),
-        RandomFloatInRange(20,50),
-        RandomFloatInRange(20,50),
-    };
-    Vector2 velocity[4] = {
-        Vector2Normalize({ RandomFloatInRange(-1,1), RandomFloatInRange(-1,1) }) * RandomFloatInRange(0,5),
-        Vector2Normalize({ RandomFloatInRange(-1,1), RandomFloatInRange(-1,1) }) * RandomFloatInRange(0,5),
-        Vector2Normalize({ RandomFloatInRange(-1,1), RandomFloatInRange(-1,1) }) * RandomFloatInRange(0,5),
-        Vector2Normalize({ RandomFloatInRange(-1,1), RandomFloatInRange(-1,1) }) * RandomFloatInRange(0,5),
-    };
-
-    for (int i = 0; i < 4; ++i)
-    {
-        SetShaderValue(metaballShader, metaRadLoc[i], radius + i, UNIFORM_FLOAT);
-    }
+    Vector2 points[g_ballCount];
+    for (int i = 0; i < g_ballCount; ++i)
+        points[i] = { RandomFloatInRange(0,(float)windowWidth), RandomFloatInRange(0,(float)windowHeight) };
+    
+    float radius[g_ballCount];
+    for (int i = 0; i < g_ballCount; ++i)
+        radius[i] = RandomFloatInRange(20,50);
+    
+    Vector2 velocity[g_ballCount];
+    for (int i = 0; i < g_ballCount; ++i)
+        velocity[i] = Vector2Normalize({ RandomFloatInRange(-1,1), RandomFloatInRange(-1,1) }) * RandomFloatInRange(0, 5);
+    
+    SetShaderValueV(metaballShader, metaRadLoc, radius, UNIFORM_FLOAT, g_ballCount);
 
     while (!WindowShouldClose())
     {
@@ -122,13 +170,12 @@ int main()
         ******************************************/
 
         float data[2] = { (float)GetMouseX(), (float)GetMouseY() };
-        SetShaderValue(metaballShader, metaCursorLoc, data, UNIFORM_VEC2);
 
-        for (int i = 0; i < 4; ++i)
-        {
-            SetShaderValue(metaballShader, metaPtLoc[i], points + i, UNIFORM_VEC2);
-        }
-        for (int i = 0; i < 4; ++i)
+        SetShaderValueV(metaballShader, metaCursorLoc, data, UNIFORM_VEC2, g_ballCount);
+
+        SetShaderValueV(metaballShader, metaPtLoc, points, UNIFORM_VEC2, g_ballCount);
+
+        for (int i = 0; i < g_ballCount; ++i)
         {
             points[i] += velocity[i];
 
@@ -138,9 +185,9 @@ int main()
             if (points[i].y > windowHeight || points[i].y < 0)
                 velocity[i].y *= -1;
         }
-        for (int i = 0; i < 4; ++i)
+        for (int i = 0; i < g_ballCount; ++i)
         {
-            for (int j = 0; j < 4; ++j)
+            for (int j = 0; j < g_ballCount; ++j)
             {
                 if (j == i)
                     continue;
