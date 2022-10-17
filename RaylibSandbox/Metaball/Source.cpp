@@ -63,6 +63,7 @@ float RandomFloatInRange(float min, float max)
 }
 
 constexpr int g_ballCount = 7;
+constexpr float g_speedLimit = 10;
 
 const std::string vertShader = R"TXT(
 #version 330
@@ -155,7 +156,7 @@ int main()
     
     float radius[g_ballCount];
     for (int i = 0; i < g_ballCount; ++i)
-        radius[i] = RandomFloatInRange(20,50);
+        radius[i] = RandomFloatInRange(100,200) / g_ballCount;
     
     Vector2 velocity[g_ballCount];
     for (int i = 0; i < g_ballCount; ++i)
@@ -179,11 +180,23 @@ int main()
         {
             points[i] += velocity[i];
 
-            if (points[i].x > windowWidth || points[i].x < 0)
-                velocity[i].x *= -1;
+            bool tooLeft  = points[i].x - radius[i] < 0;
+            bool tooHigh  = points[i].y - radius[i] < 0;
+            bool tooRight = points[i].x + radius[i] > windowWidth;
+            bool tooLow   = points[i].y + radius[i] > windowHeight;
 
-            if (points[i].y > windowHeight || points[i].y < 0)
-                velocity[i].y *= -1;
+            if (tooLeft || tooRight) velocity[i].x *= -1;
+            if (tooHigh || tooLow)   velocity[i].y *= -1;
+
+            if (tooLeft)  points[i].x = radius[i];
+            if (tooHigh)  points[i].y = radius[i];
+            if (tooRight) points[i].x = windowWidth  - radius[i];
+            if (tooLow)   points[i].y = windowHeight - radius[i];
+
+            if (Vector2Length(velocity[i]) > g_speedLimit) velocity[i] = Vector2Normalize(velocity[i]) * g_speedLimit;
+
+            // Air resistance
+            //velocity[i] *= 0.98f;
         }
         for (int i = 0; i < g_ballCount; ++i)
         {
@@ -194,16 +207,18 @@ int main()
 
                 float dist = Vector2Distance(points[j], points[i]);
 
-                if (dist > (radius[j] + radius[i]))
-                    velocity[i] += Vector2Normalize(points[j] - points[i]) * ((radius[j] * radius[i] * 2.0f) / (dist * dist));
+                Vector2 towards = Vector2Normalize(points[j] - points[i]);
+                float newSpeed = ((radius[j] * radius[i] * 2.0f) / (dist * dist));
 
-                // Drag
+                float touchDistance = (radius[j] + radius[i]); // Distance in order to touch
+
+                // Gravity
+                if (dist > touchDistance)
+                    velocity[i] += towards * newSpeed;
+
+                // Repulsion
                 else if (dist > 0.0f)
-                {
-                    Vector2 relativeVel = velocity[i] - velocity[j];
-                    velocity[i] -= relativeVel * 0.5f * 0.3f * GetFrameTime();
-                    velocity[i] += Vector2Normalize(points[i] - points[j]) * ((radius[j] * radius[i] * 2.0f) / (dist * dist));
-                }
+                    velocity[i] += towards * -newSpeed;
             }
         }
 
