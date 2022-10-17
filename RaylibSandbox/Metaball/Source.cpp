@@ -123,7 +123,7 @@ void main()
 		activity += ((r[i] / resolution.x) / distance(fragTexCoord, p[i] / resolution));
 	}
 
-	finalColor = vec4((activity >= 1.0 ? mix(vec3(129,21,206)/255,vec3(29,25,40)/255, clamp(pow(activity - 1.0, 0.25),0.0,1.0)) : vec3(1.0)), 1.0);
+	finalColor = vec4(mix(vec3(129,21,206)/255,vec3(29,25,40)/255, clamp(pow(activity - 1.0, 0.25),0.0,1.0)), activity >= 1.0 ? 1.0 : 0.0);
 }
 )TXT";
 
@@ -176,59 +176,61 @@ int main()
 
         SetShaderValueV(metaballShader, metaPtLoc, points, UNIFORM_VEC2, g_ballCount);
 
-        for (int i = 0; i < g_ballCount; ++i)
+        for (int step = 0; step < 1; ++step)
         {
-            points[i] += velocity[i];
-
-            bool tooLeft  = points[i].x - radius[i] < 0;
-            bool tooHigh  = points[i].y - radius[i] < 0;
-            bool tooRight = points[i].x + radius[i] > windowWidth;
-            bool tooLow   = points[i].y + radius[i] > windowHeight;
-
-            if (tooLeft || tooRight) velocity[i].x *= -1;
-            if (tooHigh || tooLow)   velocity[i].y *= -1;
-
-            if (tooLeft)  points[i].x = radius[i];
-            if (tooHigh)  points[i].y = radius[i];
-            if (tooRight) points[i].x = windowWidth  - radius[i];
-            if (tooLow)   points[i].y = windowHeight - radius[i];
-
-            if (Vector2Length(velocity[i]) > g_speedLimit) velocity[i] = Vector2Normalize(velocity[i]) * g_speedLimit;
-
-            // Air resistance
-            //velocity[i] *= 0.98f;
-        }
-        for (int i = 0; i < g_ballCount; ++i)
-        {
-            for (int j = 0; j < g_ballCount; ++j)
+            for (int i = 0; i < g_ballCount; ++i)
             {
-                if (j == i)
-                    continue;
+                points[i] += velocity[i];
 
-                float dist = Vector2Distance(points[j], points[i]);
+                bool tooLeft = points[i].x - radius[i] < 0;
+                bool tooHigh = points[i].y - radius[i] < 0;
+                bool tooRight = points[i].x + radius[i] > windowWidth;
+                bool tooLow = points[i].y + radius[i] > windowHeight;
 
-                Vector2 towards = Vector2Normalize(points[j] - points[i]);
-                float newSpeed = ((radius[j] * radius[i] * 2.0f) / (dist * dist));
+                if (tooLeft || tooRight) velocity[i].x *= -1;
+                if (tooHigh || tooLow)   velocity[i].y *= -1;
 
-                float touchDistance = (radius[j] + radius[i]); // Distance in order to touch
+                if (tooLeft)  points[i].x = radius[i];
+                if (tooHigh)  points[i].y = radius[i];
+                if (tooRight) points[i].x = windowWidth - radius[i];
+                if (tooLow)   points[i].y = windowHeight - radius[i];
 
-                // Gravity
-                if (dist > touchDistance)
-                    velocity[i] += towards * newSpeed;
+                if (Vector2Length(velocity[i]) > g_speedLimit) velocity[i] = Vector2Normalize(velocity[i]) * g_speedLimit;
 
-                // Repulsion
-                else if (dist > 0.0f)
-                    velocity[i] += towards * -newSpeed;
+                // Air resistance
+                //velocity[i] *= 0.98f;
+            }
+            for (int i = 0; i < g_ballCount; ++i)
+            {
+                for (int j = 0; j < g_ballCount; ++j)
+                {
+                    if (j == i)
+                        continue;
+
+                    float dist = Vector2Distance(points[j], points[i]);
+
+                    Vector2 towards = Vector2Normalize(points[j] - points[i]);
+                    float newSpeed = ((radius[j] * radius[i] * 2.0f) / (dist * dist));
+
+                    float touchDistance = (radius[j] + radius[i]); // Distance in order to touch
+
+                    // Gravity
+                    if (dist > touchDistance)
+                        velocity[i] += towards * newSpeed;
+
+                    // Repulsion
+                    else if (dist > 0.0f)
+                        velocity[i] += towards * -newSpeed * (radius[i] * 0.1f);
+                }
             }
         }
-
         /******************************************
         *   Draw the frame                        *
         ******************************************/
 
         BeginDrawing(); {
 
-            ClearBackground(BLACK);
+            ClearBackground(Color{ 0,255,0,255 });
 
             BeginShaderMode(metaballShader); {
 
