@@ -62,7 +62,7 @@ float RandomFloatInRange(float min, float max)
     return ((float)rand() / (float)RAND_MAX) * (max - min) + min;
 }
 
-constexpr int g_ballCount = 7;
+constexpr int g_ballCount = 10;
 constexpr float g_speedLimit = 10;
 
 const std::string vertShader = R"TXT(
@@ -108,6 +108,9 @@ uniform vec4 colDiffuse;
 const int numBalls = )TXT" + std::to_string(g_ballCount) + R"TXT(;
 uniform vec2 p[numBalls];
 uniform float r[numBalls];
+const vec3 colorEdge = vec3(129,21,206)/255;
+const vec3 colorCore = vec3(29,25,40)/255;
+const vec3 colorInner = vec3(38,144,252)/255;
 
 // Output fragment color
 out vec4 finalColor;
@@ -123,7 +126,11 @@ void main()
 		activity += ((r[i] / resolution.x) / distance(fragTexCoord, p[i] / resolution));
 	}
 
-	finalColor = vec4(mix(vec3(129,21,206)/255,vec3(29,25,40)/255, clamp(pow(activity - 1.0, 0.25),0.0,1.0)), activity >= 1.0 ? 1.0 : 0.0);
+    float amount = clamp(pow(activity - 1.0, 0.25), 0.0, 1.0);
+    float height = clamp((fragTexCoord.y-0.5)*2+0.5, 0.0, 1.0);
+    vec3 outerColor = mix(colorInner, colorEdge, height);
+    vec3 innerColor = mix(1.0-colorCore, colorCore, height);
+	finalColor = vec4(mix(outerColor, innerColor, amount), activity >= 1.0 ? 1.0 : 0.0);
 }
 )TXT";
 
@@ -131,7 +138,7 @@ int main()
 {
     int windowWidth = 720;
     int windowHeight = 720;
-    InitWindow(windowWidth, windowHeight, "My Raylib Program");
+    InitWindow(windowWidth, windowHeight, "Bloodgoop Metaballs");
     SetTargetFPS(60);
 
     /******************************************
@@ -230,7 +237,7 @@ int main()
 
         BeginDrawing(); {
 
-            ClearBackground(Color{ 0,255,0,255 });
+            ClearBackground(Color{ 0,0,0,255 });
 
             BeginShaderMode(metaballShader); {
 
