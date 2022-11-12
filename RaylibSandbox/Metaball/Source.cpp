@@ -126,11 +126,13 @@ void main()
 		activity += ((r[i] / resolution.x) / distance(fragTexCoord, p[i] / resolution));
 	}
 
-    float amount = clamp(pow(activity - 1.0, 0.25), 0.0, 1.0);
-    float height = clamp((fragTexCoord.y-0.5)*2+0.5, 0.0, 1.0);
+    float amount = clamp(pow(activity - 1.0, 0.125), 0.0, 1.0);
+    float height = clamp(fragTexCoord.y, 0.0, 1.0);
     vec3 outerColor = mix(colorInner, colorEdge, height);
-    vec3 innerColor = mix(1.0-colorCore, colorCore, height);
-	finalColor = vec4(mix(outerColor, innerColor, amount), activity >= 1.0 ? 1.0 : 0.0);
+    vec3 innerColor = mix(mix(1.0-colorCore, mix(colorInner, colorEdge, height), height), mix(mix(colorEdge, colorInner, height), colorCore, height), height);
+    vec3 color = mix(outerColor, innerColor, amount);
+    if (activity >= 1.0) finalColor = vec4(color, 1.0);
+    else discard;
 }
 )TXT";
 
@@ -138,6 +140,7 @@ int main()
 {
     int windowWidth = 720;
     int windowHeight = 720;
+    SetConfigFlags(FLAG_MSAA_4X_HINT);
     InitWindow(windowWidth, windowHeight, "Bloodgoop Metaballs");
     SetTargetFPS(60);
 
@@ -163,7 +166,7 @@ int main()
     
     float radius[g_ballCount];
     for (int i = 0; i < g_ballCount; ++i)
-        radius[i] = RandomFloatInRange(100,200) / g_ballCount;
+        radius[i] = RandomFloatInRange(100,300) / g_ballCount;
     
     Vector2 velocity[g_ballCount];
     for (int i = 0; i < g_ballCount; ++i)
