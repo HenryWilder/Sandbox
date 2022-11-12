@@ -62,8 +62,10 @@ float RandomFloatInRange(float min, float max)
     return ((float)rand() / (float)RAND_MAX) * (max - min) + min;
 }
 
-constexpr int g_ballCount = 10;
-constexpr float g_speedLimit = 10;
+constexpr int g_ballCount = 16;
+constexpr float g_speedLimit = 5;
+
+constexpr int windowSize = 738;
 
 const std::string vertShader = R"TXT(
 #version 330
@@ -116,18 +118,20 @@ const vec3 colorInner = vec3(38,144,252)/255;
 out vec4 finalColor;
 
 // NOTE: Add here your custom variables
-uniform vec2 resolution = vec2(720, 720);
+uniform vec2 resolution = vec2()TXT" + std::to_string(windowSize) + R"TXT();
 
 void main()
 {
 	float activity = 0.0;
 	for (int i = 0; i < numBalls; ++i)
 	{
-		activity += ((r[i] / resolution.x) / distance(fragTexCoord, p[i] / resolution));
+        float value = r[i] / resolution.x;
+        float distance = distance(fragTexCoord, p[i] / resolution);
+		activity += (value / distance);
 	}
 
     float amount = clamp(pow(activity - 1.0, 0.125), 0.0, 1.0);
-    float height = clamp(fragTexCoord.y, 0.0, 1.0);
+    float height = clamp(fragTexCoord.y*720/413, 0.0, 1.0);
     vec3 outerColor = mix(colorInner, colorEdge, height);
     vec3 innerColor = mix(mix(1.0-colorCore, mix(colorInner, colorEdge, height), height), mix(mix(colorEdge, colorInner, height), colorCore, height), height);
     vec3 color = mix(outerColor, innerColor, amount);
@@ -138,9 +142,9 @@ void main()
 
 int main()
 {
-    int windowWidth = 720;
-    int windowHeight = 720;
-    SetConfigFlags(FLAG_MSAA_4X_HINT);
+    int windowWidth = windowSize;
+    int windowHeight = windowSize;
+    int boundsHeight = 413;
     InitWindow(windowWidth, windowHeight, "Bloodgoop Metaballs");
     SetTargetFPS(60);
 
@@ -166,7 +170,7 @@ int main()
     
     float radius[g_ballCount];
     for (int i = 0; i < g_ballCount; ++i)
-        radius[i] = RandomFloatInRange(100,300) / g_ballCount;
+        radius[i] = RandomFloatInRange(50,200) / g_ballCount;
     
     Vector2 velocity[g_ballCount];
     for (int i = 0; i < g_ballCount; ++i)
@@ -195,7 +199,7 @@ int main()
                 bool tooLeft = points[i].x - radius[i] < 0;
                 bool tooHigh = points[i].y - radius[i] < 0;
                 bool tooRight = points[i].x + radius[i] > windowWidth;
-                bool tooLow = points[i].y + radius[i] > windowHeight;
+                bool tooLow = points[i].y + radius[i] > boundsHeight;
 
                 if (tooLeft || tooRight) velocity[i].x *= -1;
                 if (tooHigh || tooLow)   velocity[i].y *= -1;
@@ -203,7 +207,7 @@ int main()
                 if (tooLeft)  points[i].x = radius[i];
                 if (tooHigh)  points[i].y = radius[i];
                 if (tooRight) points[i].x = windowWidth - radius[i];
-                if (tooLow)   points[i].y = windowHeight - radius[i];
+                if (tooLow)   points[i].y = boundsHeight - radius[i];
 
                 if (Vector2Length(velocity[i]) > g_speedLimit) velocity[i] = Vector2Normalize(velocity[i]) * g_speedLimit;
 
@@ -220,7 +224,7 @@ int main()
                     float dist = Vector2Distance(points[j], points[i]);
 
                     Vector2 towards = Vector2Normalize(points[j] - points[i]);
-                    float newSpeed = ((radius[j] * radius[i] * 2.0f) / (dist * dist));
+                    float newSpeed = ((radius[j] * radius[i] * 1.5f) / (dist * dist));
 
                     float touchDistance = (radius[j] + radius[i]); // Distance in order to touch
 
