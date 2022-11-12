@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <time.h>
 #include <string>
+#include <regex>
 
 #define sign(x) (((x) > (decltype(x))(0)) - ((x) < (decltype(x))(0)))
 
@@ -67,10 +68,46 @@ float RandomFloatInRange(float min, float max)
     return ((float)rand() / (float)RAND_MAX) * (max - min) + min;
 }
 
-constexpr int g_ballCount = 3;
-constexpr float g_speedLimit = 20;
+// Constants
+
+constexpr int g_ballCount = 8;
+
+constexpr float g_speedLimit = 10;
 
 constexpr int windowSize = 738;
+
+constexpr float minRadius = 20;
+constexpr float maxRadius = 40;
+
+// Hard
+constexpr int hardBoundsMinX = -32;
+constexpr int hardBoundsMinY = -32;
+constexpr int hardBoundsWidth = 738 + 32;
+constexpr int hardBoundsHeight = 413 + 32;
+constexpr int hardBoundsMaxX = hardBoundsMinX + hardBoundsWidth;
+constexpr int hardBoundsMaxY = hardBoundsMinY + hardBoundsHeight;
+
+constexpr float hardBoundsMinXF = (float)hardBoundsMinX;
+constexpr float hardBoundsMinYF = (float)hardBoundsMinY;
+constexpr float hardBoundsMaxXF = (float)hardBoundsMaxX;
+constexpr float hardBoundsMaxYF = (float)hardBoundsMaxY;
+
+// Soft
+constexpr int softBoundsPadding = 32;
+
+constexpr int softBoundsMinX = hardBoundsMinX + softBoundsPadding;
+constexpr int softBoundsMinY = hardBoundsMinY + softBoundsPadding;
+constexpr int softBoundsMaxX = hardBoundsMaxX - softBoundsPadding;
+constexpr int softBoundsMaxY = hardBoundsMaxY - softBoundsPadding;
+constexpr int softBoundsWidth  = softBoundsMaxX - softBoundsMinX;
+constexpr int softBoundsHeight = softBoundsMaxY - softBoundsMinY;
+
+constexpr float softBoundsMinXF = (float)softBoundsMinX;
+constexpr float softBoundsMinYF = (float)softBoundsMinY;
+constexpr float softBoundsMaxXF = (float)softBoundsMaxX;
+constexpr float softBoundsMaxYF = (float)softBoundsMaxY;
+
+constexpr float G = 0.1f; // Gravitational constant
 
 const std::string vertShader = R"TXT(
 #version 330
@@ -101,7 +138,7 @@ void main()
 }
 )TXT";
 
-const std::string g_fragShader = R"TXT(
+std::string g_fragShader = R"TXT(
 #version 330
 
 // Input vertex attributes (from vertex shader)
@@ -112,7 +149,7 @@ in vec4 fragColor;
 uniform sampler2D texture0;
 uniform vec4 colDiffuse;
 
-const int numBalls = )TXT" + std::to_string(g_ballCount) + R"TXT(;
+const int numBalls = )TXT"+std::to_string(g_ballCount)+R"TXT(;
 uniform vec2 p[numBalls];
 uniform float r[numBalls];
 const vec3 colorEdge = vec3(129,21,206)/255;
@@ -123,7 +160,7 @@ const vec3 colorInner = vec3(38,144,252)/255;
 out vec4 finalColor;
 
 // NOTE: Add here your custom variables
-uniform vec2 resolution = vec2()TXT" + std::to_string(windowSize) + R"TXT();
+uniform vec2 resolution = vec2(720.0);
 
 float Falloff(float distanceToPoint)
 {
@@ -133,22 +170,25 @@ float Falloff(float distanceToPoint)
 void main()
 {
 	float activity = 0.0;
+
+    vec2 screenPos = fragTexCoord * resolution;
+    vec2 boundsPos = (screenPos - vec2()TXT" + std::to_string(hardBoundsMinX) + "," + std::to_string(hardBoundsMinY) + R"TXT()) / vec2()TXT" + std::to_string(hardBoundsWidth) + "," + std::to_string(hardBoundsHeight) + R"TXT();
 	for (int i = 0; i < numBalls; ++i)
 	{
         float radius = r[i];
-        float distance = distance(fragTexCoord * resolution, p[i]);
-        activity += radius / distance;
+        float distance = distance(screenPos, p[i]);
+        activity += pow(radius / pow(distance, 2), 2) * pow(radius, 2);
 	}
 
     float amount = clamp(pow(activity - 1.0, 0.125), 0.0, 1.0);
-    float height = clamp(fragTexCoord.y*720/413, 0.0, 1.0);
+    float height = boundsPos.y;
     vec3 outerColor = mix(colorInner, colorEdge, height);
     vec3 innerColor = mix(mix(1.0-colorCore, mix(colorInner, colorEdge, height), height), mix(mix(colorEdge, colorInner, height), colorCore, height), height);
-    vec3 color = mix(outerColor, innerColor, amount);
-    if (activity >= 1.0) finalColor = vec4(color, 1.0);
-    else discard;
+    vec3 color = mix(outerColor, innerColor, pow(amount, 0.0675));
+    finalColor = vec4(color, clamp(activity, 0.0, 1.0));
 }
 )TXT";
+
 
 
 template<ShaderUniformDataType TYPE, int COUNT = 1>
@@ -185,39 +225,6 @@ int main()
 {
     int windowWidth = 1280;
     int windowHeight = 720;
-
-    constexpr float minRadius = 20;
-    constexpr float maxRadius = 40;
-
-    // Hard
-    constexpr int hardBoundsMinX = -32;
-    constexpr int hardBoundsMinY = -32;
-    constexpr int hardBoundsWidth = 738 + 32;
-    constexpr int hardBoundsHeight = 413 + 32;
-    constexpr int hardBoundsMaxX = hardBoundsMinX + hardBoundsWidth;
-    constexpr int hardBoundsMaxY = hardBoundsMinY + hardBoundsHeight;
-
-    constexpr float hardBoundsMinXF = (float)hardBoundsMinX;
-    constexpr float hardBoundsMinYF = (float)hardBoundsMinY;
-    constexpr float hardBoundsMaxXF = (float)hardBoundsMaxX;
-    constexpr float hardBoundsMaxYF = (float)hardBoundsMaxY;
-
-    // Soft
-    constexpr int softBoundsPadding = 32;
-
-    constexpr int softBoundsMinX = hardBoundsMinX + softBoundsPadding;
-    constexpr int softBoundsMinY = hardBoundsMinY + softBoundsPadding;
-    constexpr int softBoundsMaxX = hardBoundsMaxX - softBoundsPadding;
-    constexpr int softBoundsMaxY = hardBoundsMaxY - softBoundsPadding;
-    constexpr int softBoundsWidth  = softBoundsMaxX - softBoundsMinX;
-    constexpr int softBoundsHeight = softBoundsMaxY - softBoundsMinY;
-
-    constexpr float softBoundsMinXF = (float)softBoundsMinX;
-    constexpr float softBoundsMinYF = (float)softBoundsMinY;
-    constexpr float softBoundsMaxXF = (float)softBoundsMaxX;
-    constexpr float softBoundsMaxYF = (float)softBoundsMaxY;
-
-    constexpr float G = 0.06f; // Gravitational constant
 
     InitWindow(windowWidth, windowHeight, "Bloodgoop Metaballs");
     SetTargetFPS(60);
@@ -400,6 +407,8 @@ int main()
 
             DrawRectangleLines(softBoundsMinX, softBoundsMinY, softBoundsWidth, softBoundsHeight, ORANGE);
             DrawRectangleLines(hardBoundsMinX, hardBoundsMinY, hardBoundsWidth, hardBoundsHeight, RED);
+
+            DrawFPS(0,0);
 
 #endif
 
