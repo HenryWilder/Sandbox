@@ -150,6 +150,8 @@ uniform sampler2D texture0;
 uniform vec4 colDiffuse;
 
 const int numBalls = )TXT"+std::to_string(g_ballCount)+R"TXT(;
+const vec2 boundsMin = vec2()TXT" + std::to_string(hardBoundsMinX) + "," + std::to_string(hardBoundsMinY) + R"TXT();
+const vec2 boundsSize = vec2()TXT" + std::to_string(hardBoundsWidth) + "," + std::to_string(hardBoundsHeight) + R"TXT();
 uniform vec2 p[numBalls];
 uniform float r[numBalls];
 const vec3 colorEdge = vec3(129,21,206)/255;
@@ -172,7 +174,7 @@ void main()
 	float activity = 0.0;
 
     vec2 screenPos = fragTexCoord * resolution;
-    vec2 boundsPos = (screenPos - vec2()TXT" + std::to_string(hardBoundsMinX) + "," + std::to_string(hardBoundsMinY) + R"TXT()) / vec2()TXT" + std::to_string(hardBoundsWidth) + "," + std::to_string(hardBoundsHeight) + R"TXT();
+    vec2 boundsPos = (screenPos - boundsMin) / boundsSize;
 	for (int i = 0; i < numBalls; ++i)
 	{
         float radius = r[i];
@@ -180,11 +182,17 @@ void main()
         activity += pow(radius / pow(distance, 2), 2) * pow(radius, 2);
 	}
 
-    float amount = clamp(pow(activity - 1.0, 0.125), 0.0, 1.0);
     float height = boundsPos.y;
+    // Gradient glow/reflection
     vec3 outerColor = mix(colorInner, colorEdge, height);
+    // Core
     vec3 innerColor = mix(mix(1.0-colorCore, mix(colorInner, colorEdge, height), height), mix(mix(colorEdge, colorInner, height), colorCore, height), height);
-    vec3 color = mix(outerColor, innerColor, pow(amount, 0.0675));
+    // Transition from edge to core
+    float coreTransition = clamp(pow(activity - 1.0, 0.25), 0.0, 1.0);
+
+    vec3 color = mix(outerColor, innerColor, coreTransition);
+    finalColor = vec4(vec3(color), 1.0);
+    if (activity < 1.0)
     finalColor = vec4(color, clamp(activity, 0.0, 1.0));
 }
 )TXT";
