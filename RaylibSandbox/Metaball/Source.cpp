@@ -120,6 +120,11 @@ out vec4 finalColor;
 // NOTE: Add here your custom variables
 uniform vec2 resolution = vec2()TXT" + std::to_string(windowSize) + R"TXT();
 
+float Falloff(float r)
+{
+    return pow(1.0 / pow(r, 2), 2);
+}
+
 void main()
 {
 	float activity = 0.0;
@@ -127,7 +132,7 @@ void main()
 	{
         float value = r[i] / resolution.x;
         float distance = distance(fragTexCoord, p[i] / resolution);
-		activity += (value / distance);
+		activity += value / pow(distance, 2);
 	}
 
     float amount = clamp(pow(activity - 1.0, 0.125), 0.0, 1.0);
@@ -140,11 +145,49 @@ void main()
 }
 )TXT";
 
+
+template<ShaderUniformDataType TYPE, int COUNT = 1>
+struct ShaderUniform
+{
+    ShaderUniform(Shader shader, const char* uniformName) :
+        shader(shader), loc(GetShaderLocation(shader, uniformName)) {}
+
+    Shader shader;
+    int loc;
+
+    void operator=(void* value)
+    {
+        SetShaderValueV(shader, loc, value, TYPE, COUNT);
+    }
+};
+
+template<ShaderUniformDataType TYPE>
+struct ShaderUniform<TYPE, 1>
+{
+    ShaderUniform(Shader shader, const char* uniformName) :
+        shader(shader), loc(GetShaderLocation(shader, uniformName)) {}
+
+    Shader shader;
+    int loc;
+
+    void operator=(void* value)
+    {
+        SetShaderValue(shader, loc, value, TYPE);
+    }
+};
+
 int main()
 {
     int windowWidth = windowSize;
     int windowHeight = windowSize;
-    int boundsHeight = 413;
+
+    constexpr int boundsMinX = 0;
+    constexpr int boundsMinY = 0;
+    constexpr int boundsWidth = 738;
+    constexpr int boundsHeight = 413;
+    constexpr int boundsMaxX = boundsMinX + boundsWidth;
+    constexpr int boundsMaxY = boundsMinY + boundsHeight;
+
     InitWindow(windowWidth, windowHeight, "Bloodgoop Metaballs");
     SetTargetFPS(60);
 
@@ -158,25 +201,25 @@ int main()
     ClearBackground(WHITE);
     EndTextureMode();
 
-    int metaCursorLoc = GetShaderLocation(metaballShader, "cursor");
-    int metaPtLoc = GetShaderLocation(metaballShader, "p");
-    int metaRadLoc = GetShaderLocation(metaballShader, "r");
+    ShaderUniform<UNIFORM_VEC2, g_ballCount> metaPt(metaballShader, "p");
+    ShaderUniform<UNIFORM_FLOAT, g_ballCount> metaRad(metaballShader, "r");
+    ShaderUniform<UNIFORM_VEC2> metaRes(metaballShader, "resolution");
 
     srand(time(nullptr));
 
-    Vector2 points[g_ballCount];
+    Vector2 points[g_ballCount] = {};
     for (int i = 0; i < g_ballCount; ++i)
-        points[i] = { RandomFloatInRange(0,(float)windowWidth), RandomFloatInRange(0,(float)windowHeight) };
+        points[i] = { RandomFloatInRange(boundsMinX, boundsMaxX), RandomFloatInRange(boundsMinY, boundsMaxY) };
     
-    float radius[g_ballCount];
+    float radii[g_ballCount] = {};
     for (int i = 0; i < g_ballCount; ++i)
-        radius[i] = RandomFloatInRange(50,200) / g_ballCount;
+        radii[i] = RandomFloatInRange(20,50) / g_ballCount;
     
-    Vector2 velocity[g_ballCount];
+    Vector2 velocities[g_ballCount] = {};
     for (int i = 0; i < g_ballCount; ++i)
-        velocity[i] = Vector2Normalize({ RandomFloatInRange(-1,1), RandomFloatInRange(-1,1) }) * RandomFloatInRange(0, 5);
+        velocities[i] = Vector2Normalize({ RandomFloatInRange(-1,1), RandomFloatInRange(-1,1) }) * RandomFloatInRange(0, 5);
     
-    SetShaderValueV(metaballShader, metaRadLoc, radius, UNIFORM_FLOAT, g_ballCount);
+    metaRad = radii;
 
     while (!WindowShouldClose())
     {
@@ -184,57 +227,60 @@ int main()
         *   Simulate frame and update variables   *
         ******************************************/
 
-        float data[2] = { (float)GetMouseX(), (float)GetMouseY() };
-
-        SetShaderValueV(metaballShader, metaCursorLoc, data, UNIFORM_VEC2, g_ballCount);
-
-        SetShaderValueV(metaballShader, metaPtLoc, points, UNIFORM_VEC2, g_ballCount);
+        metaPt = points;
 
         for (int step = 0; step < 1; ++step)
         {
-            for (int i = 0; i < g_ballCount; ++i)
+            // Bounds
             {
-                points[i] += velocity[i];
-
-                bool tooLeft = points[i].x - radius[i] < 0;
-                bool tooHigh = points[i].y - radius[i] < 0;
-                bool tooRight = points[i].x + radius[i] > windowWidth;
-                bool tooLow = points[i].y + radius[i] > boundsHeight;
-
-                if (tooLeft || tooRight) velocity[i].x *= -1;
-                if (tooHigh || tooLow)   velocity[i].y *= -1;
-
-                if (tooLeft)  points[i].x = radius[i];
-                if (tooHigh)  points[i].y = radius[i];
-                if (tooRight) points[i].x = windowWidth - radius[i];
-                if (tooLow)   points[i].y = boundsHeight - radius[i];
-
-                if (Vector2Length(velocity[i]) > g_speedLimit) velocity[i] = Vector2Normalize(velocity[i]) * g_speedLimit;
-
-                // Air resistance
-                //velocity[i] *= 0.98f;
-            }
-            for (int i = 0; i < g_ballCount; ++i)
-            {
-                for (int j = 0; j < g_ballCount; ++j)
+                for (int i = 0; i < g_ballCount; ++i)
                 {
-                    if (j == i)
-                        continue;
+                    points[i] += velocities[i];
 
-                    float dist = Vector2Distance(points[j], points[i]);
+                    bool tooLeft  = points[i].x - radii[i] < boundsMinX;
+                    bool tooHigh  = points[i].y - radii[i] < boundsMinY;
+                    bool tooRight = points[i].x + radii[i] > boundsMaxX;
+                    bool tooLow   = points[i].y + radii[i] > boundsMaxY;
 
-                    Vector2 towards = Vector2Normalize(points[j] - points[i]);
-                    float newSpeed = ((radius[j] * radius[i] * 1.5f) / (dist * dist));
+                    if (tooLeft || tooRight) velocities[i].x *= -1;
+                    if (tooHigh || tooLow)   velocities[i].y *= -1;
 
-                    float touchDistance = (radius[j] + radius[i]); // Distance in order to touch
+                    if (tooLeft)  points[i].x = boundsMinX + radii[i];
+                    if (tooHigh)  points[i].y = boundsMinY + radii[i];
+                    if (tooRight) points[i].x = boundsMaxX - radii[i];
+                    if (tooLow)   points[i].y = boundsMaxY - radii[i];
 
-                    // Gravity
-                    if (dist > touchDistance)
-                        velocity[i] += towards * newSpeed;
+                    if (Vector2Length(velocities[i]) > g_speedLimit) velocities[i] = Vector2Normalize(velocities[i]) * g_speedLimit;
 
-                    // Repulsion
-                    else if (dist > 0.0f)
-                        velocity[i] += towards * -newSpeed * (radius[i] * 0.1f);
+                    // Air resistance
+                    //velocity[i] *= 0.98f;
+                }
+            }
+
+            // Collision
+            {
+                for (int i = 0; i < g_ballCount; ++i)
+                {
+                    for (int j = 0; j < g_ballCount; ++j)
+                    {
+                        if (j == i)
+                            continue;
+
+                        float dist = Vector2Distance(points[j], points[i]);
+
+                        Vector2 towards = Vector2Normalize(points[j] - points[i]);
+                        float newSpeed = ((radii[j] * radii[i] * 1.5f) / (dist * dist));
+
+                        float touchDistance = (radii[j] + radii[i]); // Distance in order to touch
+
+                                                                     // Gravity
+                        if (dist > touchDistance)
+                            velocities[i] += towards * newSpeed;
+
+                        // Repulsion
+                        else if (dist > 0.0f)
+                            velocities[i] += towards * -newSpeed * (radii[i] * 0.1f);
+                    }
                 }
             }
         }
@@ -251,6 +297,8 @@ int main()
                 DrawTexture(screen.texture, 0, 0, WHITE);
 
             } EndShaderMode();
+
+            DrawRectangleLines(boundsMinX, boundsMinY, boundsWidth, boundsHeight, RED);
 
         } EndDrawing();
     }
