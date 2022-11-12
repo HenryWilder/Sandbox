@@ -70,44 +70,74 @@ float RandomFloatInRange(float min, float max)
 
 // Constants
 
-constexpr int g_ballCount = 8;
+namespace Window
+{
+    // Render area
+    constexpr int windowWidth = 1280;
+    constexpr int windowHeight = 720;
 
-constexpr float g_speedLimit = 10;
+    // Hard bounds
+    constexpr int hardBoundsMinX = -32;
+    constexpr int hardBoundsMinY = -32;
+    constexpr int hardBoundsWidth = 738 + 32;
+    constexpr int hardBoundsHeight = 413 + 32;
+    constexpr int hardBoundsMaxX = hardBoundsMinX + hardBoundsWidth;
+    constexpr int hardBoundsMaxY = hardBoundsMinY + hardBoundsHeight;
 
-constexpr int windowSize = 738;
+    // Float
+    constexpr float hardBoundsMinXF = (float)hardBoundsMinX;
+    constexpr float hardBoundsMinYF = (float)hardBoundsMinY;
+    constexpr float hardBoundsMaxXF = (float)hardBoundsMaxX;
+    constexpr float hardBoundsMaxYF = (float)hardBoundsMaxY;
 
-constexpr float minRadius = 20;
-constexpr float maxRadius = 40;
+    // Soft bounds
+    constexpr int softBoundsPadding = 32; // Inset
 
-// Hard
-constexpr int hardBoundsMinX = -32;
-constexpr int hardBoundsMinY = -32;
-constexpr int hardBoundsWidth = 738 + 32;
-constexpr int hardBoundsHeight = 413 + 32;
-constexpr int hardBoundsMaxX = hardBoundsMinX + hardBoundsWidth;
-constexpr int hardBoundsMaxY = hardBoundsMinY + hardBoundsHeight;
+    constexpr int softBoundsMinX = hardBoundsMinX + softBoundsPadding;
+    constexpr int softBoundsMinY = hardBoundsMinY + softBoundsPadding;
+    constexpr int softBoundsMaxX = hardBoundsMaxX - softBoundsPadding;
+    constexpr int softBoundsMaxY = hardBoundsMaxY - softBoundsPadding;
+    constexpr int softBoundsWidth  = softBoundsMaxX - softBoundsMinX;
+    constexpr int softBoundsHeight = softBoundsMaxY - softBoundsMinY;
 
-constexpr float hardBoundsMinXF = (float)hardBoundsMinX;
-constexpr float hardBoundsMinYF = (float)hardBoundsMinY;
-constexpr float hardBoundsMaxXF = (float)hardBoundsMaxX;
-constexpr float hardBoundsMaxYF = (float)hardBoundsMaxY;
+    // Float
+    constexpr float softBoundsMinXF = (float)softBoundsMinX;
+    constexpr float softBoundsMinYF = (float)softBoundsMinY;
+    constexpr float softBoundsMaxXF = (float)softBoundsMaxX;
+    constexpr float softBoundsMaxYF = (float)softBoundsMaxY;
+}
 
-// Soft
-constexpr int softBoundsPadding = 32;
+namespace Physics
+{
+    // Gravitational constant
+    constexpr float G = 0.1f;
+    // Speed of causality (universal speed limit)
+    constexpr float c = 8.0f;
+    // 4/3pi
+    constexpr float fourThirdsPi = (PI * 4.0f) / 3.0f;
+}
 
-constexpr int softBoundsMinX = hardBoundsMinX + softBoundsPadding;
-constexpr int softBoundsMinY = hardBoundsMinY + softBoundsPadding;
-constexpr int softBoundsMaxX = hardBoundsMaxX - softBoundsPadding;
-constexpr int softBoundsMaxY = hardBoundsMaxY - softBoundsPadding;
-constexpr int softBoundsWidth  = softBoundsMaxX - softBoundsMinX;
-constexpr int softBoundsHeight = softBoundsMaxY - softBoundsMinY;
+namespace Goop
+{
+    // Number of balls in the simulation
+    constexpr int entityCount = 32;
 
-constexpr float softBoundsMinXF = (float)softBoundsMinX;
-constexpr float softBoundsMinYF = (float)softBoundsMinY;
-constexpr float softBoundsMaxXF = (float)softBoundsMaxX;
-constexpr float softBoundsMaxYF = (float)softBoundsMaxY;
+    // Info for procedural generation
+    constexpr float minRadius = 20.0f;
+    constexpr float maxRadius = 60.0f;
+    constexpr float minStartSpeed = 0.0f;
+    constexpr float maxStartSpeed = 5.0f;
 
-constexpr float G = 0.1f; // Gravitational constant
+    // Physical properties of the fluid
+    namespace Fluid
+    {
+        constexpr float density = 1.0f;
+        constexpr float dragCoeff = 0.7f; // Drag coefficient
+        constexpr float repulsion = 0.4f; // Multiplier for force when repelling
+        constexpr float viscosity = 0.9f; // Multiplier for combining speeds when overlapping
+        constexpr float touchPercent = 0.4f; // Percent of radii allowed to overlap before repelling
+    }
+}
 
 const std::string vertShader = R"TXT(
 #version 330
@@ -149,9 +179,9 @@ in vec4 fragColor;
 uniform sampler2D texture0;
 uniform vec4 colDiffuse;
 
-const int numBalls = )TXT"+std::to_string(g_ballCount)+R"TXT(;
-const vec2 boundsMin = vec2()TXT" + std::to_string(hardBoundsMinX) + "," + std::to_string(hardBoundsMinY) + R"TXT();
-const vec2 boundsSize = vec2()TXT" + std::to_string(hardBoundsWidth) + "," + std::to_string(hardBoundsHeight) + R"TXT();
+const int numBalls = )TXT"+std::to_string(Goop::entityCount)+R"TXT(;
+const vec2 boundsMin = vec2()TXT" + std::to_string(Window::hardBoundsMinX) + "," + std::to_string(Window::hardBoundsMinY) + R"TXT();
+const vec2 boundsSize = vec2()TXT" + std::to_string(Window::hardBoundsWidth) + "," + std::to_string(Window::hardBoundsHeight) + R"TXT();
 uniform vec2 p[numBalls];
 uniform float r[numBalls];
 const vec3 colorEdge = vec3(129,21,206)/255;
@@ -188,7 +218,7 @@ void main()
     // Core
     vec3 innerColor = mix(mix(1.0-colorCore, mix(colorInner, colorEdge, height), height), mix(mix(colorEdge, colorInner, height), colorCore, height), height);
     // Transition from edge to core
-    float coreTransition = clamp(pow(activity - 1.0, 0.25), 0.0, 1.0);
+    float coreTransition = clamp(pow(activity - 1.0, 0.125) * 0.7, 0.0, 1.0);
 
     vec3 color = mix(outerColor, innerColor, coreTransition);
     finalColor = vec4(vec3(color), 1.0);
@@ -229,12 +259,37 @@ struct ShaderUniform<TYPE, 1>
     }
 };
 
+float DragForce(Vector2 velocitySelf, Vector2 velocityOther, float overlapArea)
+{
+    constexpr float p = Goop::Fluid::density;
+    constexpr float CD = Goop::Fluid::dragCoeff;
+    float A = overlapArea;
+    float v = Vector2Length(velocitySelf - velocityOther);
+    float FD = 0.5 * p * (v*v) * CD * A;
+    return FD;
+}
+
+float ForceOfGravity(float distance, float mass1, float mass2)
+{
+    return Physics::G * ((mass1 * mass2) / (distance * distance));
+}
+
+float ForceOfGravity(Vector2 position1, Vector2 position2, float mass1, float mass2)
+{
+    float distance = Vector2Distance(position1, position2);
+    return ForceOfGravity(distance, mass1, mass2);
+}
+
+Vector2 ForceToVelocity(Vector2 direction, float force, float mass, float dt)
+{
+    float acceleration = force / mass;
+    float speed = acceleration * dt;
+    return direction * speed;
+}
+
 int main()
 {
-    int windowWidth = 1280;
-    int windowHeight = 720;
-
-    InitWindow(windowWidth, windowHeight, "Bloodgoop Metaballs");
+    InitWindow(Window::windowWidth, Window::windowHeight, "Bloodgoop Metaballs");
     SetTargetFPS(60);
 
     /******************************************
@@ -242,40 +297,38 @@ int main()
     ******************************************/
 
     Shader metaballShader = LoadShaderCode(vertShader.c_str(), g_fragShader.c_str());
-    RenderTexture2D screen = LoadRenderTexture(windowWidth, windowHeight);
+    RenderTexture2D screen = LoadRenderTexture(Window::windowWidth, Window::windowHeight);
     BeginTextureMode(screen);
     ClearBackground(WHITE);
     EndTextureMode();
 
-    ShaderUniform<UNIFORM_VEC2, g_ballCount> metaPt(metaballShader, "p");
-    ShaderUniform<UNIFORM_FLOAT, g_ballCount> metaRad(metaballShader, "r");
+    ShaderUniform<UNIFORM_VEC2, Goop::entityCount> metaPt(metaballShader, "p");
+    ShaderUniform<UNIFORM_FLOAT, Goop::entityCount> metaRad(metaballShader, "r");
     ShaderUniform<UNIFORM_VEC2> metaRes(metaballShader, "resolution");
 
-    Vector2 resolution = { 1280.0f, 720.0f };
+    Vector2 resolution = { (float)Window::windowWidth, (float)Window::windowHeight };
     metaRes = &resolution;
 
     srand(time(nullptr));
 
     
-    float radii[g_ballCount] = {};
-    for (int i = 0; i < g_ballCount; ++i)
-        radii[i] = RandomFloatInRange(minRadius, maxRadius);
+    float radii[Goop::entityCount] = {};
+    for (int i = 0; i < Goop::entityCount; ++i)
+        radii[i] = RandomFloatInRange(Goop::minRadius, Goop::maxRadius);
 
-    Vector2 points[g_ballCount] = {};
-    for (int i = 0; i < g_ballCount; ++i)
-        points[i] = { RandomFloatInRange(softBoundsMinX + radii[i], softBoundsMaxX - radii[i]), RandomFloatInRange(softBoundsMinY + radii[i], softBoundsMaxY - radii[i]) };
-
-    constexpr float fourThirdsPi = (PI * 4.0f) / 3.0f;
+    Vector2 points[Goop::entityCount] = {};
+    for (int i = 0; i < Goop::entityCount; ++i)
+        points[i] = { RandomFloatInRange(Window::softBoundsMinX + radii[i], Window::softBoundsMaxX - radii[i]), RandomFloatInRange(Window::softBoundsMinY + radii[i], Window::softBoundsMaxY - radii[i]) };
 
     // Density is even for the material, so mass is dictaded by volume.
     // Specifically, density is roughly that of water, so about 1 mass unit = 1 volume unit.
-    float masses[g_ballCount] = {};
-    for (int i = 0; i < g_ballCount; ++i)
-        masses[i] = fourThirdsPi * (radii[i] * radii[i] * radii[i]);
+    float masses[Goop::entityCount] = {};
+    for (int i = 0; i < Goop::entityCount; ++i)
+        masses[i] = Physics::fourThirdsPi * (radii[i] * radii[i] * radii[i]);
     
-    Vector2 velocities[g_ballCount] = {};
-    for (int i = 0; i < g_ballCount; ++i)
-        velocities[i] = Vector2Normalize({ RandomFloatInRange(-1,1), RandomFloatInRange(-1,1) }) * RandomFloatInRange(0, 5);
+    Vector2 velocities[Goop::entityCount] = {};
+    for (int i = 0; i < Goop::entityCount; ++i)
+        velocities[i] = Vector2Normalize({ RandomFloatInRange(-1,1), RandomFloatInRange(-1,1) }) * RandomFloatInRange(Goop::minStartSpeed, Goop::maxStartSpeed);
     
     metaRad = radii;
 
@@ -285,7 +338,7 @@ int main()
         *   Simulate frame and update variables   *
         ******************************************/
 
-        float time = GetFrameTime();
+        float dt = GetFrameTime();
 
         metaPt = points;
 
@@ -293,9 +346,9 @@ int main()
         {
             // Collision
             {
-                for (int i = 0; i < g_ballCount; ++i)
+                for (int i = 0; i < Goop::entityCount; ++i)
                 {
-                    for (int j = 0; j < g_ballCount; ++j)
+                    for (int j = 0; j < Goop::entityCount; ++j)
                     {
                         // Don't apply gravity to self
                         if (j == i) continue;
@@ -306,15 +359,45 @@ int main()
                         if (dist == 0.0f) continue;
 
                         Vector2 towards = Vector2Normalize(points[j] - points[i]);
-                        float force = G * ((masses[j] * masses[i]) / (dist * dist));
-                        float acceleration = force / masses[i];
-                        float speed = acceleration * time;
+                        float force = ForceOfGravity(dist, masses[j], masses[i]);
+                        Vector2 gravVelocity = ForceToVelocity(towards, force, masses[i], dt);
 
                         // Distance in order to touch
-                        float touchDistance = (radii[j] + radii[i]);
+                        float touchDistance = (radii[j] + radii[i]) * Goop::Fluid::touchPercent;
 
                         // Repel when overlapping, attract when not
-                        velocities[i] += towards * (dist > touchDistance ? speed : -speed);
+                        velocities[i] += (dist > touchDistance ? gravVelocity : (gravVelocity * -Goop::Fluid::repulsion));
+                    }
+                }
+            }
+
+            // Friction
+            {
+                for (int i = 0; i < Goop::entityCount; ++i)
+                {
+                    for (int j = 0; j < Goop::entityCount; ++j)
+                    {
+                        // Don't apply gravity to self
+                        if (j == i) continue;
+
+                        float dist = Vector2Distance(points[j], points[i]);
+
+                        // Skip to avoid division errors;
+                        if (dist == 0.0f) continue;
+
+                        // Distance in order to apply friction
+                        float overlapDistance = (radii[j] + radii[i]);
+
+                        // Distance in order to touch (and thus repel)
+                        float touchDistance = overlapDistance * Goop::Fluid::touchPercent;
+
+                        // Apply friction when overlapping
+                        if (dist <= overlapDistance && dist > touchDistance)
+                        {
+                            float dragForce = DragForce(velocities[i], velocities[j], overlapDistance - dist);
+                            Vector2 dragVelocity = ForceToVelocity(Vector2Normalize(velocities[i]) * -1.0f, dragForce, masses[i], dt);
+                            velocities[i] += dragVelocity;
+                        }
                     }
                 }
             }
@@ -322,7 +405,7 @@ int main()
             // Bounds
             {
                 // Soft boundary
-                for (int i = 0; i < g_ballCount; ++i)
+                for (int i = 0; i < Goop::entityCount; ++i)
                 {
                     float touchDistance = radii[i];
 
@@ -331,17 +414,15 @@ int main()
                         if (distanceToWall <= touchDistance)
                         {
                             // Walls push back with the same mass as the bodies
-                            float force = G * ((masses[i] * masses[i]) / (distanceToWall * distanceToWall));
-                            float acceleration = force / masses[i];
-                            float speed = acceleration * time;
-                            velocities[i] += reflectDirection * speed;
+                            float force = ForceOfGravity(distanceToWall, masses[i], masses[i]);
+                            velocities[i] += ForceToVelocity(reflectDirection, force, masses[i], dt);
                         }
                     };
 
-                    float distanceToL = points[i].x - softBoundsMinXF;
-                    float distanceToR = softBoundsMaxXF - points[i].x;
-                    float distanceToT = points[i].y - softBoundsMinYF;
-                    float distanceToB = softBoundsMaxYF - points[i].y;
+                    float distanceToL = points[i].x - Window::softBoundsMinXF;
+                    float distanceToR = Window::softBoundsMaxXF - points[i].x;
+                    float distanceToT = points[i].y - Window::softBoundsMinYF;
+                    float distanceToB = Window::softBoundsMaxYF - points[i].y;
 
                     ApplyWallGrav(distanceToL, right);
                     ApplyWallGrav(distanceToR, left);
@@ -350,29 +431,29 @@ int main()
                 }
 
                 // Hard boundary
-                for (int i = 0; i < g_ballCount; ++i)
+                for (int i = 0; i < Goop::entityCount; ++i)
                 {
-                    bool tooLeft  = points[i].x - radii[i] < hardBoundsMinX;
-                    bool tooHigh  = points[i].y - radii[i] < hardBoundsMinY;
-                    bool tooRight = points[i].x + radii[i] > hardBoundsMaxX;
-                    bool tooLow   = points[i].y + radii[i] > hardBoundsMaxY;
+                    bool tooLeft  = points[i].x - radii[i] < Window::hardBoundsMinX;
+                    bool tooHigh  = points[i].y - radii[i] < Window::hardBoundsMinY;
+                    bool tooRight = points[i].x + radii[i] > Window::hardBoundsMaxX;
+                    bool tooLow   = points[i].y + radii[i] > Window::hardBoundsMaxY;
 
                     if (tooLeft || tooRight) velocities[i].x *= -1;
                     if (tooHigh || tooLow)   velocities[i].y *= -1;
 
-                    if (tooLeft)  points[i].x = hardBoundsMinX + radii[i];
-                    if (tooHigh)  points[i].y = hardBoundsMinY + radii[i];
-                    if (tooRight) points[i].x = hardBoundsMaxX - radii[i];
-                    if (tooLow)   points[i].y = hardBoundsMaxY - radii[i];
+                    if (tooLeft)  points[i].x = Window::hardBoundsMinX + radii[i];
+                    if (tooHigh)  points[i].y = Window::hardBoundsMinY + radii[i];
+                    if (tooRight) points[i].x = Window::hardBoundsMaxX - radii[i];
+                    if (tooLow)   points[i].y = Window::hardBoundsMaxY - radii[i];
                 }
             }
 
             // Limit speeds and update positions
             {
-                for (int i = 0; i < g_ballCount; ++i)
+                for (int i = 0; i < Goop::entityCount; ++i)
                 {
-                    if (Vector2Length(velocities[i]) > g_speedLimit)
-                        velocities[i] = Vector2Normalize(velocities[i]) * g_speedLimit;
+                    if (Vector2Length(velocities[i]) > Physics::c)
+                        velocities[i] = Vector2Normalize(velocities[i]) * Physics::c;
 
                     points[i] += velocities[i];
                 }
@@ -395,13 +476,13 @@ int main()
 #if _DEBUG
 
             // Draw body collisions
-            for (int i = 0; i < g_ballCount; ++i)
+            for (int i = 0; i < Goop::entityCount; ++i)
                 DrawCircleLines(points[i].x, points[i].y, radii[i], MAGENTA);
 
             // Draw body interactions
-            for (int i = 0; i < g_ballCount; ++i)
+            for (int i = 0; i < Goop::entityCount; ++i)
             {
-                for (int j = 0; j < g_ballCount; ++j)
+                for (int j = 0; j < Goop::entityCount; ++j)
                 {
                     if (j == i)
                         break;
@@ -413,8 +494,8 @@ int main()
                 }
             }
 
-            DrawRectangleLines(softBoundsMinX, softBoundsMinY, softBoundsWidth, softBoundsHeight, ORANGE);
-            DrawRectangleLines(hardBoundsMinX, hardBoundsMinY, hardBoundsWidth, hardBoundsHeight, RED);
+            DrawRectangleLines(Window::softBoundsMinX, Window::softBoundsMinY, Window::softBoundsWidth, Window::softBoundsHeight, ORANGE);
+            DrawRectangleLines(Window::hardBoundsMinX, Window::hardBoundsMinY, Window::hardBoundsWidth, Window::hardBoundsHeight, RED);
 
             DrawFPS(0,0);
 
