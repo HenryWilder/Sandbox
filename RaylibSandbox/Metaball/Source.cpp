@@ -3,7 +3,7 @@
 #include <algorithm>
 #include <time.h>
 #include <string>
-#include <regex>
+#include <stdexcept>
 
 #define sign(x) (((x) > (decltype(x))(0)) - ((x) < (decltype(x))(0)))
 
@@ -76,11 +76,13 @@ namespace Window
     constexpr int windowWidth = 1280;
     constexpr int windowHeight = 720;
 
+    constexpr int softBoundsPadding = 32; // Inset
+
     // Hard bounds
-    constexpr int hardBoundsMinX = -32;
-    constexpr int hardBoundsMinY = -32;
-    constexpr int hardBoundsWidth = 738 + 32;
-    constexpr int hardBoundsHeight = 413 + 32;
+    constexpr int hardBoundsMinX = 0;
+    constexpr int hardBoundsMinY = 0;
+    constexpr int hardBoundsWidth = 400; // 738
+    constexpr int hardBoundsHeight = 400; // 413
     constexpr int hardBoundsMaxX = hardBoundsMinX + hardBoundsWidth;
     constexpr int hardBoundsMaxY = hardBoundsMinY + hardBoundsHeight;
 
@@ -91,8 +93,6 @@ namespace Window
     constexpr float hardBoundsMaxYF = (float)hardBoundsMaxY;
 
     // Soft bounds
-    constexpr int softBoundsPadding = 32; // Inset
-
     constexpr int softBoundsMinX = hardBoundsMinX + softBoundsPadding;
     constexpr int softBoundsMinY = hardBoundsMinY + softBoundsPadding;
     constexpr int softBoundsMaxX = hardBoundsMaxX - softBoundsPadding;
@@ -110,9 +110,9 @@ namespace Window
 namespace Physics
 {
     // Gravitational constant
-    constexpr float G = 0.1f;
+    constexpr float G = 0.05f;
     // Speed of causality (universal speed limit)
-    constexpr float c = 8.0f;
+    constexpr float c = 6.0f;
     // 4/3pi
     constexpr float fourThirdsPi = (PI * 4.0f) / 3.0f;
 }
@@ -123,19 +123,18 @@ namespace Goop
     constexpr int entityCount = 32;
 
     // Info for procedural generation
-    constexpr float minRadius = 20.0f;
-    constexpr float maxRadius = 60.0f;
-    constexpr float minStartSpeed = 0.0f;
+    constexpr float minRadius = 10.0f;
+    constexpr float maxRadius = 30.0f;
+    constexpr float minStartSpeed = 3.0f;
     constexpr float maxStartSpeed = 5.0f;
 
     // Physical properties of the fluid
     namespace Fluid
     {
         constexpr float density = 1.0f;
-        constexpr float dragCoeff = 0.7f; // Drag coefficient
-        constexpr float repulsion = 0.4f; // Multiplier for force when repelling
-        constexpr float viscosity = 0.9f; // Multiplier for combining speeds when overlapping
-        constexpr float touchPercent = 0.4f; // Percent of radii allowed to overlap before repelling
+        constexpr float dragCoeff = 0.0f; // Drag coefficient
+        constexpr float repulsion = 2.0f; // Multiplier for force when repelling
+        constexpr float touchPercent = 0.2f; // Percent of radii allowed to overlap before repelling
     }
 }
 
@@ -194,36 +193,32 @@ out vec4 finalColor;
 // NOTE: Add here your custom variables
 uniform vec2 resolution = vec2(720.0);
 
-float Falloff(float distanceToPoint)
-{
-    return pow(1.0 / pow(distanceToPoint, 2), 2);
-}
-
 void main()
 {
-	float activity = 0.0;
-
     vec2 screenPos = fragTexCoord * resolution;
     vec2 boundsPos = (screenPos - boundsMin) / boundsSize;
-	for (int i = 0; i < numBalls; ++i)
+
+	float activity = 0.0;
+    for (int i = 0; i < numBalls; ++i)
 	{
         float radius = r[i];
         float distance = distance(screenPos, p[i]);
-        activity += pow(radius / pow(distance, 2), 2) * pow(radius, 2);
+        activity += (pow(radius / pow(distance, 2), 2) * pow(radius, 2));
 	}
 
     float height = boundsPos.y;
     // Gradient glow/reflection
     vec3 outerColor = mix(colorInner, colorEdge, height);
     // Core
-    vec3 innerColor = mix(mix(1.0-colorCore, mix(colorInner, colorEdge, height), height), mix(mix(colorEdge, colorInner, height), colorCore, height), height);
+    //vec3 innerColor = mix(mix(1.0-colorCore, mix(colorInner, colorEdge, height), height), mix(mix(colorEdge, colorInner, height), colorCore, height), height);
+    //vec3 innerColor = colorCore;
+    vec3 innerColor = outerColor * activity * 0.5;
     // Transition from edge to core
-    float coreTransition = clamp(pow(activity - 1.0, 0.125) * 0.7, 0.0, 1.0);
+    float coreTransition = clamp(1.0 - pow(1.0/pow(activity, 2), 5), 0.0, 1.0);
 
     vec3 color = mix(outerColor, innerColor, coreTransition);
-    finalColor = vec4(vec3(color), 1.0);
-    if (activity < 1.0)
-    finalColor = vec4(color, clamp(activity, 0.0, 1.0));
+    // finalColor = vec4(vec3(activity, coreTransition, 0.0), 1.0);
+    finalColor = vec4(vec3(color), clamp(activity, 0.0, 1.0));
 }
 )TXT";
 
@@ -261,9 +256,11 @@ struct ShaderUniform<TYPE, 1>
 
 float DragForce(Vector2 velocitySelf, Vector2 velocityOther, float overlapArea)
 {
+    // Rename variables
     constexpr float p = Goop::Fluid::density;
     constexpr float CD = Goop::Fluid::dragCoeff;
     float A = overlapArea;
+
     float v = Vector2Length(velocitySelf - velocityOther);
     float FD = 0.5 * p * (v*v) * CD * A;
     return FD;
@@ -271,6 +268,10 @@ float DragForce(Vector2 velocitySelf, Vector2 velocityOther, float overlapArea)
 
 float ForceOfGravity(float distance, float mass1, float mass2)
 {
+#if _DEBUG
+    if (distance == 0.0f)
+        throw std::domain_error("Cannot apply gravity on two entities occupying the same point");
+#endif
     return Physics::G * ((mass1 * mass2) / (distance * distance));
 }
 
@@ -282,6 +283,10 @@ float ForceOfGravity(Vector2 position1, Vector2 position2, float mass1, float ma
 
 Vector2 ForceToVelocity(Vector2 direction, float force, float mass, float dt)
 {
+#if _DEBUG
+    if (mass == 0.0f)
+        throw std::domain_error("Cannot apply drag on massless entity");
+#endif
     float acceleration = force / mass;
     float speed = acceleration * dt;
     return direction * speed;
@@ -372,6 +377,7 @@ int main()
             }
 
             // Friction
+#if 0
             {
                 for (int i = 0; i < Goop::entityCount; ++i)
                 {
@@ -394,13 +400,16 @@ int main()
                         // Apply friction when overlapping
                         if (dist <= overlapDistance && dist > touchDistance)
                         {
-                            float dragForce = DragForce(velocities[i], velocities[j], overlapDistance - dist);
+                            float overlapLength = overlapDistance - dist;
+                            float overlapArea = PI * (overlapLength * overlapLength);
+                            float dragForce = DragForce(velocities[i], velocities[j], overlapArea);
                             Vector2 dragVelocity = ForceToVelocity(Vector2Normalize(velocities[i]) * -1.0f, dragForce, masses[i], dt);
-                            velocities[i] += dragVelocity;
+                            velocities[i] -= dragVelocity;
                         }
                     }
                 }
             }
+#endif
 
             // Bounds
             {
@@ -411,7 +420,7 @@ int main()
 
                     auto ApplyWallGrav = [&](float distanceToWall, Vector2 reflectDirection)
                     {
-                        if (distanceToWall <= touchDistance)
+                        if (distanceToWall <= touchDistance && distanceToWall != 0.0f)
                         {
                             // Walls push back with the same mass as the bodies
                             float force = ForceOfGravity(distanceToWall, masses[i], masses[i]);
@@ -485,12 +494,15 @@ int main()
                 for (int j = 0; j < Goop::entityCount; ++j)
                 {
                     if (j == i)
-                        break;
+                        continue;
 
                     float dist = Vector2Distance(points[j], points[i]);
-                    float touchDist = radii[i] + radii[j];
+                    float overlapDist = radii[i] + radii[j];
+                    float touchDist = overlapDist * Goop::Fluid::touchPercent;
 
-                    DrawLine(points[i].x, points[i].y, points[j].x, points[j].y, (dist > touchDist ? GREEN : ORANGE));
+                    Vector2 direction = Vector2Normalize(points[j] - points[i]);
+                    Vector2 pt2 = points[i] + direction * radii[j];
+                    DrawLine(points[i].x, points[i].y, pt2.x, pt2.y, ColorAlpha((dist > overlapDist ? GREEN : (dist > touchDist ? YELLOW : RED)), 0.25f));
                 }
             }
 
@@ -498,6 +510,8 @@ int main()
             DrawRectangleLines(Window::hardBoundsMinX, Window::hardBoundsMinY, Window::hardBoundsWidth, Window::hardBoundsHeight, RED);
 
             DrawFPS(0,0);
+
+            DrawText(TextFormat("%f", GetTime()), 0, 20, 20, MAGENTA);
 
 #endif
 

@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.30907.101
+# Visual Studio Version 17
+VisualStudioVersion = 17.1.32407.343
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ConwayLife", "RaylibApp\RaylibApp.vcxproj", "{121C392A-DDAD-4484-AD81-059A7FFB8518}"
 EndProject
@@ -108,6 +108,10 @@ EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CoolerInventory", "CoolerInventory\CoolerInventory.vcxproj", "{57BDA1CE-EE80-4057-BF6F-7DC462D3E2CF}"
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "Electron Architect 3", "Electron Architect 3\Electron Architect 3.vcxproj", "{4A0EB673-D24C-4E97-9FBC-130C9D4773C0}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RelativisticRaytrace", "RelativisticRaytrace\RelativisticRaytrace.vcxproj", "{44528FAE-0479-488D-AD85-09841672766E}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "RelativisticRaytrace2", "RelativisticRaytrace2\RelativisticRaytrace2.vcxproj", "{ED62E384-2A66-4C1B-AB1A-AC4ECE2910A6}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -752,6 +756,30 @@ Global
 		{4A0EB673-D24C-4E97-9FBC-130C9D4773C0}.Release|x64.Build.0 = Release|x64
 		{4A0EB673-D24C-4E97-9FBC-130C9D4773C0}.Release|x86.ActiveCfg = Release|Win32
 		{4A0EB673-D24C-4E97-9FBC-130C9D4773C0}.Release|x86.Build.0 = Release|Win32
+		{44528FAE-0479-488D-AD85-09841672766E}.Debug|x64.ActiveCfg = Debug|x64
+		{44528FAE-0479-488D-AD85-09841672766E}.Debug|x64.Build.0 = Debug|x64
+		{44528FAE-0479-488D-AD85-09841672766E}.Debug|x86.ActiveCfg = Debug|Win32
+		{44528FAE-0479-488D-AD85-09841672766E}.Debug|x86.Build.0 = Debug|Win32
+		{44528FAE-0479-488D-AD85-09841672766E}.Development|x64.ActiveCfg = Debug|x64
+		{44528FAE-0479-488D-AD85-09841672766E}.Development|x64.Build.0 = Debug|x64
+		{44528FAE-0479-488D-AD85-09841672766E}.Development|x86.ActiveCfg = Debug|Win32
+		{44528FAE-0479-488D-AD85-09841672766E}.Development|x86.Build.0 = Debug|Win32
+		{44528FAE-0479-488D-AD85-09841672766E}.Release|x64.ActiveCfg = Release|x64
+		{44528FAE-0479-488D-AD85-09841672766E}.Release|x64.Build.0 = Release|x64
+		{44528FAE-0479-488D-AD85-09841672766E}.Release|x86.ActiveCfg = Release|Win32
+		{44528FAE-0479-488D-AD85-09841672766E}.Release|x86.Build.0 = Release|Win32
+		{ED62E384-2A66-4C1B-AB1A-AC4ECE2910A6}.Debug|x64.ActiveCfg = Debug|x64
+		{ED62E384-2A66-4C1B-AB1A-AC4ECE2910A6}.Debug|x64.Build.0 = Debug|x64
+		{ED62E384-2A66-4C1B-AB1A-AC4ECE2910A6}.Debug|x86.ActiveCfg = Debug|Win32
+		{ED62E384-2A66-4C1B-AB1A-AC4ECE2910A6}.Debug|x86.Build.0 = Debug|Win32
+		{ED62E384-2A66-4C1B-AB1A-AC4ECE2910A6}.Development|x64.ActiveCfg = Debug|x64
+		{ED62E384-2A66-4C1B-AB1A-AC4ECE2910A6}.Development|x64.Build.0 = Debug|x64
+		{ED62E384-2A66-4C1B-AB1A-AC4ECE2910A6}.Development|x86.ActiveCfg = Debug|Win32
+		{ED62E384-2A66-4C1B-AB1A-AC4ECE2910A6}.Development|x86.Build.0 = Debug|Win32
+		{ED62E384-2A66-4C1B-AB1A-AC4ECE2910A6}.Release|x64.ActiveCfg = Release|x64
+		{ED62E384-2A66-4C1B-AB1A-AC4ECE2910A6}.Release|x64.Build.0 = Release|x64
+		{ED62E384-2A66-4C1B-AB1A-AC4ECE2910A6}.Release|x86.ActiveCfg = Release|Win32
+		{ED62E384-2A66-4C1B-AB1A-AC4ECE2910A6}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
