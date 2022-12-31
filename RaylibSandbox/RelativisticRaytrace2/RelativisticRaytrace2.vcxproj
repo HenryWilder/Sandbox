@@ -160,6 +160,10 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="vector_field.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="vector_field.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

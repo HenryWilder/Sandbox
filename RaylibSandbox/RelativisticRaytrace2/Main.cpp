@@ -2,12 +2,23 @@
 #include <vector>
 #include <raylib.h>
 #include <raymath.h>
+#include "vector_field.h"
 
 constexpr float c = 3.44737343303f; // In units per second
 constexpr float c2 = c * c; // c squared
 constexpr float c4 = c2 * c2; // c to the power of 4
 constexpr float G = 10.0; // Gravitational constant
 constexpr float massOfLight = 0.01; // Fudge number for testing
+
+Vector3 SpeedLimited(Vector3 velocity)
+{
+	if (Vector3LengthSqr(velocity) <= c2)
+		return velocity;
+
+	Vector3 direction = Vector3Normalize(velocity);
+	Vector3 newVelocity = Vector3Scale(direction, c);
+	return newVelocity;
+}
 
 // Like a black hole or star
 struct MassPoint
@@ -21,21 +32,13 @@ struct MassPoint
 
 std::vector<MassPoint> bodies = {
 	// Black hole
-	MassPoint{
-		.position = { 0,2,0 },
-		.color = DARKGRAY,
-		.emission = 0,
-		.radius = 0.01f,
-		.mass = 200.0f
-	},
-	// White hole
-	MassPoint{
-		.position = { 1,-2,0 },
-		.color = DARKGRAY,
-		.emission = 0,
-		.radius = 0.01f,
-		.mass = -200.0f
-	},
+	//MassPoint{
+	//	.position = { 0,2,0 },
+	//	.color = MAGENTA,
+	//	.emission = 0,
+	//	.radius = 0.01f,
+	//	.mass = 200.0f
+	//},
 	// Star 1
 	MassPoint{
 		.position = { 35,0,0 },
@@ -134,6 +137,7 @@ Color LightTrace(Vector3 startPoint, Vector3 startDirection)
 			acceleration = Vector3Add(acceleration, accelerationDueToBody);
 		}
 		velocity = Vector3Add(velocity, acceleration);
+		velocity = SpeedLimited(velocity);
 		Vector3 currentPoint = Vector3Add(lastPoint, velocity);
 
 		if (draw)
@@ -156,8 +160,123 @@ Color LightTrace(Vector3 startPoint, Vector3 startDirection)
 
 constexpr float cameraResolution = 2.5f; // Degrees between light rays
 
+// Must come after grid has been initialized or results will be meaningless.
+void ApplyGridGravity(float time, float step)
+{
+	for (int x = 0; x < g_gridWidth; ++x)
+	{
+		for (int y = 0; y < g_gridWidth; ++y)
+		{
+			for (int z = 0; z < g_gridWidth; ++z)
+			{
+				GridPoint& point = g_grid[x][y][z];
+
+				Vector3 lastPoint = point.truePosition;
+				Vector3 velocity = Vector3Zero();
+
+				for (float t = 0.0f; t <= time; t += step)
+				{
+					Vector3 acceleration = Vector3Zero();
+					for (MassPoint& body : bodies)
+					{
+						float distanceToBody = Vector3Distance(lastPoint, body.position);
+						if (distanceToBody == 0.0f) continue;
+						Vector3 directionToBody = Vector3Direction(lastPoint, body.position);
+						float force = Force(1, body.mass, distanceToBody) * step;
+						Vector3 accelerationDueToBody = Vector3Scale(directionToBody, force);
+						acceleration = Vector3Add(acceleration, accelerationDueToBody);
+					}
+					velocity = Vector3Add(velocity, acceleration);
+					velocity = SpeedLimited(velocity);
+					Vector3 currentPoint = Vector3Add(lastPoint, velocity);
+
+					lastPoint = currentPoint;
+				}
+
+				point.truePosition = lastPoint;
+			}
+		}
+	}
+}
+
+void VectorFieldTest()
+{
+	InitGrid();
+	ApplyGridGravity(0.1f, 0.1f);
+
+	InitWindow(1280, 720, "Relativistic Raytrace");
+	SetTargetFPS(60);
+
+	Camera3D camera{};
+	camera.position = { -10, 10, 0 };
+	camera.target = { 0, 0, 0 };
+	camera.up = { 0, 1, 0 };
+	camera.fovy = 45;
+	camera.type = CAMERA_PERSPECTIVE;
+	SetCameraMode(camera, CAMERA_ORBITAL);
+
+	while (!WindowShouldClose())
+	{
+		UpdateCamera(&camera);
+
+		BeginDrawing();
+		ClearBackground(BLACK);
+
+		BeginMode3D(camera);
+
+		for (int x = 0; x < g_gridWidth; ++x)
+		{
+			for (int y = 0; y < g_gridHeight; ++y)
+			{
+				for (int z = 0; z < g_gridDepth; ++z)
+				{
+					Vector3 point = TruePositionAtGridIntegerPosition(x, y, z);
+		
+					try {
+						if (IsGridIntegerPositionWithinBounds(x + 1, y, z))
+						{
+							Vector3 pointX = TruePositionAtGridIntegerPosition(x + 1, y, z);
+							DrawLine3D(point, pointX, RED);
+						}
+						if (IsGridIntegerPositionWithinBounds(x, y + 1, z))
+						{
+							Vector3 pointY = TruePositionAtGridIntegerPosition(x, y + 1, z);
+							DrawLine3D(point, pointY, GREEN);
+						}
+						if (IsGridIntegerPositionWithinBounds(x, y, z + 1))
+						{
+							Vector3 pointZ = TruePositionAtGridIntegerPosition(x, y, z + 1);
+							DrawLine3D(point, pointZ, BLUE);
+						}
+					}
+					catch (std::exception e)
+					{
+						printf("Out of bounds");
+					}
+		
+					DrawPoint3D(point, WHITE);
+				}
+			}
+		}
+
+		for (MassPoint& body : bodies)
+		{
+			DrawSphere(body.position, body.radius, body.color);
+		}
+
+		EndMode3D();
+
+		DrawFPS(0,0);
+		EndDrawing();
+	}
+	CloseWindow();
+}
+
 int main()
 {
+	VectorFieldTest();
+	return 0;
+
 	InitWindow(720*2, 720, "Relativistic Raytrace");
 	SetTargetFPS(60);
 
@@ -165,7 +284,7 @@ int main()
 
 	Vector3 up = { 0,1,0 };
 
-	Camera3D camera;
+	Camera3D camera{};
 	camera.position = { -10.0f, 0, 0 };
 	camera.target = { 0, 0, 0 };
 	camera.up = up;
