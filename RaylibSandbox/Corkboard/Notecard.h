@@ -26,8 +26,8 @@ public:
 	Notecard(Vector2 position, Color color) : position(position), color(color) {}
 
 	constexpr static Vector2 size = { 5 * 40, 3 * 40 };
-	constexpr static float pinRadius = 5.0f;
-	constexpr static Vector2 pinOffset = { size.x / 2, pinRadius * 2 }; // The position of the pin
+	constexpr static float pinRadius = 6.0f;
+	constexpr static Vector2 pinOffset = { size.x / 2, pinRadius + 1 }; // The position of the pin
 
 	Vector2 position; // The position of the card's top-left corner
 	Color color;
@@ -47,6 +47,7 @@ public:
 
 	// The card is on a layer below the threads
 	void DrawCard() const;
+	void DrawCardGhost() const;
 
 	// The pin is on a layer above the threads
 	void DrawPin() const;

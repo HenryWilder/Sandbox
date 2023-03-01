@@ -2,6 +2,16 @@
 #include <raylib.h>
 #include <vector>
 
+constexpr Color threadWhite = {255,255,255,255};
+constexpr Color threadRed = {245, 66, 66,255};
+constexpr Color threadOrange = {245, 126, 66, 255};
+constexpr Color threadYellow = {245, 215, 66,255};
+constexpr Color threadGreen = {70, 184, 119,255};
+constexpr Color threadLightBlue = {66, 221, 245,255};
+constexpr Color threadBlue = {55, 58, 166,255};
+constexpr Color threadPurple = {101, 34, 179,255};
+constexpr Color threadPink = {238, 120, 240,255};
+
 class Notecard;
 
 class Thread
@@ -26,4 +36,4 @@ extern std::vector<Thread*> g_threads;
 
 void CreateThread(Color color, Notecard* start, Notecard* end);
 
-void DestroyThread(Thread* thread);
+void DestroyThread(Thread* thread, Notecard* ignoring = nullptr);

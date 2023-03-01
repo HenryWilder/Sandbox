@@ -57,15 +57,36 @@ inline Vector3& operator/=(Vector3& a, float div) { return (a = Vector3Scale(a, 
 using Element = std::variant<Notecard*, Thread*, CBButton*>;
 using OptElement = std::optional<Element>;
 
-std::vector<CBButton> g_buttons = {
-    CBButton({0,0})
+std::vector<CBButton*> g_buttons = {
+    // Card colors
+    new CBButton(CBButton::size.x * 0, 0, cardstockWhite, false),
+    new CBButton(CBButton::size.x * 1, 0, cardstockRed, false),
+    new CBButton(CBButton::size.x * 2, 0, cardstockOrange, false),
+    new CBButton(CBButton::size.x * 3, 0, cardstockYellow, false),
+    new CBButton(CBButton::size.x * 4, 0, cardstockGreen, false),
+    new CBButton(CBButton::size.x * 5, 0, cardstockLightBlue, false),
+    new CBButton(CBButton::size.x * 6, 0, cardstockBlue, false),
+    new CBButton(CBButton::size.x * 7, 0, cardstockLavender, false),
+    new CBButton(CBButton::size.x * 8, 0, cardstockPink, false),
+
+    // Thread colors
+    // Todo: Make specialized colors
+    new CBButton(CBButton::size.x * 0, CBButton::size.y, threadWhite, true),
+    new CBButton(CBButton::size.x * 1, CBButton::size.y, threadRed, true),
+    new CBButton(CBButton::size.x * 2, CBButton::size.y, threadOrange, true),
+    new CBButton(CBButton::size.x * 3, CBButton::size.y, threadYellow, true),
+    new CBButton(CBButton::size.x * 4, CBButton::size.y, threadGreen, true),
+    new CBButton(CBButton::size.x * 5, CBButton::size.y, threadLightBlue, true),
+    new CBButton(CBButton::size.x * 6, CBButton::size.y, threadBlue, true),
+    new CBButton(CBButton::size.x * 7, CBButton::size.y, threadPurple, true),
+    new CBButton(CBButton::size.x * 8, CBButton::size.y, threadPink, true),
 };
 
 int main()
 {
     int windowWidth = 1280;
     int windowHeight = 720;
-    InitWindow(windowWidth, windowHeight, "My Raylib Program");
+    InitWindow(windowWidth, windowHeight, "Corkboard");
     SetTargetFPS(60);
 
     /******************************************
@@ -81,6 +102,9 @@ int main()
     bool draggingPin = false; // If optDraggedElement is a card, this says whether the card is being dragged or the pin (making a thread).
     Vector2 clickOffset = Vector2Zero();
 
+    Color cardColor = cardstockWhite;
+    Color threadColor = threadWhite;
+
     while (!WindowShouldClose())
     {
         /******************************************
@@ -94,11 +118,11 @@ int main()
 
         // Hover checks
         {
-            for (CBButton& button : g_buttons)
+            for (CBButton* button : g_buttons)
             {
-                if (button.IsHovered(cursor))
+                if (button->IsHovered(cursor))
                 {
-                    optHoveredElement = &button;
+                    optHoveredElement = button;
                     goto FinishedHoverChecks;
                 }
             }
@@ -177,7 +201,7 @@ int main()
                     }
 
                     if (shouldCreateThread)
-                        CreateThread(RED, startCard, endCard);
+                        CreateThread(threadColor, startCard, endCard);
                 }
 
                 // Cleanup
@@ -236,6 +260,46 @@ int main()
             }
         }
 
+        // Left click outside of any elements
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !optHoveredElement.has_value() && !optDraggedElement.has_value())
+        {
+            CreateCard(Vector2Subtract(cursor, Notecard::pinOffset), cardColor);
+        }
+
+        // Left click a button
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && optHoveredElement.has_value() && !optDraggedElement.has_value() && std::holds_alternative<CBButton*>(*optHoveredElement))
+        {
+            CBButton* button = std::get<CBButton*>(*optHoveredElement);
+
+            if (button->isThreadColor)
+            {
+                threadColor = button->color;
+            }
+            else
+            {
+                cardColor = button->color;
+            }
+        }
+
+        // Right click an element
+        if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON) && optHoveredElement.has_value() && !optDraggedElement.has_value())
+        {
+            Element hoveredElement = *optHoveredElement;
+
+            if (std::holds_alternative<Notecard*>(hoveredElement))
+            {
+                Notecard* card = std::get<Notecard*>(hoveredElement);
+                DestroyCard(card);
+                optHoveredElement = {};
+            }
+            else if (std::holds_alternative<Thread*>(hoveredElement))
+            {
+                Thread* thread = std::get<Thread*>(hoveredElement);
+                DestroyThread(thread);
+                optHoveredElement = {};
+            }
+        }
+
         /******************************************
         *   Draw the frame                        *
         ******************************************/
@@ -278,11 +342,6 @@ int main()
                 {
                     DrawRing(card->PinPosition(), Notecard::pinRadius, Notecard::pinRadius + 3, 0, 360, 100, BLUE);
                 }
-                // Hovering card
-                else
-                {
-                    DrawRectangleLinesEx(card->GetCardRectangle(), 3, BLUE);
-                }
             }
 
             for (Thread* thread : g_threads)
@@ -305,7 +364,7 @@ int main()
                 _ASSERT_EXPR(optDraggedElement.has_value() && std::holds_alternative<Notecard*>(*optDraggedElement), L"Dragging a pin without having a notecard selected");
 
                 Notecard* startCard = std::get<Notecard*>(*optDraggedElement);
-                DrawLineEx(startCard->PinPosition(), cursor, 2.0f, LIGHTGRAY);
+                DrawLineEx(startCard->PinPosition(), cursor, Thread::thickness, threadColor);
             }
 
             for (Notecard* card : g_cards)
@@ -313,9 +372,69 @@ int main()
                 card->DrawPin();
             }
 
-            for (CBButton button : g_buttons)
+            // Draw ghost of hovered card over everything else
+            if (optHoveredElement.has_value() && std::holds_alternative<Notecard*>(*optHoveredElement) && !hoveringPin)
             {
-                button.Draw();
+                Notecard* card = std::get<Notecard*>(*optHoveredElement);
+
+                card->DrawCardGhost();
+
+                DrawText(TextFormat("%i", card->threads.size()), card->position.x, card->position.y - 10, 8, RED);
+                DrawRectangleLinesEx(card->GetCardRectangle(), 3, YELLOW);
+            }
+
+            /******************************************
+            *   Draw the UI                           *
+            ******************************************/
+            
+            // Not hovering nor dragging
+            if (!optHoveredElement.has_value() && !optDraggedElement.has_value())
+            {
+                int width = 4 * 5;
+                int height = 3 * 5;
+                Rectangle rec = { cursor.x - width - 2, cursor.y - height - 2, width, height };
+
+                Rectangle recShadow = rec;
+                recShadow.x -= 2;
+                recShadow.y += 2;
+                BeginBlendMode(BLEND_MULTIPLIED);
+                DrawRectangleLinesEx(recShadow, 2, {0,0,0,70});
+                EndBlendMode();
+
+                DrawRectangleLinesEx(rec, 2, cardColor);
+            }
+
+            // Hovering a pin
+            if (!optDraggedElement.has_value() && hoveringPin)
+            {
+                _ASSERT_EXPR(optHoveredElement.has_value() && std::holds_alternative<Notecard*>(*optHoveredElement), L"Hovering a pin without actually hovering a pin");
+
+                int width = 4 * 5;
+                int height = 2;
+                Rectangle rec = { cursor.x - width - 2, cursor.y - height - 2 * 5 - 2, width, height };
+
+                Rectangle recShadow = rec;
+                recShadow.x -= 2;
+                recShadow.y += 2;
+                BeginBlendMode(BLEND_MULTIPLIED);
+                DrawRectangleLinesEx(recShadow, 2, {0,0,0,70});
+                EndBlendMode();
+
+                DrawRectangleLinesEx(rec, 2, threadColor);
+            }
+
+            // Buttons
+            for (CBButton* button : g_buttons)
+            {
+                button->Draw();
+            }
+
+            // Hovered button
+            if (optHoveredElement.has_value() && std::holds_alternative<CBButton*>(*optHoveredElement))
+            {
+                CBButton* button = std::get<CBButton*>(*optHoveredElement);
+
+                DrawRectangleLinesEx(button->GetRectangle(), 3, YELLOW);
             }
 
         } EndDrawing();
@@ -335,6 +454,12 @@ int main()
     {
         delete g_threads.back();
         g_threads.pop_back();
+    }
+
+    while (!g_buttons.empty())
+    {
+        delete g_buttons.back();
+        g_buttons.pop_back();
     }
 
     CloseWindow();

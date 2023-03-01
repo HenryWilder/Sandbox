@@ -48,6 +48,18 @@ void Notecard::DrawCard() const
 	DrawText(content.c_str(), x, y + titleSize + 1, contentSize, BLACK);
 }
 
+void Notecard::DrawCardGhost() const
+{
+	DrawRectangleV(position, size, ColorAlpha(color, 0.85f));
+	DrawCircleV(PinPosition(), pinRadius, GOLD);
+
+	int x = position.x + 5;
+	int y = position.y + 5;
+
+	DrawText(title.c_str(), x, y, titleSize, BLACK);
+	DrawText(content.c_str(), x, y + titleSize + 1, contentSize, BLACK);
+}
+
 void Notecard::DrawPin() const
 {
 	// Shadow
@@ -105,7 +117,7 @@ void DestroyCard(Notecard* card)
 	g_cards.erase(it);
 	for (Thread* thread : card->threads)
 	{
-		DestroyThread(thread);
+		DestroyThread(thread, card);
 	}
 	delete card;
 }

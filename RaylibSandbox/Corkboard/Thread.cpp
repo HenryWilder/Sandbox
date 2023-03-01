@@ -63,14 +63,16 @@ void CreateThread(Color color, Notecard* start, Notecard* end)
     end->AddThreadConnection(thread);
 }
 
-void DestroyThread(Thread* thread)
+void DestroyThread(Thread* thread, Notecard* ignoring)
 {
     auto it = std::find(g_threads.begin(), g_threads.end(), thread);
     if (it != g_threads.end())
     {
         g_threads.erase(it);
-        thread->start->RemoveThreadConnection(thread);
-        thread->end->RemoveThreadConnection(thread);
+        if (thread->start != ignoring)
+            thread->start->RemoveThreadConnection(thread);
+        if (thread->end != ignoring)
+            thread->end->RemoveThreadConnection(thread);
         delete thread;
     }
     else
