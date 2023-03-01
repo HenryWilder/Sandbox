@@ -93,11 +93,6 @@ int main()
     *   Load textures, shaders, and meshes    *
     ******************************************/
 
-    CreateCard(Vector2Zero(), cardstockBlue);
-    g_cards.back()->title = "Title";
-    g_cards.back()->content = "Content";
-    CreateCard(Vector2Zero(), cardstockGreen);
-
     OptElement optDraggedElement = {};
     bool draggingPin = false; // If optDraggedElement is a card, this says whether the card is being dragged or the pin (making a thread).
     Vector2 clickOffset = Vector2Zero();
@@ -127,24 +122,27 @@ int main()
                 }
             }
 
-            for (Thread* thread : g_threads)
+            if (!draggingPin) // Ignore thread collision when creating a thread
             {
-                if (thread->IsHovered(cursor))
+                for (Thread* thread : g_threads)
                 {
-                    optHoveredElement = thread;
-
-                    // Pins have priority
-                    for (Notecard* card : g_cards)
+                    if (thread->IsHovered(cursor))
                     {
-                        if (card->IsPinHovered(cursor))
-                        {
-                            optHoveredElement = card;
-                            hoveringPin = true;
-                            break;
-                        }
-                    }
+                        optHoveredElement = thread;
 
-                    goto FinishedHoverChecks;
+                        // Pins have priority
+                        for (Notecard* card : g_cards)
+                        {
+                            if (card->IsPinHovered(cursor))
+                            {
+                                optHoveredElement = card;
+                                hoveringPin = true;
+                                break;
+                            }
+                        }
+
+                        goto FinishedHoverChecks;
+                    }
                 }
             }
 

@@ -9,7 +9,7 @@ constexpr Color threadYellow = {245, 215, 66,255};
 constexpr Color threadGreen = {70, 184, 119,255};
 constexpr Color threadLightBlue = {66, 221, 245,255};
 constexpr Color threadBlue = {55, 58, 166,255};
-constexpr Color threadPurple = {101, 34, 179,255};
+constexpr Color threadPurple = {112, 45, 145,255};
 constexpr Color threadPink = {238, 120, 240,255};
 
 class Notecard;
