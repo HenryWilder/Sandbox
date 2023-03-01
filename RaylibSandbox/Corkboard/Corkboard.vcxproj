@@ -166,12 +166,14 @@
   <ItemGroup>
     <ClCompile Include="CBButton.cpp" />
     <ClCompile Include="Notecard.cpp" />
+    <ClCompile Include="Serialize.cpp" />
     <ClCompile Include="Source.cpp" />
     <ClCompile Include="Thread.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="CBButton.h" />
     <ClInclude Include="Notecard.h" />
+    <ClInclude Include="Serialize.h" />
     <ClInclude Include="Thread.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

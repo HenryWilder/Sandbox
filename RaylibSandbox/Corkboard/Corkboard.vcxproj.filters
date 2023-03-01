@@ -27,6 +27,9 @@
     <ClCompile Include="CBButton.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Serialize.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Notecard.h">
@@ -36,6 +39,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="CBButton.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Serialize.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
