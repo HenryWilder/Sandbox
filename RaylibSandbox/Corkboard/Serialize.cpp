@@ -106,8 +106,14 @@ void LoadBoard(std::string filename)
 		srcFile >> b;
 		if (srcFile >> code; code != "###") goto Error;
 		std::getline(srcFile, title, '`');
+		// Trim leading/trailing spaces
+		title.erase(0, 1);
+		title.pop_back();
 		if (srcFile >> code; code != "``") goto Error;
 		std::getline(srcFile, content, '`');
+		// Trim leading/trailing spaces
+		content.erase(0, 1);
+		content.pop_back();
 		if (srcFile >> code; code != "``") goto Error;
 
 		Notecard* card = new Notecard(position, {(unsigned char)r,(unsigned char)g,(unsigned char)b,255}, title, content);
