@@ -7,6 +7,7 @@
 #include "Thread.h"
 #include "Notecard.h"
 #include "CBButton.h"
+#include "Serialize.h"
 
 #define sign(x) (((x) > (decltype(x))(0)) - ((x) < (decltype(x))(0)))
 
@@ -99,6 +100,8 @@ int main()
 
     Color cardColor = cardstockWhite;
     Color threadColor = threadWhite;
+
+    LoadBoard("testboard.txt");
 
     while (!WindowShouldClose())
     {
@@ -441,6 +444,8 @@ int main()
     /******************************************
     *   Unload and free memory                *
     ******************************************/
+
+    SaveBoard("testboard.txt");
 
     while (!g_cards.empty())
     {

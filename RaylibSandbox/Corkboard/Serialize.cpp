@@ -24,8 +24,9 @@ void SaveBoard(std::string filename)
 	std::ofstream destFile = std::ofstream(filename);
 
 	destFile << "v00.000.001\n"; // Version number
-	destFile << "c " << g_cards.size(); // Number of cards
-	destFile << "t" << g_threads.size() << '\n'; // Number of threads
+	destFile
+		<< "c " << g_cards.size() // Number of cards
+		<< " t " << g_threads.size() << '\n'; // Number of threads
 
 	destFile << '\n';
 
@@ -34,8 +35,8 @@ void SaveBoard(std::string filename)
 	{
 		cardNumber.emplace(card, i);
 		destFile
-			<< "x " << card->position.x << " y " << card->position.y // Position
-			<< " r " << card->color.r << " g " << card->color.g << " b " << card->color.b // Color
+			<< "x " << (float)card->position.x << " y " << (float)card->position.y // Position
+			<< " r " << (int)card->color.r << " g " << (int)card->color.g << " b " << (int)card->color.b // Color
 			<< " ### " << card->title << " ``` " << card->content << " ```\n"; // Content
 		++i;
 	}
@@ -45,9 +46,9 @@ void SaveBoard(std::string filename)
 	for (Thread* thread : g_threads)
 	{
 		destFile
-			<< "s " << cardNumber.find(thread->start)->second // Source
-			<< " d " << cardNumber.find(thread->end)->second // Destination
-			<< " r " << thread->color.r << " g " << thread->color.g << " b " << thread->color.b << '\n'; // Color
+			<< "s " << (int)cardNumber.find(thread->start)->second // Source
+			<< " d " << (int)cardNumber.find(thread->end)->second // Destination
+			<< " r " << (int)thread->color.r << " g " << (int)thread->color.g << " b " << (int)thread->color.b << '\n'; // Color
 	}
 
 	destFile.close();
@@ -89,7 +90,7 @@ void LoadBoard(std::string filename)
 	for (int i = 0; i < cardsCount; ++i)
 	{
 		Vector2 position{0,0}; // Position
-		Color color{0,0,0,255}; // Color
+		int r, g, b; // Color
 		std::string title, content; // Text
 
 		// Position
@@ -98,26 +99,26 @@ void LoadBoard(std::string filename)
 		if (srcFile >> code; code != "y") goto Error;
 		srcFile >> position.y;
 		if (srcFile >> code; code != "r") goto Error;
-		srcFile >> color.r;
+		srcFile >> r;
 		if (srcFile >> code; code != "g") goto Error;
-		srcFile >> color.g;
+		srcFile >> g;
 		if (srcFile >> code; code != "b") goto Error;
-		srcFile >> color.b;
+		srcFile >> b;
 		if (srcFile >> code; code != "###") goto Error;
 		std::getline(srcFile, title, '`');
 		if (srcFile >> code; code != "``") goto Error;
 		std::getline(srcFile, content, '`');
 		if (srcFile >> code; code != "``") goto Error;
 
-		Notecard* card = new Notecard(position, color, title, content);
+		Notecard* card = new Notecard(position, {(unsigned char)r,(unsigned char)g,(unsigned char)b,255}, title, content);
 		g_cards.push_back(card);
 	}
 
 	// Load threads
-	for (int i = 0; i < cardsCount; ++i)
+	for (int i = 0; i < threadsCount; ++i)
 	{
 		int sourceIndex, destinationIndex;
-		Color color{0,0,0,255};
+		int r, g, b;
 
 		if (srcFile >> code; code != "s") goto Error;
 		srcFile >> sourceIndex;
@@ -127,15 +128,15 @@ void LoadBoard(std::string filename)
 		if (sourceIndex == destinationIndex) goto Error;
 
 		if (srcFile >> code; code != "r") goto Error;
-		srcFile >> color.r;
+		srcFile >> r;
 		if (srcFile >> code; code != "g") goto Error;
-		srcFile >> color.g;
+		srcFile >> g;
 		if (srcFile >> code; code != "b") goto Error;
-		srcFile >> color.b;
+		srcFile >> b;
 
 		Notecard* source = g_cards[sourceIndex];
 		Notecard* destination = g_cards[destinationIndex];
-		Thread* thread = new Thread(color, source, destination);
+		Thread* thread = new Thread({(unsigned char)r,(unsigned char)g,(unsigned char)b,255}, source, destination);
 		source->AddThreadConnection(thread);
 		destination->AddThreadConnection(thread);
 		g_threads.push_back(thread);
