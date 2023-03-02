@@ -24,6 +24,7 @@ class Notecard
 {
 public:
 	Notecard(Vector2 position, Color color) : position(position), color(color) {}
+	Notecard(Vector2 position, Color color, const std::string& title, const std::string& content) : position(position), color(color), title(title), content(content) {}
 
 	constexpr static Vector2 size = { 5 * 40, 3 * 40 };
 	constexpr static float pinRadius = 6.0f;
