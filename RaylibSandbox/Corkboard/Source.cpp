@@ -17,28 +17,170 @@ using OptElement = std::optional<Element>;
 
 std::vector<CBButton*> g_buttons = {
     // Card colors
-    new CBButton(CBButton::size.x * 0, 0, cardstockWhite, false),
-    new CBButton(CBButton::size.x * 1, 0, cardstockRed, false),
-    new CBButton(CBButton::size.x * 2, 0, cardstockOrange, false),
-    new CBButton(CBButton::size.x * 3, 0, cardstockYellow, false),
-    new CBButton(CBButton::size.x * 4, 0, cardstockGreen, false),
-    new CBButton(CBButton::size.x * 5, 0, cardstockLightBlue, false),
-    new CBButton(CBButton::size.x * 6, 0, cardstockBlue, false),
-    new CBButton(CBButton::size.x * 7, 0, cardstockLavender, false),
-    new CBButton(CBButton::size.x * 8, 0, cardstockPink, false),
+    new CardColorButton(CBButton::size.x * 0, 0, cardstockWhite),
+    new CardColorButton(CBButton::size.x * 1, 0, cardstockRed),
+    new CardColorButton(CBButton::size.x * 2, 0, cardstockOrange),
+    new CardColorButton(CBButton::size.x * 3, 0, cardstockYellow),
+    new CardColorButton(CBButton::size.x * 4, 0, cardstockGreen),
+    new CardColorButton(CBButton::size.x * 5, 0, cardstockLightBlue),
+    new CardColorButton(CBButton::size.x * 6, 0, cardstockBlue),
+    new CardColorButton(CBButton::size.x * 7, 0, cardstockLavender),
+    new CardColorButton(CBButton::size.x * 8, 0, cardstockPink),
 
     // Thread colors
     // Todo: Make specialized colors
-    new CBButton(CBButton::size.x * 0, CBButton::size.y, threadWhite, true),
-    new CBButton(CBButton::size.x * 1, CBButton::size.y, threadRed, true),
-    new CBButton(CBButton::size.x * 2, CBButton::size.y, threadOrange, true),
-    new CBButton(CBButton::size.x * 3, CBButton::size.y, threadYellow, true),
-    new CBButton(CBButton::size.x * 4, CBButton::size.y, threadGreen, true),
-    new CBButton(CBButton::size.x * 5, CBButton::size.y, threadLightBlue, true),
-    new CBButton(CBButton::size.x * 6, CBButton::size.y, threadBlue, true),
-    new CBButton(CBButton::size.x * 7, CBButton::size.y, threadPurple, true),
-    new CBButton(CBButton::size.x * 8, CBButton::size.y, threadPink, true),
+    new ThreadColorButton(CBButton::size.x * 0, CBButton::size.y, threadWhite),
+    new ThreadColorButton(CBButton::size.x * 1, CBButton::size.y, threadRed),
+    new ThreadColorButton(CBButton::size.x * 2, CBButton::size.y, threadOrange),
+    new ThreadColorButton(CBButton::size.x * 3, CBButton::size.y, threadYellow),
+    new ThreadColorButton(CBButton::size.x * 4, CBButton::size.y, threadGreen),
+    new ThreadColorButton(CBButton::size.x * 5, CBButton::size.y, threadLightBlue),
+    new ThreadColorButton(CBButton::size.x * 6, CBButton::size.y, threadBlue),
+    new ThreadColorButton(CBButton::size.x * 7, CBButton::size.y, threadPurple),
+    new ThreadColorButton(CBButton::size.x * 8, CBButton::size.y, threadPink),
 };
+
+void CheckHovered(Vector2 cursor, OptElement& optHoveredElement, bool& hoveringPin, bool draggingPin)
+{
+    if (!draggingPin) // Ignore these collision when creating a thread
+    {
+        // Buttons
+        for (CBButton* button : g_buttons)
+        {
+            if (button->IsHovered(cursor))
+            {
+                optHoveredElement = button;
+                return;
+            }
+        }
+
+        // Pins
+        for (Notecard* card : g_cards)
+        {
+            if (card->IsPinHovered(cursor))
+            {
+                optHoveredElement = card;
+                hoveringPin = true;
+                return;
+            }
+        }
+
+        // Threads
+        for (Thread* thread : g_threads)
+        {
+            if (thread->IsHovered(cursor))
+            {
+                optHoveredElement = thread;
+                return;
+            }
+        }
+    }
+
+    // Cards
+    for (Notecard* card : g_cards)
+    {
+        if (card->IsCardHovered(cursor))
+        {
+            optHoveredElement = card;
+            return;
+        }
+    }
+}
+
+void UpdateDragging(Vector2 cursor, Vector2 clickOffset, OptElement& optHoveredElement, OptElement& optDraggedElement, bool& draggingPin)
+{
+    Element draggedElement = *optDraggedElement;
+
+    // Always lose target on release
+    if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
+    {
+        // Create pin
+        if (draggingPin && // Wants to create thread
+            optHoveredElement.has_value() && // Hovering something
+            std::holds_alternative<Notecard*>(*optHoveredElement) && // Hovering a notecard or pin
+            *optHoveredElement != draggedElement) // Not hovering the same notecard/pin that we originated from
+        {
+            _ASSERT_EXPR(std::holds_alternative<Notecard*>(draggedElement), L"Can only drag threads from pins.");
+
+            Notecard* startCard = std::get<Notecard*>(draggedElement);
+            Notecard* endCard = std::get<Notecard*>(*optHoveredElement);
+
+            // Don't create duplicate connections
+            bool shouldCreateThread = true;
+            {
+                Notecard* cardWithFewerConnections =
+                    startCard->threads.size() <= endCard->threads.size()
+                    ? startCard
+                    : endCard;
+
+                for (Thread* thread : cardWithFewerConnections->threads)
+                {
+                    bool connectionExists =
+                        (thread->start == startCard && thread->end == endCard) ||
+                        (thread->end == startCard && thread->start == endCard);
+
+                    if (connectionExists)
+                    {
+                        shouldCreateThread = false;
+                        break;
+                    }
+                }
+            }
+
+            if (shouldCreateThread)
+                CreateThread(threadColor, startCard, endCard);
+        }
+
+        // Cleanup
+        optDraggedElement = {};
+        draggingPin = false;
+    }
+    else
+    {
+        // Notecard
+        if (std::holds_alternative<Notecard*>(draggedElement))
+        {
+            if (!draggingPin)
+            {
+                std::get<Notecard*>(draggedElement)->position = cursor + clickOffset;
+            }
+        }
+    }
+}
+
+void UpdateHovering(Vector2 cursor, OptElement& optHoveredElement, OptElement& optDraggedElement, Vector2& clickOffset, bool hoveringPin, bool& draggingPin)
+{
+    Element hoveredElement = *optHoveredElement;
+
+    // Notecard
+    if (std::holds_alternative<Notecard*>(hoveredElement))
+    {
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+        {
+            optDraggedElement = hoveredElement;
+            if (hoveringPin)
+            {
+                draggingPin = true;
+            }
+            else
+            {
+                Notecard* card = std::get<Notecard*>(hoveredElement);
+                clickOffset = card->position - cursor;
+                auto it = std::find(g_cards.begin(), g_cards.end(), card);
+                g_cards.erase(it);
+                g_cards.push_front(card);
+            }
+        }
+    }
+    // Thread
+    else // if (std::holds_alternative<Thread*>(draggedElement))
+    {
+        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+        {
+            // Todo
+        }
+    }
+}
 
 int main()
 {
@@ -51,12 +193,13 @@ int main()
     *   Load textures, shaders, and meshes    *
     ******************************************/
 
+    cardColor = cardstockWhite;
+    threadColor = threadWhite;
+
     OptElement optDraggedElement = {};
+
     bool draggingPin = false; // If optDraggedElement is a card, this says whether the card is being dragged or the pin (making a thread).
     Vector2 clickOffset = Vector2Zero();
-
-    Color cardColor = cardstockWhite;
-    Color threadColor = threadWhite;
 
     LoadBoard("testboard.txt");
 
@@ -71,190 +214,65 @@ int main()
         OptElement optHoveredElement = {};
         bool hoveringPin = false; // If optHoveredElement is a card, this says whether the card is being hovered or the pin.
 
-        // Hover checks
-        {
-            for (CBButton* button : g_buttons)
-            {
-                if (button->IsHovered(cursor))
-                {
-                    optHoveredElement = button;
-                    goto FinishedHoverChecks;
-                }
-            }
+        CheckHovered(cursor, optHoveredElement, hoveringPin, draggingPin);
 
-            if (!draggingPin) // Ignore thread collision when creating a thread
-            {
-                for (Thread* thread : g_threads)
-                {
-                    if (thread->IsHovered(cursor))
-                    {
-                        optHoveredElement = thread;
-
-                        // Pins have priority
-                        for (Notecard* card : g_cards)
-                        {
-                            if (card->IsPinHovered(cursor))
-                            {
-                                optHoveredElement = card;
-                                hoveringPin = true;
-                                break;
-                            }
-                        }
-
-                        goto FinishedHoverChecks;
-                    }
-                }
-            }
-
-            for (Notecard* card : g_cards)
-            {
-                if (card->IsCardHovered(cursor))
-                {
-                    optHoveredElement = card;
-                    hoveringPin = card->IsPinHovered(cursor);
-                    goto FinishedHoverChecks;
-                }
-            }
-        }
-    FinishedHoverChecks:
-
+        // Dragging something
         if (optDraggedElement.has_value())
-        {
-            Element draggedElement = *optDraggedElement;
+            UpdateDragging(cursor, clickOffset, optHoveredElement, optDraggedElement, draggingPin);
 
-            // Always lose target on release
-            if (IsMouseButtonReleased(MOUSE_LEFT_BUTTON))
-            {
-                // Create pin
-                if (draggingPin && // Wants to create thread
-                    optHoveredElement.has_value() && // Hovering something
-                    std::holds_alternative<Notecard*>(*optHoveredElement) && // Hovering a notecard or pin
-                    *optHoveredElement != draggedElement) // Not hovering the same notecard/pin that we originated from
-                {
-                    _ASSERT_EXPR(std::holds_alternative<Notecard*>(draggedElement), L"Can only drag threads from pins.");
-
-                    Notecard* startCard = std::get<Notecard*>(draggedElement);
-                    Notecard* endCard = std::get<Notecard*>(*optHoveredElement);
-
-                    // Don't create duplicate connections
-                    bool shouldCreateThread = true;
-                    {
-                        Notecard* cardWithFewerConnections =
-                            startCard->threads.size() <= endCard->threads.size()
-                            ? startCard
-                            : endCard;
-
-                        for (Thread* thread : cardWithFewerConnections->threads)
-                        {
-                            bool connectionExists =
-                                (thread->start == startCard && thread->end == endCard) ||
-                                (thread->end == startCard && thread->start == endCard);
-
-                            if (connectionExists)
-                            {
-                                shouldCreateThread = false;
-                                break;
-                            }
-                        }
-                    }
-
-                    if (shouldCreateThread)
-                        CreateThread(threadColor, startCard, endCard);
-                }
-
-                // Cleanup
-                optDraggedElement = {};
-                draggingPin = false;
-            }
-            else
-            {
-                // Notecard
-                if (std::holds_alternative<Notecard*>(draggedElement))
-                {
-                    if (!draggingPin)
-                    {
-                        std::get<Notecard*>(draggedElement)->position = cursor + clickOffset;
-                    }
-                }
-                // Thread
-                else // if (std::holds_alternative<Thread*>(draggedElement))
-                {
-                    // Todo
-                }
-            }
-        }
-
+        // Hovering something
         if (optHoveredElement.has_value())
-        {
-            Element hoveredElement = *optHoveredElement;
+            UpdateHovering(cursor, optHoveredElement, optDraggedElement, clickOffset, hoveringPin, draggingPin);
 
-            // Notecard
-            if (std::holds_alternative<Notecard*>(hoveredElement))
+        // Handle clicks
+        // Clicking has no effect when dragging.
+        if (!optDraggedElement.has_value())
+        {
+            // Left click
+            if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
             {
-                if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+                // Left click the board
+                // Creates a notecard
+                if (!optHoveredElement.has_value())
                 {
-                    optDraggedElement = hoveredElement;
-                    if (hoveringPin)
-                    {
-                        draggingPin = true;
-                    }
-                    else
-                    {
-                        Notecard* card = std::get<Notecard*>(hoveredElement);
-                        clickOffset = card->position - cursor;
-                        auto it = std::find(g_cards.begin(), g_cards.end(), card);
-                        g_cards.erase(it);
-                        g_cards.push_front(card);
-                    }
+                    CreateCard(cursor - Notecard::pinOffset, cardColor);
                 }
-            }
-            // Thread
-            else // if (std::holds_alternative<Thread*>(draggedElement))
-            {
-                if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON))
+
+                // Left click a button
+                // Performs the button operation
+                else if (std::holds_alternative<CBButton*>(*optHoveredElement))
                 {
-                    // Todo
+                    std::get<CBButton*>(*optHoveredElement)->OnClick();
                 }
+
+                // Left clicking a thread does nothing.
             }
-        }
 
-        // Left click outside of any elements
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && !optHoveredElement.has_value() && !optDraggedElement.has_value())
-        {
-            CreateCard(Vector2Subtract(cursor, Notecard::pinOffset), cardColor);
-        }
-
-        // Left click a button
-        if (IsMouseButtonPressed(MOUSE_LEFT_BUTTON) && optHoveredElement.has_value() && !optDraggedElement.has_value() && std::holds_alternative<CBButton*>(*optHoveredElement))
-        {
-            CBButton* button = std::get<CBButton*>(*optHoveredElement);
-
-            if (button->isThreadColor)
+            // Right click
+            else if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON))
             {
-                threadColor = button->color;
-            }
-            else
-            {
-                cardColor = button->color;
-            }
-        }
+                if (optHoveredElement.has_value())
+                {
+                    Element hoveredElement = *optHoveredElement;
 
-        // Right click an element
-        if (IsMouseButtonPressed(MOUSE_RIGHT_BUTTON) && optHoveredElement.has_value() && !optDraggedElement.has_value())
-        {
-            Element hoveredElement = *optHoveredElement;
+                    // Right click a notecard
+                    if (std::holds_alternative<Notecard*>(hoveredElement))
+                    {
+                        DestroyCard(std::get<Notecard*>(hoveredElement));
+                        optHoveredElement = {};
+                    }
 
-            if (std::holds_alternative<Notecard*>(hoveredElement))
-            {
-                Notecard* card = std::get<Notecard*>(hoveredElement);
-                DestroyCard(card);
-                optHoveredElement = {};
-            }
-            else if (std::holds_alternative<Thread*>(hoveredElement))
-            {
-                Thread* thread = std::get<Thread*>(hoveredElement);
-                DestroyThread(thread);
-                optHoveredElement = {};
+                    // Right click a thread
+                    else if (std::holds_alternative<Thread*>(hoveredElement))
+                    {
+                        DestroyThread(std::get<Thread*>(hoveredElement));
+                        optHoveredElement = {};
+                    }
+
+                    // Right clicking a button does nothing.
+                }
+
+                // Right clicking has no effect without an element.
             }
         }
 
