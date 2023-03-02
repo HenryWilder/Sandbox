@@ -1,6 +1,6 @@
 #include "Thread.h"
 #include "Notecard.h"
-#include <raymath.h>
+#include "VectorMath.h"
 
 Vector2 Thread::StartPosition() const
 {
@@ -21,7 +21,7 @@ void Thread::Draw() const
 
     // Shadow
     BeginBlendMode(BLEND_MULTIPLIED);
-    DrawLineEx(Vector2Add(startPos, shadowOffset), Vector2Add(endPos, shadowOffset), thickness, {0,0,0,100});
+    DrawLineEx(startPos + shadowOffset, endPos + shadowOffset, thickness, {0,0,0,100});
     EndBlendMode();
 
     DrawLineEx(startPos, endPos, thickness, color);
@@ -32,23 +32,21 @@ bool Thread::IsHovered(Vector2 point) const
     Vector2 startPos = StartPosition();
     Vector2 endPos = EndPosition();
 
-    float lengthSquared = Vector2LengthSqr(Vector2Subtract(endPos, startPos));
-
     // Start and end overlap
-    if (lengthSquared == 0.0f)
+    if (startPos == endPos)
     {
-        bool pointMatches =
-            startPos.x == point.x &&
-            startPos.y == point.y;
+        bool pointMatches = startPos == point; // Point overlaps singularity
 
         return pointMatches;
     }
 
-    Vector2 endRelativeToStart = Vector2Subtract(endPos, startPos);
-    float t = Clamp(Vector2DotProduct(Vector2Subtract(point, startPos), endRelativeToStart) / lengthSquared, 0, 1);
-    Vector2 projection = Vector2Add(startPos, Vector2Scale(endRelativeToStart, t));
+    float lengthSquared = Vector2DistanceSqr(endPos, startPos);
 
-    bool hovering = Vector2Distance(point, projection) <= thickness;
+    Vector2 endRelativeToStart = endPos - startPos;
+    float t = Clamp(Vector2DotProduct(point - startPos, endRelativeToStart) / lengthSquared, 0, 1);
+    Vector2 projection = startPos + endRelativeToStart * t;
+
+    bool hovering = Vector2DistanceSqr(point, projection) <= thickness * thickness;
 
     return hovering;
 }
